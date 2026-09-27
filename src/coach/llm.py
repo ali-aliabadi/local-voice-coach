@@ -6,7 +6,7 @@ from typing import NamedTuple
 
 from openai import AsyncOpenAI
 
-from . import config
+from . import config, settings
 
 TERMINATORS = (".", "!", "?", "…")
 ABBREVIATIONS = re.compile(r"\b(Mr|Mrs|Ms|Dr|St|vs|etc|e\.g|i\.e)\.$")
@@ -32,11 +32,17 @@ def _client(base_url: str, api_key: str) -> AsyncOpenAI:
 
 
 def endpoint_for(backend, model_override: str | None = None) -> Endpoint:
-    """Build the endpoint for a chosen backend. The only way endpoints are made."""
+    """Build the endpoint for a chosen backend. The only way endpoints are made.
+
+    Credentials resolve here rather than in the catalogue, so editing the API key in the
+    settings screen takes effect on the next session with no restart.
+    """
+    if backend.local:
+        base_url, api_key = settings.get("lm_studio_url"), "lm-studio"
+    else:
+        base_url, api_key = config.BASE_URL, settings.api_key()
     return Endpoint(
-        _client(backend.base_url, backend.api_key),
-        model_override or backend.model,
-        backend.extra or {},
+        _client(base_url, api_key), model_override or backend.model, backend.extra or {}
     )
 
 
@@ -65,8 +71,8 @@ async def stream_sentences(ep: Endpoint, messages, max_tokens=None):
     stream = await ep.client.chat.completions.create(
         model=ep.model,
         messages=messages,
-        temperature=config.TEMPERATURE,
-        max_tokens=max_tokens or config.REPLY_MAX_TOKENS,
+        temperature=settings.get("temperature"),
+        max_tokens=max_tokens or settings.get("reply_max_tokens"),
         stream=True,
         **ep.extra,
     )
@@ -96,8 +102,8 @@ async def complete(ep: Endpoint, messages, max_tokens=None) -> Reply:
     reply = await ep.client.chat.completions.create(
         model=ep.model,
         messages=messages,
-        temperature=config.TEMPERATURE,
-        max_tokens=max_tokens or config.REVIEW_MAX_TOKENS,
+        temperature=settings.get("temperature"),
+        max_tokens=max_tokens or settings.get("review_max_tokens"),
         **ep.extra,
     )
     text = (reply.choices[0].message.content or "").strip()
@@ -109,13 +115,16 @@ async def complete(ep: Endpoint, messages, max_tokens=None) -> Reply:
     return Reply(text, (time.perf_counter() - started) * 1000)
 
 
-async def describe_error(ep: Endpoint, exc: Exception) -> None:
-    """A wrong model id is the likeliest first-run failure - name the valid ones."""
-    if "404" not in str(exc) and "not found" not in str(exc).lower():
-        return
-    try:
-        names = [m.id for m in (await ep.client.models.list()).data]
-    except Exception:
-        return
-    print(f"'{ep.model}' isn't a valid model id. Try one of:")
-    print("  " + "\n  ".join(n for n in names if "flash" in n or "pro" in n))
+async def explain(ep: Endpoint, exc: Exception) -> str:
+    """Turn an exception into something the user can act on."""
+    message = str(exc)
+    if "404" in message or "not found" in message.lower():
+        try:
+            names = [m.id for m in (await ep.client.models.list()).data]
+            usable = [n for n in names if "flash" in n or "pro" in n]
+            return f"'{ep.model}' is not a valid model. Try: {', '.join(usable[:6])}"
+        except Exception:
+            pass
+    if "api key" in message.lower() or "401" in message or "403" in message:
+        return "That API key was rejected. Check it in Settings."
+    return message

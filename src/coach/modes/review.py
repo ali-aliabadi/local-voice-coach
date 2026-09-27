@@ -1,18 +1,16 @@
-"""review — one hard question at a time, then a written technical critique.
+"""review - one hard question at a time, then a written technical critique.
 
-Deliberately slow. Latency does not matter here, so this uses the thinking model and
-asks it for the kind of depth a real interviewer would actually probe. The question is
-spoken; the critique is printed, because nobody wants to listen to six paragraphs.
+Deliberately slow. Latency does not matter here, so it uses the deep endpoint and asks for
+the depth a real interviewer would probe. The question is spoken; the critique is written,
+because nobody wants to listen to six paragraphs.
 """
 
-from .. import config, llm, store
-from ..audio import QuitRequested, record_answer
-from ..stt import format_metrics
+from .. import llm, settings, store
 
-HELP = "one hard question, then a written technical critique"
+HELP = "one hard question, then a written critique"
 ENDPOINT = "deep"
 
-ASK_PROMPT = (
+PROMPT = (
     "You are a staff engineer interviewing a candidate for a software engineering role. "
     "Ask ONE substantial technical question, in 1-2 short spoken sentences. "
     "Prefer questions with real depth behind them - system design, trade-offs, failure "
@@ -24,87 +22,88 @@ ASK_PROMPT = (
 CRITIQUE_PROMPT = (
     "You are a staff engineer who just heard a candidate answer an interview question. "
     "Write a direct, specific critique. Be honest - flattery wastes their time.\n\n"
-    "Cover, with a short heading each:\n"
-    "1. Verdict — one line, and a score out of 5.\n"
-    "2. What was actually right, naming the specific claims that held up.\n"
-    "3. What was wrong, missing, or too vague - quote their words where useful.\n"
+    "Use these headings:\n"
+    "1. Verdict - one line, and a score out of 5.\n"
+    "2. What was right - name the specific claims that held up.\n"
+    "3. What was wrong, missing or vague - quote their words where useful.\n"
     "4. What a real interviewer would ask next to probe the weak spot.\n"
-    "5. A stronger version of the answer, in 3-4 sentences they could actually say.\n\n"
-    "Judge the engineering, not the English. Do not correct grammar or vocabulary. "
-    "The delivery numbers are given only so you can comment on pacing and hesitation in "
-    "the verdict line if something stands out; ignore them otherwise."
+    "5. A stronger answer, in 3-4 sentences they could actually say.\n\n"
+    "Judge the engineering, not the English. Never correct grammar or vocabulary. "
+    "The delivery numbers are given only so you can mention pacing or hesitation in the "
+    "verdict line if something stands out; ignore them otherwise."
 )
 
 
-async def run(endpoint, transcriber, speaker) -> list[dict]:
+async def run(endpoint, transcriber, io) -> None:
     history: list[dict] = []
-    scores: list[dict] = []
-
-    print("\n🔬 Review mode: slower, deeper. Replies are printed, not spoken.")
 
     while True:
         # --- ask ---
-        messages = [{"role": "system", "content": ASK_PROMPT}]
-        messages += history[-config.HISTORY_TURNS * 2 :]
-        print("\n🤔 Composing a question...", end="\r", flush=True)
+        messages = [{"role": "system", "content": settings.prompt("review", PROMPT)}]
+        messages += history[-settings.get("history_turns") * 2 :]
+        await io.send(type="thinking", text="Composing a question")
+        asked = llm.Reply("", None)
         try:
-            asked = llm.Reply("", None)
             async for kind, chunk in llm.stream_sentences(endpoint, messages):
                 if kind == "sentence":
-                    print(f"Interviewer: {chunk}")
-                    await speaker.say(chunk)
+                    await io.send(type="sentence", text=chunk)
+                    await io.say(chunk)
                 else:
                     asked = chunk
         except Exception as exc:
-            print(f"\n⚠️  LLM error: {exc}")
-            await llm.describe_error(endpoint, exc)
-            return scores
-        await speaker.drain()
+            await io.send(type="error", text=await llm.explain(endpoint, exc))
+            return
         question = asked.text
         store.record("interviewer", question, reply_ms=asked.ms)
+        await io.send(type="turn_done", latency_ms=asked.ms)
+        await io.drain()
 
         # --- answer ---
-        try:
-            audio = await record_answer("[Any key to answer, 'q' to finish]")
-        except QuitRequested:
-            return scores
+        audio = await io.record()
         if audio is None:
-            print("⚠️  Nothing recorded — hold it a bit longer.")
+            await io.send(type="notice", text="Nothing recorded - hold it a little longer.")
             continue
-
-        print("🛑 Transcribing...")
-        text, metrics, stt_ms = await transcriber.transcribe(audio)
+        text, metrics, words, stt_ms = await transcriber.transcribe(audio)
         if not text:
-            print("⚠️  Didn't catch that. Try speaking closer to the mic.")
+            await io.send(type="notice", text="Didn't catch that. Move closer to the mic.")
             continue
 
-        print(f'\nYou ({stt_ms:.0f}ms): "{text}"')
-        if metrics:
-            scores.append(metrics)
-            print(f"   📊 {format_metrics(metrics)}")
-        store.record("you", text, metrics, stt_ms=stt_ms)
+        turn = io.save_answer(audio, text, metrics, stt_ms)
+        await io.send(type="transcript", text=text, metrics=metrics, words=words, turn=turn)
 
         # --- critique ---
-        delivery = format_metrics(metrics) if metrics else "not measured"
-        print("\n🔬 Reviewing (this one takes a few seconds)...")
+        delivery = ", ".join(f"{k} {v}" for k, v in (metrics or {}).items()) or "not measured"
+        await io.send(type="thinking", text="Reviewing your answer")
         try:
             critique = await llm.complete(
                 endpoint,
                 [
-                    {"role": "system", "content": CRITIQUE_PROMPT},
+                    {
+                        "role": "system",
+                        "content": settings.prompt("review:critique_prompt", CRITIQUE_PROMPT),
+                    },
                     {
                         "role": "user",
-                        "content": f"Question asked:\n{question}\n\n"
-                        f"Candidate's answer:\n{text}\n\n"
+                        "content": f"Question asked:\n{question}\n\nCandidate's answer:\n{text}\n\n"
                         f"Delivery numbers: {delivery}",
                     },
                 ],
             )
         except Exception as exc:
-            print(f"⚠️  LLM error: {exc}")
+            await io.send(type="error", text=await llm.explain(endpoint, exc))
             continue
 
-        print(f"\n{critique.text}\n   ⏱  {critique.ms / 1000:.1f}s\n")
+        if not critique.text:
+            await io.send(
+                type="notice",
+                text=(
+                    "The model returned nothing - a thinking model probably spent the whole "
+                    "budget reasoning. Raise 'Review max tokens' in Settings."
+                ),
+            )
+            continue
+
+        await io.send(type="critique", text=critique.text, latency_ms=critique.ms)
         store.record("review", critique.text, reply_ms=critique.ms)
         history.append({"role": "user", "content": f"Q: {question}\nA: {text}"})
         history.append({"role": "assistant", "content": critique.text[:400]})

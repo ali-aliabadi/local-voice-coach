@@ -1,0 +1,157 @@
+/* Calm and minimal: generous space, one accent, soft type.
+   The user is already nervous. The interface should not add to it. */
+
+:root {
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --ink: #23201c;
+  --muted: #7d766c;
+  --line: #e8e4dd;
+  --accent: #4a7c6f;
+  --accent-soft: #e6f0ec;
+  --warn: #b4532f;
+  --radius: 14px;
+  --space: 1.5rem;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171614;
+    --surface: #1f1e1b;
+    --ink: #eae6df;
+    --muted: #979084;
+    --line: #2e2c28;
+    --accent: #7db5a4;
+    --accent-soft: #23302c;
+    --warn: #e08a63;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.65 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+}
+
+header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1rem clamp(1rem, 5vw, 3rem);
+  border-bottom: 1px solid var(--line);
+}
+nav { display: flex; gap: 1.25rem; }
+
+.view {
+  max-width: 46rem; margin: 0 auto;
+  padding: clamp(2rem, 6vh, 4rem) clamp(1rem, 5vw, 2rem) 5rem;
+}
+
+h1 { font-size: 1.5rem; font-weight: 550; letter-spacing: -0.01em; margin: 0 0 1.75rem; }
+h2 { font-size: 1.05rem; font-weight: 550; margin: 2.5rem 0 1rem; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 3rem 0 2rem; }
+
+button { font: inherit; cursor: pointer; }
+.link {
+  background: none; border: 0; color: var(--muted); padding: 0;
+  text-decoration: none; border-bottom: 1px solid transparent;
+}
+.link:hover { color: var(--ink); border-bottom-color: var(--line); }
+.primary {
+  background: var(--accent); color: #fff; border: 0;
+  border-radius: 9px; padding: 0.6rem 1.4rem;
+}
+.danger {
+  background: none; border: 1px solid var(--line); color: var(--warn);
+  border-radius: 9px; padding: 0.55rem 1.1rem;
+}
+.danger:hover { border-color: var(--warn); }
+
+/* ---- setup ---- */
+.cards { display: grid; gap: 0.75rem; }
+.card {
+  text-align: left; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 1.1rem 1.25rem; width: 100%;
+  transition: border-color .15s, transform .15s;
+}
+.card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.card[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.card b { font-weight: 550; display: block; }
+.card span { color: var(--muted); font-size: 0.9rem; }
+
+.table { display: grid; gap: 0.4rem; }
+.pick {
+  display: grid; gap: 0.15rem 1rem; text-align: left; width: 100%;
+  grid-template-columns: 1fr auto; align-items: baseline;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 11px; padding: 0.8rem 1rem;
+}
+.pick:hover:not([disabled]) { border-color: var(--accent); }
+.pick[disabled] { opacity: 0.45; cursor: not-allowed; }
+.pick b { font-weight: 550; }
+.pick .meta { color: var(--muted); font-size: 0.85rem; grid-column: 1 / -1; }
+.pick .cost { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.tag {
+  font-size: 0.72rem; border: 1px solid var(--line); border-radius: 99px;
+  padding: 0.05rem 0.5rem; color: var(--muted); margin-left: 0.4rem;
+}
+.tag.free { color: var(--accent); border-color: var(--accent); }
+
+/* ---- practice: focus mode ---- */
+.question {
+  font-size: clamp(1.35rem, 3.5vw, 1.9rem); line-height: 1.4; font-weight: 450;
+  letter-spacing: -0.015em; margin: clamp(2rem, 10vh, 5rem) 0; text-wrap: balance;
+}
+.stage { display: grid; justify-items: center; gap: 0.9rem; }
+.mic {
+  width: 78px; height: 78px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface);
+  transition: transform .15s, background .2s, border-color .2s;
+}
+.mic::after {
+  content: ""; display: block; width: 15px; height: 15px; margin: 0 auto;
+  border-radius: 50%; background: var(--accent); transition: all .2s;
+}
+.mic:hover:not(:disabled) { transform: scale(1.04); }
+.mic:disabled { opacity: 0.35; }
+.mic.recording { border-color: var(--warn); background: var(--surface); }
+.mic.recording::after { border-radius: 3px; background: var(--warn); width: 17px; height: 17px; }
+.mic-label { color: var(--muted); font-size: 0.9rem; margin: 0; }
+#level { opacity: 0; transition: opacity .2s; }
+#level.on { opacity: 1; }
+
+/* ---- result ---- */
+#result { margin-top: clamp(2.5rem, 8vh, 4rem); border-top: 1px solid var(--line); padding-top: 1.75rem; }
+.metrics { display: flex; flex-wrap: wrap; gap: 1.75rem; margin-bottom: 1.25rem; }
+.metric b { font-size: 1.35rem; font-weight: 550; font-variant-numeric: tabular-nums; }
+.metric span { display: block; color: var(--muted); font-size: 0.78rem; letter-spacing: 0.02em; }
+.transcript { line-height: 2; margin: 1.25rem 0; }
+.filler {
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  border-radius: 4px; padding: 0.05em 0.3em;
+}
+.row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.hint, .foot { color: var(--muted); font-size: 0.85rem; }
+audio { height: 34px; }
+.critique { white-space: pre-wrap; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+.notice { color: var(--warn); }
+.end { display: block; margin: 4rem auto 0; }
+
+/* ---- settings ---- */
+fieldset { border: 0; padding: 0; margin: 0 0 2.5rem; }
+legend { font-weight: 550; padding: 0; margin-bottom: 0.9rem; }
+label { display: block; margin-bottom: 1.25rem; }
+label > span { display: block; font-size: 0.9rem; margin-bottom: 0.3rem; }
+label small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+input, select, textarea {
+  font: inherit; width: 100%; padding: 0.5rem 0.7rem; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
+}
+input[type="number"] { max-width: 9rem; }
+textarea { min-height: 8.5rem; line-height: 1.6; resize: vertical; }
+.saved { color: var(--accent); font-size: 0.85rem; }
+
+svg { display: block; max-width: 100%; }

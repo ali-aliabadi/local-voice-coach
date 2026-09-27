@@ -1,0 +1,113 @@
+// Microphone in, speaker out. The only two things the browser does that Python cannot.
+
+const SAMPLE_RATE = 16000;   // what Whisper wants, so the browser resamples, not us
+
+export class Mic {
+  constructor() {
+    this.context = null;
+    this.stream = null;
+    this.level = 0;
+  }
+
+  /** Ask once, keep the permission. Throws if the user refuses or there's no mic. */
+  async open() {
+    if (this.context) return;
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+    });
+    this.context = new AudioContext({ sampleRate: SAMPLE_RATE });
+    await this.context.audioWorklet.addModule('/static/recorder.worklet.js');
+  }
+
+  /** Start streaming Float32 chunks to `onChunk`. Also tracks a level for the meter. */
+  async start(onChunk) {
+    await this.open();
+    if (this.context.state === 'suspended') await this.context.resume();
+    this.source = this.context.createMediaStreamSource(this.stream);
+    this.node = new AudioWorkletNode(this.context, 'recorder');
+    this.node.port.onmessage = (event) => {
+      const samples = event.data;
+      let sum = 0;
+      for (let i = 0; i < samples.length; i += 16) sum += samples[i] * samples[i];
+      this.level = Math.sqrt(sum / (samples.length / 16));
+      onChunk(samples.buffer);
+    };
+    this.source.connect(this.node);
+  }
+
+  stop() {
+    this.source?.disconnect();
+    this.node?.disconnect();
+    this.source = this.node = null;
+    this.level = 0;
+  }
+}
+
+export class Playback {
+  /** Plays WAV blobs strictly in order, so sentences never overlap or swap. */
+  constructor() {
+    this.queue = [];
+    this.element = new Audio();
+    this.playing = false;
+    this.waiters = [];
+  }
+
+  push(bytes) {
+    this.queue.push(new Blob([bytes], { type: 'audio/wav' }));
+    if (!this.playing) this.#next();
+  }
+
+  #next() {
+    const blob = this.queue.shift();
+    if (!blob) {
+      this.playing = false;
+      this.waiters.splice(0).forEach((resolve) => resolve());
+      return;
+    }
+    this.playing = true;
+    const url = URL.createObjectURL(blob);
+    this.element.src = url;
+    const advance = () => { URL.revokeObjectURL(url); this.#next(); };
+    this.element.onended = advance;
+    this.element.onerror = advance;
+    this.element.play().catch(advance);
+  }
+
+  /** Resolves once everything queued has finished playing. */
+  idle() {
+    if (!this.playing && this.queue.length === 0) return Promise.resolve();
+    return new Promise((resolve) => this.waiters.push(resolve));
+  }
+
+  stop() {
+    this.queue.length = 0;
+    this.element.pause();
+    this.playing = false;
+    this.waiters.splice(0).forEach((resolve) => resolve());
+  }
+}
+
+/** The little bar under the mic button. Rendered from Mic.level. */
+export function meter(canvas, mic) {
+  const context = canvas.getContext('2d');
+  const bars = 28;
+  const history = new Array(bars).fill(0);
+  let running = true;
+
+  (function frame() {
+    if (!running) return;
+    history.push(Math.min(1, mic.level * 7));
+    history.shift();
+    const style = getComputedStyle(document.body);
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = style.getPropertyValue('--accent').trim() || '#4a7c6f';
+    const width = canvas.width / bars;
+    history.forEach((value, i) => {
+      const height = Math.max(2, value * canvas.height);
+      context.fillRect(i * width, (canvas.height - height) / 2, width - 2, height);
+    });
+    requestAnimationFrame(frame);
+  })();
+
+  return () => { running = false; };
+}

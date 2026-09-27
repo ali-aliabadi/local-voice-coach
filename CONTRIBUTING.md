@@ -19,7 +19,10 @@ src/coach/           the package
 src/coach/modes/     one file per mode, discovered automatically
 tests/               plain asserts, no framework
 scripts/             checks and tooling
+web/                 the browser app: plain ES modules, no build step
 ```
+
+There is no bundler and no `package.json` on purpose. Edit `web/*.js` and reload.
 
 ## The 300-line budget
 
@@ -69,6 +72,12 @@ Copy `src/coach/modes/talk.py` and change the prompt.
 
 One row in `CATALOGUE` in `src/coach/backends.py`. It appears in the picker the moment
 LM Studio serves it. Never branch on a backend key.
+
+## Adding a setting
+
+One row in `SPEC` in `src/coach/settings.py`. The settings screen renders itself from
+that, so there is no frontend change and no hand-written form field. Secrets set
+`secret=True` and are never sent back to the browser.
 
 ## Tests
 

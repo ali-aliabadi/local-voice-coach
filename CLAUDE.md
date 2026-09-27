@@ -14,26 +14,25 @@ an hour a day.
 
 ## Architecture
 
-```
-main.py  --mode {talk,panel,review}
-   │
-   ├── Whisper (local) ──► word timestamps ──► fluency()  wpm · fillers · pauses · lead-in
-   │                                              arithmetic only, no model, no network
-   ├── Gemini / local LLM (cloud or localhost) ──► the interviewer
-   └── Kokoro (local, 54 voices) ──────────────► the voice(s)
-                                │
-                                ▼
-                  english_practice_log.md   per-answer scores + session averages
-```
+The browser is an I/O device. Everything that thinks runs in Python. Full reasoning in
+[DESIGN.md](DESIGN.md) — read it before proposing a structural change.
 
-Only transcript **text** reaches the model. Audio never leaves the machine.
+```
+browser                          server (localhost)
+AudioWorklet ──raw PCM 16kHz───► Whisper ──► fluency()   arithmetic, no model
+                                     │
+                                     ▼   Gemini, or LM Studio
+  audio player ◄────WAV frames──── Kokoro
+  transcript / timeline / charts ◄─ JSON events over one WebSocket
+                                     │
+                                 SQLite + recordings/
+```
 
 ## Commands
 
 ```bash
 uv pip install -e .
-echo 'GEMINI_API_KEY=...' > .env     # gitignored, read by config.load_env()
-python main.py [--mode talk|panel|review] [--backend ...] [--stats]
+python main.py                       # serves http://127.0.0.1:8000
 ./scripts/check.sh                   # ruff + format + line budget + tests
 ```
 
@@ -43,15 +42,17 @@ python main.py [--mode talk|panel|review] [--backend ...] [--stats]
 
 | Path | Holds |
 |---|---|
-| `src/coach/config.py` | every tunable. Contributors look here first. |
-| `src/coach/audio.py` | keypress, recording, the `Speaker` playback worker |
-| `src/coach/stt.py` | `Transcriber` and `fluency()` |
-| `src/coach/llm.py` | `Endpoint`, streaming, sentence chunking, error hints |
-| `src/coach/backends.py` | the backend catalogue, plus internet/LM-Studio probing |
-| `src/coach/picker.py` | the startup tree (mode, then backend) |
-| `src/coach/store.py` | SQLite: sessions, turns, measured latency |
-| `src/coach/session.py` | the end-of-session scoreboard and `--stats` trend |
+| `main.py` | the only root module: argument parsing, starts uvicorn |
+| `src/coach/config.py` | constants that are not user-facing |
+| `src/coach/settings.py` | user-editable settings; SPEC drives the settings UI |
+| `src/coach/stt.py` | Whisper, `fluency()`, `word_rows()` |
+| `src/coach/tts.py` | Kokoro to WAV bytes; touches no audio device |
+| `src/coach/llm.py` | endpoints, streaming, sentence chunking |
+| `src/coach/backends.py` | the model catalogue and reachability probing |
+| `src/coach/store.py` | SQLite: sessions, turns, settings, retention |
+| `src/coach/server/` | Starlette app and the WebSocket session driver |
 | `src/coach/modes/` | one file per mode, discovered automatically |
+| `web/` | plain ES modules, no build step |
 
 ## House rules
 
@@ -90,6 +91,12 @@ fix if exact filler counts ever matter.
 `gemini-3.8-flash` spends `max_tokens` on hidden reasoning and returns fragments like
 `"Length: 1"` unless it is switched off; Flash-Lite **rejects** `reasoning_effort` outright.
 So the flag travels with the model in `config.*_EXTRA`, never set globally.
+
+### numpy scalars must be coerced at the boundary
+faster-whisper returns numpy floats. `sum()` over comparisons of them yields `int64`,
+which is neither JSON serialisable nor accepted by sqlite3 — it broke every turn once.
+`fluency()` and `word_rows()` wrap every value in `int()`/`float()`; there is a regression
+test for it. Any new value derived from Whisper output needs the same treatment.
 
 ### Backends are data, not branches
 `backends.CATALOGUE` is the single list of everything that can play the interviewer. A mode

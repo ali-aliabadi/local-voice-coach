@@ -4,6 +4,7 @@ Two jobs: keep every turn you have ever practised, and remember how slow each ba
 really was, so the picker shows measured latency instead of a guess.
 """
 
+import pathlib
 import sqlite3
 import time
 
@@ -30,7 +31,12 @@ CREATE TABLE IF NOT EXISTS turns (
     longest_pause REAL,
     lead_in       REAL,
     stt_ms        REAL,
-    reply_ms      REAL                    -- first token for streams, whole call otherwise
+    reply_ms      REAL,                   -- first token for streams, whole call otherwise
+    audio_path    TEXT                    -- recording on disk, or NULL once purged
+);
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS turns_session ON turns(session_id);
 """
@@ -76,13 +82,16 @@ def record(
     metrics: dict | None = None,
     stt_ms: float | None = None,
     reply_ms: float | None = None,
-) -> None:
+    audio_path: str | None = None,
+) -> int | None:
+    """Persist one turn. Returns its id, which the browser uses to fetch the recording."""
     if _session is None:
-        return
+        return None
     m = metrics or {}
-    db().execute(
+    cursor = db().execute(
         "INSERT INTO turns (session_id, at, role, text, wpm, fillers, pauses,"
-        " longest_pause, lead_in, stt_ms, reply_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        " longest_pause, lead_in, stt_ms, reply_ms, audio_path)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             _session,
             time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -95,8 +104,45 @@ def record(
             m.get("lead_in"),
             stt_ms,
             reply_ms,
+            audio_path,
         ),
     )
+    db().commit()
+    return cursor.lastrowid
+
+
+def current_session() -> int | None:
+    return _session
+
+
+def audio_path(turn_id: int) -> str | None:
+    row = db().execute("SELECT audio_path FROM turns WHERE id = ?", (turn_id,)).fetchone()
+    return row["audio_path"] if row else None
+
+
+def purge_audio(older_than_days: int) -> int:
+    """Delete recordings past retention. 0 means keep forever. Returns how many went."""
+    if older_than_days <= 0:
+        return 0
+    cutoff = time.time() - older_than_days * 86400
+    gone = 0
+    for row in (
+        db().execute("SELECT id, audio_path FROM turns WHERE audio_path IS NOT NULL").fetchall()
+    ):
+        path = pathlib.Path(row["audio_path"])
+        if not path.exists() or path.stat().st_mtime < cutoff:
+            path.unlink(missing_ok=True)
+            db().execute("UPDATE turns SET audio_path = NULL WHERE id = ?", (row["id"],))
+            gone += 1
+    db().commit()
+    return gone
+
+
+def forget_everything() -> None:
+    """The delete button. The pitch is that this data is yours, so leaving is one click."""
+    for row in db().execute("SELECT audio_path FROM turns WHERE audio_path IS NOT NULL").fetchall():
+        pathlib.Path(row["audio_path"]).unlink(missing_ok=True)
+    db().executescript("DELETE FROM turns; DELETE FROM sessions;")
     db().commit()
 
 

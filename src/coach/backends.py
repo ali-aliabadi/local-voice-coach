@@ -10,9 +10,7 @@ import socket
 from typing import NamedTuple
 from urllib.request import urlopen
 
-from . import config
-
-LM_STUDIO_URL = "http://localhost:1234/v1"
+from . import settings
 
 
 class Backend(NamedTuple):
@@ -26,12 +24,12 @@ class Backend(NamedTuple):
     ram: str
     note: str
     local: bool = True
-    base_url: str = LM_STUDIO_URL
-    api_key: str = "lm-studio"
     extra: dict | None = None  # thinking flags travel with the model, never globally
 
 
-CLOUD = {"local": False, "base_url": config.BASE_URL, "api_key": config.API_KEY}
+# Credentials are not here on purpose: llm.endpoint_for resolves them from settings at
+# use time, so editing the API key in the UI works without a restart.
+CLOUD = {"local": False}
 
 # A data table: column alignment reads better here than one argument per line.
 # fmt: off
@@ -72,7 +70,8 @@ def lm_studio_models(timeout: float = 1.5) -> set[str]:
     try:
         import json
 
-        with urlopen(f"{LM_STUDIO_URL}/models", timeout=timeout) as response:
+        url = settings.get("lm_studio_url")
+        with urlopen(f"{url}/models", timeout=timeout) as response:
             return {m["id"] for m in json.load(response).get("data", [])}
     except Exception:
         return set()
@@ -98,7 +97,7 @@ def survey(role: str) -> tuple[list[tuple[Backend, str | None]], bool]:
                 reason = None
         else:
             reason = None if has_net else "no internet"
-            if reason is None and not config.API_KEY:
-                reason = "no GEMINI_API_KEY"
+            if reason is None and not settings.api_key():
+                reason = "no API key - add one in Settings"
         rows.append((backend, reason))
     return rows, any(reason is None for _, reason in rows)

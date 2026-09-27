@@ -1,26 +1,21 @@
-"""panel — two or more interviewers, each with their own voice.
+"""panel - two or more interviewers, each with their own voice.
 
-Closer to a real onsite: someone warm, someone digging into the technical detail, and
-someone pushing back. Kokoro ships 54 voices, so the panel costs nothing extra to run.
+Closer to a real onsite: someone warm, someone digging into technical detail, and someone
+pushing back. Kokoro ships 54 voices, so a panel costs nothing extra to run.
 """
 
 import re
 
-from .. import config, llm, store
-from ..audio import QuitRequested, record_answer
-from ..stt import format_metrics
+from .. import llm, settings, store
 
-HELP = "several interviewers, one Kokoro voice each"
+HELP = "several interviewers, one voice each"
 ENDPOINT = "fast"
 
 # name -> (kokoro voice, what they care about). Add a row and they join the panel.
 PANEL = {
     "MAYA": ("af_heart", "the hiring manager: warm, asks behavioural and motivation questions"),
     "DEREK": ("bm_george", "a staff engineer: digs into system design and technical trade-offs"),
-    "PRIYA": (
-        "af_nicole",
-        "the bar raiser: politely pushes back, asks about edge cases and failure modes",
-    ),
+    "PRIYA": ("af_nicole", "the bar raiser: pushes back, asks about edge cases and failure modes"),
 }
 DEFAULT_VOICE = next(iter(PANEL.values()))[0]
 NAME_RE = re.compile(r"^\s*([A-Z][A-Z]+)\s*:\s*")
@@ -46,40 +41,31 @@ def split_speaker(text: str) -> tuple[str | None, str]:
     return (name if name in PANEL else None), text[match.end() :].strip()
 
 
-async def run(endpoint, transcriber, speaker) -> list[dict]:
+async def run(endpoint, transcriber, io) -> None:
     history: list[dict] = []
-    scores: list[dict] = []
-
-    print("\n🎤 Panel: " + ", ".join(PANEL))
+    await io.send(
+        type="panel", members=[{"name": name, "role": role} for name, (_, role) in PANEL.items()]
+    )
 
     while True:
-        try:
-            audio = await record_answer()
-        except QuitRequested:
-            return scores
-
+        audio = await io.record()
         if audio is None:
-            print("⚠️  Nothing recorded — hold it a bit longer.")
+            await io.send(type="notice", text="Nothing recorded - hold it a little longer.")
             continue
 
-        print("🛑 Transcribing...")
-        text, metrics, stt_ms = await transcriber.transcribe(audio)
+        text, metrics, words, stt_ms = await transcriber.transcribe(audio)
         if not text:
-            print("⚠️  Didn't catch that. Try speaking closer to the mic.")
+            await io.send(type="notice", text="Didn't catch that. Move closer to the mic.")
             continue
 
-        print(f'\nYou ({stt_ms:.0f}ms): "{text}"')
-        if metrics:
-            scores.append(metrics)
-            print(f"   📊 {format_metrics(metrics)}")
-        store.record("you", text, metrics, stt_ms=stt_ms)
+        turn = io.save_answer(audio, text, metrics, stt_ms)
+        await io.send(type="transcript", text=text, metrics=metrics, words=words, turn=turn)
 
         history.append({"role": "user", "content": text})
-        messages = [{"role": "system", "content": PROMPT}]
-        messages += history[-config.HISTORY_TURNS * 2 :]
+        messages = [{"role": "system", "content": settings.prompt("panel", PROMPT)}]
+        messages += history[-settings.get("history_turns") * 2 :]
 
-        print("🤖 Thinking...", end="\r", flush=True)
-        # The name only appears on the first sentence; the rest of the turn is the same voice.
+        # The name only appears on the first sentence; the rest of the turn is one voice.
         name, voice, reply = None, DEFAULT_VOICE, llm.Reply("", None)
         try:
             async for kind, chunk in llm.stream_sentences(endpoint, messages):
@@ -92,17 +78,15 @@ async def run(endpoint, transcriber, speaker) -> list[dict]:
                         name, voice = found, PANEL[found][0]
                     if not chunk:
                         continue
-                print(f"{name or 'Panel'}: {chunk}")
-                await speaker.say(chunk, voice=voice)
+                await io.send(type="sentence", text=chunk, speaker=name)
+                await io.say(chunk, voice=voice)
         except Exception as exc:
-            print(f"\n⚠️  LLM error: {exc}")
-            await llm.describe_error(endpoint, exc)
+            await io.send(type="error", text=await llm.explain(endpoint, exc))
             history.pop()
             continue
 
         if reply.text:
             history.append({"role": "assistant", "content": reply.text})
             store.record(f"panel:{name or '?'}", reply.text, reply_ms=reply.ms)
-            print(f"   ⏱  first token: {reply.ms:.0f}ms")
-
-        await speaker.drain()
+        await io.send(type="turn_done", latency_ms=reply.ms)
+        await io.drain()

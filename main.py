@@ -1,84 +1,53 @@
-"""Spoken software-engineering interview practice.
+"""Spoken interview practice that measures your hesitation.
 
-Local ears and voice (Whisper + Kokoro); the interviewer runs in the cloud or locally.
-Run it with no arguments and it asks which mode and which backend. Pass --mode/--backend
-(or set MODE=/BACKEND= in .env) to skip the prompts.
+Local, private, free. Whisper and Kokoro run on this machine; only transcript text ever
+reaches a model, and only if you pick a cloud backend.
 
-Modes live in coach/modes/ and register themselves - see that package's docstring.
+    python main.py                 open http://127.0.0.1:8000
+    python main.py --port 9000
+    python main.py --host 0.0.0.0  see the warning below
 """
 
 import argparse
-import asyncio
-import sys
+import threading
+import webbrowser
 
-import sounddevice as sd
-from kokoro_onnx import Kokoro
+import uvicorn
 
-from coach import backends, config, llm, picker, session, store
-from coach.audio import Speaker
-from coach.modes import discover
-from coach.stt import Transcriber
-
-MODES = discover()
+BANNER = """
+  interview practice · local, private
+  ─────────────────────────────────────
+"""
 
 
-async def main(name: str, backend, endpoint) -> None:
-    mode = MODES[name]
-    where = "local" if backend.local else "cloud"
-    store.start(name, backend.key, endpoint.model)
-
-    print("\n⏳ Loading Whisper (STT)...")
-    transcriber = Transcriber()
-    print("⏳ Loading Kokoro (TTS)...")
-    speaker = Speaker(Kokoro(config.TTS_MODEL_PATH, config.TTS_VOICES_PATH))
-    print(f"✅ Ready. {name} · {endpoint.model} ({where})")
-
-    try:
-        await mode.run(endpoint, transcriber, speaker)
-        print("\nSession over. Nice work.")
-    finally:
-        store.finish()
-        session.print_summary(name)
-        await speaker.close()
+def open_when_up(url: str, delay: float = 2.5) -> None:
+    threading.Timer(delay, lambda: webbrowser.open(url)).start()
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
+    parser.add_argument("--port", type=int, default=8000)
     parser.add_argument(
-        "--mode",
-        choices=sorted(MODES),
-        help="  ".join(f"{n}: {m.HELP}" for n, m in sorted(MODES.items())),
+        "--host",
+        default="127.0.0.1",
+        help="Anything but 127.0.0.1 exposes your microphone feed to your network, and "
+        "browsers block getUserMedia on plain http from another host anyway.",
     )
-    parser.add_argument(
-        "--backend",
-        choices=sorted(backends.BY_KEY),
-        help="skip the interviewer prompt and use this backend",
-    )
-    parser.add_argument("--model", help="override the model on the chosen backend")
-    parser.add_argument(
-        "--stats", action="store_true", help="print your progress across past sessions and exit"
-    )
+    parser.add_argument("--no-open", action="store_true", help="don't open a browser")
     args = parser.parse_args()
 
-    if args.stats:
-        session.print_trend()
-        raise SystemExit
+    url = f"http://{args.host}:{args.port}"
+    print(BANNER)
+    if args.host != "127.0.0.1":
+        print("  ! serving beyond localhost. Microphone access needs https from another device.\n")
+    print(f"  {url}\n")
+    if not args.no_open:
+        open_when_up(url)
 
-    # Push-to-talk reads raw keypresses, which needs a real terminal.
-    if not sys.stdin.isatty():
-        raise SystemExit(
-            "Run this from a terminal - push-to-talk needs a tty.\n  ./.venv/bin/python main.py"
-        )
+    uvicorn.run("coach.server.app:app", host=args.host, port=args.port, log_level="warning")
 
-    mode_name = args.mode or config.DEFAULT_MODE or picker.choose_mode(MODES)
-    role = MODES[mode_name].ENDPOINT
-    key = args.backend or config.DEFAULT_BACKEND
-    backend = backends.BY_KEY[key] if key else picker.choose_backend(role, mode_name)
 
-    try:
-        asyncio.run(main(mode_name, backend, llm.endpoint_for(backend, args.model)))
-    except KeyboardInterrupt:
-        sd.stop()
-        print("\nSession ended.")
+if __name__ == "__main__":
+    main()

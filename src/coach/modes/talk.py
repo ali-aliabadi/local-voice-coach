@@ -1,14 +1,12 @@
-"""talk — the default. One interviewer, fast replies, fluency scored per answer.
+"""talk - one interviewer, fast replies, every answer scored.
 
-Optimised for reps: you want the conversation to feel live, so this uses the fast
-model and never blocks on anything it doesn't have to.
+Built for reps: the conversation should feel live, so this uses the fast endpoint and
+never blocks on anything it does not have to.
 """
 
-from .. import config, llm, store
-from ..audio import QuitRequested, record_answer
-from ..stt import format_metrics
+from .. import llm, settings, store
 
-HELP = "fast conversation, fluency scored per answer (default)"
+HELP = "fast conversation, fluency scored per answer"
 ENDPOINT = "fast"
 
 PROMPT = (
@@ -23,54 +21,42 @@ PROMPT = (
 )
 
 
-async def run(endpoint, transcriber, speaker) -> list[dict]:
+async def run(endpoint, transcriber, io) -> None:
     history: list[dict] = []
-    scores: list[dict] = []
 
     while True:
-        try:
-            audio = await record_answer()
-        except QuitRequested:
-            return scores
-
+        audio = await io.record()
         if audio is None:
-            print("⚠️  Nothing recorded — hold it a bit longer.")
+            await io.send(type="notice", text="Nothing recorded - hold it a little longer.")
             continue
 
-        print("🛑 Transcribing...")
-        text, metrics, stt_ms = await transcriber.transcribe(audio)
+        text, metrics, words, stt_ms = await transcriber.transcribe(audio)
         if not text:
-            print("⚠️  Didn't catch that. Try speaking closer to the mic.")
+            await io.send(type="notice", text="Didn't catch that. Move closer to the mic.")
             continue
 
-        print(f'\nYou ({stt_ms:.0f}ms): "{text}"')
-        if metrics:
-            scores.append(metrics)
-            print(f"   📊 {format_metrics(metrics)}")
-        store.record("you", text, metrics, stt_ms=stt_ms)
+        turn = io.save_answer(audio, text, metrics, stt_ms)
+        await io.send(type="transcript", text=text, metrics=metrics, words=words, turn=turn)
 
         history.append({"role": "user", "content": text})
-        messages = [{"role": "system", "content": PROMPT}]
-        messages += history[-config.HISTORY_TURNS * 2 :]
+        messages = [{"role": "system", "content": settings.prompt("talk", PROMPT)}]
+        messages += history[-settings.get("history_turns") * 2 :]
 
-        print("🤖 Thinking...", end="\r", flush=True)
+        reply = llm.Reply("", None)
         try:
-            reply = llm.Reply("", None)
             async for kind, chunk in llm.stream_sentences(endpoint, messages):
                 if kind == "sentence":
-                    print(f"Interviewer: {chunk}")
-                    await speaker.say(chunk)
+                    await io.send(type="sentence", text=chunk)
+                    await io.say(chunk)
                 else:
                     reply = chunk
         except Exception as exc:
-            print(f"\n⚠️  LLM error: {exc}")
-            await llm.describe_error(endpoint, exc)
+            await io.send(type="error", text=await llm.explain(endpoint, exc))
             history.pop()  # don't poison context with an unanswered turn
             continue
 
         if reply.text:
             history.append({"role": "assistant", "content": reply.text})
             store.record("interviewer", reply.text, reply_ms=reply.ms)
-            print(f"   ⏱  first token: {reply.ms:.0f}ms")
-
-        await speaker.drain()  # don't record over the interviewer's own voice
+        await io.send(type="turn_done", latency_ms=reply.ms)
+        await io.drain()
