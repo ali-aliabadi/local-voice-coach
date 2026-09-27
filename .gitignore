@@ -12,3 +12,9 @@ wheels/
 # Model weights (337MB) — download separately
 *.onnx
 voices-*.bin
+
+# Secrets
+.env
+
+# Practice database
+practice.db

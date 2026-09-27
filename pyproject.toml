@@ -1,7 +1,7 @@
 [project]
 name = "local-voice-coach"
 version = "0.1.0"
-description = "Offline English conversation practice: Whisper STT -> local LLM -> Kokoro TTS"
+description = "Spoken software-engineering interview practice with fluency scoring"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,3 +12,38 @@ dependencies = [
     "openai>=2.41.0",
     "sounddevice>=0.5.5",
 ]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["coach", "coach.modes"]
+
+# ---- style: ruff is the standard. `ruff check .` and `ruff format .` ----
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "scripts"]
+# Snippets in the docs are illustrative; don't let the formatter rewrite them.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle - PEP 8
+    "F",         # pyflakes - real errors, unused imports and names
+    "I",         # isort - import order
+    "UP",        # pyupgrade - don't write 3.8 in a 3.12 project
+    "B",         # bugbear - likely bugs
+    "SIM",       # simplify - the ponytail rules a linter can check
+    "C4",        # comprehensions
+    "RET",       # returns
+    "ARG",       # unused arguments
+]
+ignore = [
+    "E501",      # line length is ruff format's job, not a lint error
+    "B008",      # we do call functions in defaults deliberately
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]    # tests import mid-file on purpose, to reset module state
