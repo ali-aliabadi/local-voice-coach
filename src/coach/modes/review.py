@@ -35,7 +35,7 @@ CRITIQUE_PROMPT = (
 
 
 async def run(endpoint, transcriber, io) -> None:
-    history: list[dict] = []
+    history: list[dict] = io.prior_turns()
 
     while True:
         # --- ask ---

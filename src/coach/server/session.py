@@ -29,6 +29,11 @@ class BrowserIO:
         self.websocket = websocket
         self.voice = voice
 
+    def prior_turns(self) -> list[dict]:
+        """What was already said this session. Seed your history with it so that a browser
+        refresh resumes the conversation rather than restarting it."""
+        return store.conversation()
+
     async def record(self) -> np.ndarray | None:
         """Gather raw PCM frames until the client says the answer is finished.
 

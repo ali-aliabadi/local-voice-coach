@@ -155,3 +155,10 @@ textarea { min-height: 8.5rem; line-height: 1.6; resize: vertical; }
 .saved { color: var(--accent); font-size: 0.85rem; }
 
 svg { display: block; max-width: 100%; }
+
+.resume { display: block; margin-bottom: 1.5rem; }
+.status {
+  color: var(--muted); font-size: 0.82rem; margin: 0 0 -1.5rem;
+  letter-spacing: 0.02em; min-height: 1.2em;
+}
+.stage .hint { margin: 0.35rem 0 0; font-size: 0.8rem; }

@@ -12,7 +12,7 @@ from coach import config  # noqa: I001
 config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "test.db")
 
 from coach import backends, settings, store  # noqa: E402
-from coach.llm import ready_to_speak  # noqa: E402
+from coach.llm import conversation, ready_to_speak  # noqa: E402
 from coach.modes.panel import split_speaker  # noqa: E402
 from coach.stt import filler_pattern, fluency, word_rows  # noqa: E402
 
@@ -91,6 +91,29 @@ assert rows[1]["filler"] and not rows[2]["filler"]
 assert rows[1]["pause"] == 1.7  # the gap before this word, since it beats the threshold
 assert rows[2]["pause"] == 0.0  # 0.1s gap is below the threshold, so not flagged
 assert rows[0]["pause"] == 0.0  # nothing precedes the first word
+
+# ---- message ordering ----
+# Local models served by LM Studio render a jinja chat template that rejects anything but
+# strict user/assistant alternation after the system message. It broke the moment the
+# interviewer started speaking first. Gemini never complained, so only a real local call
+# caught it.
+SYS = {"role": "system", "content": "sys"}
+ASSISTANT = {"role": "assistant", "content": "Tell me about yourself."}
+USER = {"role": "user", "content": "I built a payment service."}
+
+
+def alternates(messages):
+    body = [m["role"] for m in messages if m["role"] != "system"]
+    return body[0] == "user" and all(a != b for a, b in zip(body, body[1:], strict=False))
+
+
+assert alternates(conversation([SYS, ASSISTANT, USER]))  # interviewer opened
+assert alternates(conversation([SYS, USER, ASSISTANT, USER]))  # already fine
+assert alternates(conversation([SYS, USER, USER]))  # two of ours in a row
+assert alternates(conversation([SYS, ASSISTANT, USER, ASSISTANT, USER]))  # rebuilt from db
+# the interviewer's opening question is kept, not dropped, so context survives
+assert any(ASSISTANT["content"] in m["content"] for m in conversation([SYS, ASSISTANT, USER]))
+assert len([m for m in conversation([SYS, SYS, USER]) if m["role"] == "system"]) == 1
 
 # ---- panel speaker routing ----
 assert split_speaker("MAYA: Tell me about yourself.") == ("MAYA", "Tell me about yourself.")

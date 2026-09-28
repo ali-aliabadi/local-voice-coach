@@ -68,11 +68,16 @@ python main.py                       # serves http://127.0.0.1:8000
 ## The mode contract
 
 **Adding a mode must never require editing another file.** Modes are discovered with
-`pkgutil` in `src/coach/modes/__init__.py`. A mode declares `HELP`, `ENDPOINT` (`"fast"` or
-`"deep"`), and `async def run(endpoint, transcriber, speaker) -> list[dict]`.
+`pkgutil` in `src/coach/modes/__init__.py`. A mode declares `HELP`, `ENDPOINT` (`"fast"`
+or `"deep"`), and `async def run(endpoint, transcriber, io)`.
 
-Do not reintroduce a branch on mode name in `main.py`. If a mode needs a different
-backend, add an entry to `llm.ENDPOINTS`, not an `if`.
+`io` is the browser: `await io.record()`, `await io.say(text, voice)`,
+`await io.send(**event)`, `io.save_answer(...)`, and `io.prior_turns()` to resume a
+session after a refresh. Modes loop forever and never catch `SessionClosed` — the server
+catches it when the user stops.
+
+Do not reintroduce a branch on mode name. A mode needing a different backend names a role
+in `ENDPOINT`; `backends.CATALOGUE` does the rest.
 
 ## Key decisions
 
@@ -90,7 +95,14 @@ fix if exact filler counts ever matter.
 ### Thinking models and `max_tokens`
 `gemini-3.8-flash` spends `max_tokens` on hidden reasoning and returns fragments like
 `"Length: 1"` unless it is switched off; Flash-Lite **rejects** `reasoning_effort` outright.
-So the flag travels with the model in `config.*_EXTRA`, never set globally.
+So the flag travels with the model in the catalogue's `extra`, never set globally.
+
+### Messages must alternate, for local models
+LM Studio renders a jinja chat template that requires strict user/assistant alternation
+after the system message and raises `"roles must alternate"` otherwise. Gemini tolerates
+anything, so this only shows up on a local backend — it broke as soon as the interviewer
+started speaking first. `llm.conversation()` normalises every outgoing message list at the
+single choke point; do not bypass it by calling `client.chat.completions.create` directly.
 
 ### numpy scalars must be coerced at the boundary
 faster-whisper returns numpy floats. `sum()` over comparisons of them yields `int64`,
@@ -114,12 +126,18 @@ budget, exactly like `gemini-3.8-flash` did at 120. `REVIEW_MAX_TOKENS` is 2500,
 `llm.complete` prints an explanation on an empty reply rather than failing silently.
 
 ### Model choices
-- `FAST_MODEL` pinned to `gemini-3.5-flash-lite` (~1.1s first token, ~$0.42/mo at 1h/day).
-  `gemini-flash-lite-latest` resolves to the same model; pinned wins because an alias can
-  roll to different quota mid-habit.
-- Local backends are reached through LM Studio's OpenAI-compatible server on :1234.
-  `MODE=` and `BACKEND=` in `.env` skip the startup prompts.
-- Client `timeout=20.0`: one test request hung 51s. The SDK retries twice by default.
+- The default fast backend is `gemini-3.5-flash-lite` (~1.1s first token, ~$0.42/mo at
+  1h/day). `gemini-flash-lite-latest` resolves to the same model; the pinned id wins
+  because an alias can roll to different quota mid-habit.
+- Local backends are reached through LM Studio's OpenAI-compatible server, whose URL is a
+  setting. Credentials resolve in `llm.endpoint_for` at use time, never at import, so
+  editing the key in the UI works without a restart.
+- Client `timeout=45.0`: a cold Gemini call measured 16s and one request hung at 51s, so
+  the timeout has to catch the hang without aborting the slow-but-working call. The SDK
+  retries twice by default.
+- `websockets` is a hard dependency. Without it uvicorn refuses the upgrade and the whole
+  app sits on "connecting" — and Starlette's `TestClient` will not catch it, because it
+  fakes the socket in-process. Test the wire with a real client.
 
 ## Conventions
 

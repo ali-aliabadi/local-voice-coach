@@ -33,7 +33,8 @@ TEMPERATURE = 0.7
 REPLY_MAX_TOKENS = 200  # spoken replies measure ~20-40 tokens; headroom for thinking
 REVIEW_MAX_TOKENS = 2500  # written critique; local reasoners spend a lot on thinking
 HISTORY_TURNS = 8  # user+assistant pairs kept in context; drives token cost
-REQUEST_TIMEOUT = 20.0  # one test request hung 51s; SDK retries twice on its own
+REQUEST_TIMEOUT = 45.0  # a cold call measured 16s and one hung at 51s, so this catches hangs
+# without aborting slow-but-working requests; the SDK retries twice on its own
 
 # ---- STT (local) ----
 WHISPER_MODEL = "small.en"  # drop to "base.en" if transcription feels slow

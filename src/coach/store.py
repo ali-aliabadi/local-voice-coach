@@ -66,6 +66,35 @@ def start(mode: str, backend: str, model: str) -> int:
     return _session
 
 
+def resume(session_id: int) -> int | None:
+    """Re-attach to an existing session, so a browser refresh does not orphan it."""
+    global _session
+    row = db().execute("SELECT id FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    _session = row["id"] if row else None
+    return _session
+
+
+def conversation(session_id: int | None = None, limit: int = 16) -> list[dict]:
+    """The turns of a session as chat messages, oldest first.
+
+    Used to rebuild an interviewer's memory after a refresh: the browser reconnects and
+    the conversation carries on instead of starting over.
+    """
+    rows = (
+        db()
+        .execute(
+            "SELECT role, text FROM turns WHERE session_id = ? AND role != 'review'"
+            " ORDER BY id DESC LIMIT ?",
+            (session_id or _session, limit),
+        )
+        .fetchall()
+    )
+    return [
+        {"role": "user" if r["role"] == "you" else "assistant", "content": r["text"]}
+        for r in reversed(rows)
+    ]
+
+
 def finish() -> None:
     if _session is None:
         return

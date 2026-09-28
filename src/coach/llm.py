@@ -31,6 +31,37 @@ def _client(base_url: str, api_key: str) -> AsyncOpenAI:
     return AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=config.REQUEST_TIMEOUT)
 
 
+OPENING_NUDGE = "Begin the interview."
+
+
+def conversation(messages: list[dict]) -> list[dict]:
+    """Make a message list every backend will accept.
+
+    Gemini tolerates any ordering. Local models served through LM Studio render a jinja
+    chat template that requires strict user/assistant alternation after the system
+    message, and raises otherwise - which is what happens once the interviewer speaks
+    first, or once a session is rebuilt from the database after a refresh.
+
+    So: keep one system message, make sure the conversation opens on the candidate's
+    side, and merge any two turns that ended up adjacent with the same role.
+    """
+    system = [m for m in messages if m["role"] == "system"][:1]
+    rest = [dict(m) for m in messages if m["role"] != "system"]
+
+    # The interviewer opening the conversation is normal here, but a chat template cannot
+    # express it. Restore the instruction that produced it rather than dropping context.
+    if rest and rest[0]["role"] != "user":
+        rest.insert(0, {"role": "user", "content": OPENING_NUDGE})
+
+    merged: list[dict] = []
+    for message in rest:
+        if merged and merged[-1]["role"] == message["role"]:
+            merged[-1]["content"] += "\n\n" + message["content"]
+        else:
+            merged.append(message)
+    return system + merged
+
+
 def endpoint_for(backend, model_override: str | None = None) -> Endpoint:
     """Build the endpoint for a chosen backend. The only way endpoints are made.
 
@@ -70,7 +101,7 @@ async def stream_sentences(ep: Endpoint, messages, max_tokens=None):
     first_ms = None
     stream = await ep.client.chat.completions.create(
         model=ep.model,
-        messages=messages,
+        messages=conversation(messages),
         temperature=settings.get("temperature"),
         max_tokens=max_tokens or settings.get("reply_max_tokens"),
         stream=True,
@@ -101,7 +132,7 @@ async def complete(ep: Endpoint, messages, max_tokens=None) -> Reply:
     started = time.perf_counter()
     reply = await ep.client.chat.completions.create(
         model=ep.model,
-        messages=messages,
+        messages=conversation(messages),
         temperature=settings.get("temperature"),
         max_tokens=max_tokens or settings.get("review_max_tokens"),
         **ep.extra,

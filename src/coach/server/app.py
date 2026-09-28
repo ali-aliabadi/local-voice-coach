@@ -113,9 +113,19 @@ async def websocket_session(websocket):
         mode = MODES[opening["mode"]]
         backend = backends.BY_KEY[opening["backend"]]
         endpoint = llm.endpoint_for(backend)
-        store.start(opening["mode"], backend.key, endpoint.model)
+        resumed = opening.get("resume")
+        session = store.resume(int(resumed)) if resumed else None
+        if session is None:
+            session = store.start(opening["mode"], backend.key, endpoint.model)
         io = BrowserIO(websocket, _models["voice"])
-        await io.send(type="ready", mode=opening["mode"], model=endpoint.model, local=backend.local)
+        await io.send(
+            type="ready",
+            mode=opening["mode"],
+            model=endpoint.model,
+            local=backend.local,
+            session=session,
+            answered=len(store.session_scores()),
+        )
         await mode.run(endpoint, _models["stt"], io)
     except SessionClosed:
         pass

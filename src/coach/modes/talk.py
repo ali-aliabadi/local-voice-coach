@@ -21,8 +21,35 @@ PROMPT = (
 )
 
 
+OPENER = "Begin the interview. Greet them briefly and ask your first question."
+
+
 async def run(endpoint, transcriber, io) -> None:
-    history: list[dict] = []
+    # Seeded from the database, so a browser refresh resumes instead of starting over.
+    history: list[dict] = io.prior_turns()
+
+    if not history:
+        # A real interview opens with the interviewer, not with silence.
+        await io.send(type="thinking", text="The interviewer is getting ready")
+        messages = [
+            {"role": "system", "content": settings.prompt("talk", PROMPT)},
+            {"role": "user", "content": OPENER},
+        ]
+        opening = llm.Reply("", None)
+        try:
+            async for kind, chunk in llm.stream_sentences(endpoint, messages):
+                if kind == "sentence":
+                    await io.send(type="sentence", text=chunk)
+                    await io.say(chunk)
+                else:
+                    opening = chunk
+        except Exception as exc:
+            await io.send(type="error", text=await llm.explain(endpoint, exc))
+            return
+        if opening.text:
+            history.append({"role": "assistant", "content": opening.text})
+            store.record("interviewer", opening.text, reply_ms=opening.ms)
+        await io.send(type="turn_done", latency_ms=opening.ms)
 
     while True:
         audio = await io.record()

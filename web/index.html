@@ -19,6 +19,7 @@
 <!-- ─── setup ─────────────────────────────────────────────────────────── -->
 <main id="view-setup" class="view">
   <h1>What are we practising?</h1>
+  <button id="resume" class="primary resume" hidden></button>
   <div id="mode-list" class="cards"></div>
 
   <h2 id="backend-heading" hidden>Who plays the interviewer?</h2>
@@ -31,12 +32,14 @@
 
 <!-- ─── practice ──────────────────────────────────────────────────────── -->
 <main id="view-practice" class="view" hidden>
+  <p class="status" id="status"></p>
   <p class="question" id="question">Connecting&hellip;</p>
 
   <div class="stage">
     <button id="mic" class="mic" disabled aria-label="Start answering"></button>
     <p class="mic-label" id="mic-label">waiting for the interviewer</p>
     <canvas id="level" width="240" height="28" aria-hidden="true"></canvas>
+    <p class="hint">space bar works too &middot; answer as if it were real, out loud</p>
   </div>
 
   <section id="result" hidden>

@@ -41,11 +41,42 @@ def split_speaker(text: str) -> tuple[str | None, str]:
     return (name if name in PANEL else None), text[match.end() :].strip()
 
 
+OPENER = "Begin the interview. One panellist greets them briefly and asks the first question."
+
+
 async def run(endpoint, transcriber, io) -> None:
-    history: list[dict] = []
+    history: list[dict] = io.prior_turns()
     await io.send(
         type="panel", members=[{"name": name, "role": role} for name, (_, role) in PANEL.items()]
     )
+
+    if not history:
+        await io.send(type="thinking", text="The panel is getting ready")
+        messages = [
+            {"role": "system", "content": settings.prompt("panel", PROMPT)},
+            {"role": "user", "content": OPENER},
+        ]
+        name, voice, opening = None, DEFAULT_VOICE, llm.Reply("", None)
+        try:
+            async for kind, chunk in llm.stream_sentences(endpoint, messages):
+                if kind == "done":
+                    opening = chunk
+                    continue
+                if name is None:
+                    found, chunk = split_speaker(chunk)
+                    if found:
+                        name, voice = found, PANEL[found][0]
+                    if not chunk:
+                        continue
+                await io.send(type="sentence", text=chunk, speaker=name)
+                await io.say(chunk, voice=voice)
+        except Exception as exc:
+            await io.send(type="error", text=await llm.explain(endpoint, exc))
+            return
+        if opening.text:
+            history.append({"role": "assistant", "content": opening.text})
+            store.record(f"panel:{name or '?'}", opening.text, reply_ms=opening.ms)
+        await io.send(type="turn_done", latency_ms=opening.ms)
 
     while True:
         audio = await io.record()
