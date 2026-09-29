@@ -52,10 +52,12 @@ make check                           # ruff + format + line budget + tests
 | `src/coach/tts.py` | Kokoro to WAV bytes; touches no audio device |
 | `src/coach/llm.py` | endpoints, streaming, sentence chunking |
 | `src/coach/backends.py` | the model catalogue and reachability probing |
-| `src/coach/store.py` | SQLite: sessions, turns, settings, retention |
-| `src/coach/server/` | Starlette app and the WebSocket session driver |
+| `src/coach/store.py` | SQLite: writing sessions, turns, settings, retention |
+| `src/coach/history.py` | reading it back: one session, all sessions, totals |
+| `src/coach/profile.py` | who the candidate is, and the system prompt built from it |
+| `src/coach/server/` | `app.py` assembly + websocket, `api.py` JSON routes, `models.py` loaded models |
 | `src/coach/modes/` | one file per mode, discovered automatically |
-| `web/` | plain ES modules, no build step |
+| `web/` | plain ES modules, no build step; `views/` is one file per route |
 | `models/` | Kokoro weights, gitignored, fetched by `make models` |
 | `data/` | sessions, metrics, recordings — gitignored, mounted as a volume |
 
@@ -121,6 +123,22 @@ Two traps it has to avoid: the returned buffer must **not** be stripped, or the 
 space disappears and the next token glues onto the last word (`"wordword"`); and the
 length cap is a backstop for output that never punctuates, not a routine cut — a low
 value reintroduces the original bug.
+
+### The profile is what makes it a trainer
+Every mode builds its system message through `profile.system_prompt(mode, PROMPT)`, which
+layers the mode's prompt, the user's override, who they are, and how they have been
+speaking. Never call `settings.prompt` directly from a mode — the interviewer would stop
+knowing the candidate.
+
+`coaching_note` is deliberately defensive: it gives the model recent delivery stats *for
+pacing only* and forbids mentioning them. Being told you say "um" mid-answer is exactly
+what makes someone freeze, and the whole app exists to stop that.
+
+### Schema changes need a migration
+`CREATE TABLE IF NOT EXISTS` will not add a column to a database that already exists, and
+users have real practice history in theirs. Add the column to `SCHEMA` *and* to
+`store.ADDED_COLUMNS`, which applies it on connect. `words` and `word_rows` both arrived
+this way; there is a test that runs against a database built without them.
 
 ### Paths must honour DATA_DIR
 Everything the user accumulates goes under `config.DATA_DIR` (`.` natively, `/data` in the

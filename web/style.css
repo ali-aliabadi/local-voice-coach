@@ -44,10 +44,17 @@ header {
   border-bottom: 1px solid var(--line);
 }
 nav { display: flex; gap: 1.25rem; }
+header a {
+  color: var(--muted); text-decoration: none;
+  border-bottom: 1px solid transparent; padding-bottom: 1px;
+}
+header a:hover { color: var(--ink); }
+header a.on { color: var(--ink); border-bottom-color: var(--accent); }
+.brand { font-weight: 550; }
 
-.view {
-  max-width: 46rem; margin: 0 auto;
-  padding: clamp(2rem, 6vh, 4rem) clamp(1rem, 5vw, 2rem) 5rem;
+#app {
+  display: block; max-width: 46rem; margin: 0 auto;
+  padding: clamp(2rem, 6vh, 4rem) clamp(1rem, 5vw, 2rem) 6rem;
 }
 
 h1 { font-size: 1.5rem; font-weight: 550; letter-spacing: -0.01em; margin: 0 0 1.75rem; }
@@ -79,6 +86,7 @@ button { font: inherit; cursor: pointer; }
 }
 .card:hover { border-color: var(--accent); transform: translateY(-1px); }
 .card[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.card { display: block; text-decoration: none; color: inherit; }
 .card b { font-weight: 550; display: block; }
 .card span { color: var(--muted); font-size: 0.9rem; }
 
@@ -89,6 +97,7 @@ button { font: inherit; cursor: pointer; }
   background: var(--surface); border: 1px solid var(--line);
   border-radius: 11px; padding: 0.8rem 1rem;
 }
+.pick { text-decoration: none; color: inherit; }
 .pick:hover:not([disabled]) { border-color: var(--accent); }
 .pick[disabled] { opacity: 0.45; cursor: not-allowed; }
 .pick b { font-weight: 550; }
@@ -162,3 +171,28 @@ svg { display: block; max-width: 100%; }
   letter-spacing: 0.02em; min-height: 1.2em;
 }
 .stage .hint { margin: 0.35rem 0 0; font-size: 0.8rem; }
+
+/* ---- routed pages ---- */
+.lead { margin: -1rem 0 2rem; max-width: 34rem; }
+.crumbs { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.5rem; }
+.crumbs a { color: var(--muted); }
+.crumbs b { color: var(--ink); font-weight: 500; }
+.callout {
+  background: var(--accent-soft); border-radius: var(--radius);
+  padding: 0.9rem 1.1rem; font-size: 0.9rem; margin: 0 0 1.5rem;
+}
+
+/* ---- a conversation, read back ---- */
+.turn { margin: 0 0 1.75rem; padding: 0 0 1.75rem; border-bottom: 1px solid var(--line); }
+.turn:last-child { border-bottom: 0; }
+.turn.them { color: var(--muted); }
+.turn .who {
+  display: block; font-size: 0.72rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 0.3rem;
+}
+.turn.critique { white-space: pre-wrap; font-size: 0.93rem; }
+.turn audio { margin-top: 0.75rem; }
+.turn .metrics { gap: 1.4rem; margin-bottom: 0.9rem; }
+.turn .metric b { font-size: 1.05rem; }
+
+a { color: var(--accent); }

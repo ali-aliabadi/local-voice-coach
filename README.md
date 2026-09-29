@@ -44,6 +44,17 @@ environment; use `make run` for daily practice.
 The container reaches LM Studio on your machine at `host.docker.internal:1234` — already
 configured, since `localhost` inside a container means the container.
 
+## It knows who you are
+
+Fill in [your profile](http://127.0.0.1:8000/profile) — target role, level, the stack you
+actually use, and what you want to get better at — and the interviewer reads it before
+every session. It pitches difficulty at your level, digs into the projects you named, and
+pushes on the thing you said you freeze on. It never reads any of it back at you.
+
+It also sees how you have been speaking lately, and asks shorter, more concrete questions
+when you have been hesitating. It is told, in the prompt, never to mention your speech:
+being corrected mid-answer is what makes people freeze.
+
 ## Modes
 
 | Mode | What it is |
@@ -65,7 +76,11 @@ Tap the circle to answer, tap again when you're done. Space works too.
 
 After each answer you get the transcript with **every filler highlighted**, a **timeline**
 of your answer with the silences drawn as gaps, and **playback of your own voice**.
-History shows all four metrics trending across sessions.
+
+**Every session is kept and replayable.** End one and you land on its full review: the
+whole conversation, each answer scored, the highlighted transcript and timeline for each,
+and your recordings. `/history` lists them all; `/progress` totals everything you have
+ever done and charts the four numbers over time.
 
 Filler counts are a floor, not a census: Whisper drops some disfluencies even with the
 prompt biasing it toward verbatim. Pauses, wpm and lead-in come from word timestamps and

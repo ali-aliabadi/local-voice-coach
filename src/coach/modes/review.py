@@ -5,7 +5,7 @@ the depth a real interviewer would probe. The question is spoken; the critique i
 because nobody wants to listen to six paragraphs.
 """
 
-from .. import llm, settings, store
+from .. import llm, profile, settings, store
 
 HELP = "one hard question, then a written critique"
 ENDPOINT = "deep"
@@ -39,7 +39,7 @@ async def run(endpoint, transcriber, io) -> None:
 
     while True:
         # --- ask ---
-        messages = [{"role": "system", "content": settings.prompt("review", PROMPT)}]
+        messages = [{"role": "system", "content": profile.system_prompt("review", PROMPT)}]
         messages += history[-settings.get("history_turns") * 2 :]
         await io.send(type="thinking", text="Composing a question")
         asked = llm.Reply("", None)
@@ -68,7 +68,7 @@ async def run(endpoint, transcriber, io) -> None:
             await io.send(type="notice", text="Didn't catch that. Move closer to the mic.")
             continue
 
-        turn = io.save_answer(audio, text, metrics, stt_ms)
+        turn = io.save_answer(audio, text, metrics, stt_ms, words)
         await io.send(type="transcript", text=text, metrics=metrics, words=words, turn=turn)
 
         # --- critique ---
@@ -80,7 +80,9 @@ async def run(endpoint, transcriber, io) -> None:
                 [
                     {
                         "role": "system",
-                        "content": settings.prompt("review:critique_prompt", CRITIQUE_PROMPT),
+                        "content": profile.system_prompt(
+                            "review:critique_prompt", CRITIQUE_PROMPT, pacing=False
+                        ),
                     },
                     {
                         "role": "user",

@@ -4,7 +4,7 @@ Built for reps: the conversation should feel live, so this uses the fast endpoin
 never blocks on anything it does not have to.
 """
 
-from .. import llm, settings, store
+from .. import llm, profile, settings, store
 
 HELP = "fast conversation, fluency scored per answer"
 ENDPOINT = "fast"
@@ -32,7 +32,7 @@ async def run(endpoint, transcriber, io) -> None:
         # A real interview opens with the interviewer, not with silence.
         await io.send(type="thinking", text="The interviewer is getting ready")
         messages = [
-            {"role": "system", "content": settings.prompt("talk", PROMPT)},
+            {"role": "system", "content": profile.system_prompt("talk", PROMPT)},
             {"role": "user", "content": OPENER},
         ]
         opening = llm.Reply("", None)
@@ -62,11 +62,11 @@ async def run(endpoint, transcriber, io) -> None:
             await io.send(type="notice", text="Didn't catch that. Move closer to the mic.")
             continue
 
-        turn = io.save_answer(audio, text, metrics, stt_ms)
+        turn = io.save_answer(audio, text, metrics, stt_ms, words)
         await io.send(type="transcript", text=text, metrics=metrics, words=words, turn=turn)
 
         history.append({"role": "user", "content": text})
-        messages = [{"role": "system", "content": settings.prompt("talk", PROMPT)}]
+        messages = [{"role": "system", "content": profile.system_prompt("talk", PROMPT)}]
         messages += history[-settings.get("history_turns") * 2 :]
 
         reply = llm.Reply("", None)

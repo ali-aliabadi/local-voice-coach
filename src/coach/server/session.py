@@ -77,7 +77,12 @@ class BrowserIO:
         """
 
     def save_answer(
-        self, audio: np.ndarray, text: str, metrics: dict | None, stt_ms: float
+        self,
+        audio: np.ndarray,
+        text: str,
+        metrics: dict | None,
+        stt_ms: float,
+        words: list[dict] | None = None,
     ) -> int | None:
         """Persist the answer and its recording. Returns the turn id for playback."""
         session_id = store.current_session()
@@ -89,4 +94,4 @@ class BrowserIO:
             destination = folder / f"{count:03d}.wav"
             destination.write_bytes(tts.encode_wav(audio, config.SAMPLE_RATE))
             path = str(destination)
-        return store.record("you", text, metrics, stt_ms=stt_ms, audio_path=path)
+        return store.record("you", text, metrics, stt_ms=stt_ms, audio_path=path, word_rows=words)

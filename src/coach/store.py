@@ -4,6 +4,7 @@ Two jobs: keep every turn you have ever practised, and remember how slow each ba
 really was, so the picker shows measured latency instead of a guess.
 """
 
+import json
 import pathlib
 import sqlite3
 import time
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS turns (
     at            TEXT NOT NULL,
     role          TEXT NOT NULL,          -- you | interviewer | review
     text          TEXT NOT NULL,
+    words         INTEGER,
     wpm           INTEGER,
     fillers       INTEGER,
     pauses        INTEGER,
@@ -32,7 +34,9 @@ CREATE TABLE IF NOT EXISTS turns (
     lead_in       REAL,
     stt_ms        REAL,
     reply_ms      REAL,                   -- first token for streams, whole call otherwise
-    audio_path    TEXT                    -- recording on disk, or NULL once purged
+    audio_path    TEXT,                   -- recording on disk, or NULL once purged
+    word_rows     TEXT                    -- per-word timings, so a past answer can still
+                                          -- show its highlighted transcript and timeline
 );
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
@@ -45,6 +49,20 @@ _db: sqlite3.Connection | None = None
 _session: int | None = None  # one session per process, so it lives here not in the contract
 
 
+# Columns added after the first release. CREATE TABLE IF NOT EXISTS will not add them to
+# a database that already exists, so they are applied here instead.
+ADDED_COLUMNS = {"turns": {"words": "INTEGER", "word_rows": "TEXT"}}
+
+
+def _migrate(connection: sqlite3.Connection) -> None:
+    for table, columns in ADDED_COLUMNS.items():
+        present = {r["name"] for r in connection.execute(f"PRAGMA table_info({table})")}
+        for name, kind in columns.items():
+            if name not in present:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+    connection.commit()
+
+
 def db() -> sqlite3.Connection:
     global _db
     if _db is None:
@@ -52,6 +70,7 @@ def db() -> sqlite3.Connection:
         _db.row_factory = sqlite3.Row
         _db.executescript(SCHEMA)
         _db.commit()
+        _migrate(_db)
     return _db
 
 
@@ -112,20 +131,22 @@ def record(
     stt_ms: float | None = None,
     reply_ms: float | None = None,
     audio_path: str | None = None,
+    word_rows: list[dict] | None = None,
 ) -> int | None:
     """Persist one turn. Returns its id, which the browser uses to fetch the recording."""
     if _session is None:
         return None
     m = metrics or {}
     cursor = db().execute(
-        "INSERT INTO turns (session_id, at, role, text, wpm, fillers, pauses,"
-        " longest_pause, lead_in, stt_ms, reply_ms, audio_path)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO turns (session_id, at, role, text, words, wpm, fillers, pauses,"
+        " longest_pause, lead_in, stt_ms, reply_ms, audio_path, word_rows)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             _session,
             time.strftime("%Y-%m-%d %H:%M:%S"),
             role,
             text,
+            m.get("words"),
             m.get("wpm"),
             m.get("fillers"),
             m.get("pauses"),
@@ -134,6 +155,7 @@ def record(
             stt_ms,
             reply_ms,
             audio_path,
+            json.dumps(word_rows) if word_rows else None,
         ),
     )
     db().commit()

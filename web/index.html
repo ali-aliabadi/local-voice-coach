@@ -9,76 +9,16 @@
 <body>
 
 <header>
-  <button class="link" data-go="setup" id="crumb">practice</button>
+  <a class="brand" href="/">practice</a>
   <nav>
-    <button class="link" data-go="history">history</button>
-    <button class="link" data-go="settings">settings</button>
+    <a href="/history">history</a>
+    <a href="/progress">progress</a>
+    <a href="/profile">profile</a>
+    <a href="/settings">settings</a>
   </nav>
 </header>
 
-<!-- ─── setup ─────────────────────────────────────────────────────────── -->
-<main id="view-setup" class="view">
-  <h1>What are we practising?</h1>
-  <button id="resume" class="primary resume" hidden></button>
-  <div id="mode-list" class="cards"></div>
-
-  <h2 id="backend-heading" hidden>Who plays the interviewer?</h2>
-  <div id="backend-list" class="table" hidden></div>
-  <p class="foot" id="backend-foot" hidden>
-    <strong>Latency</strong> is published or estimated. <strong>Yours</strong> is measured
-    from your own past sessions &mdash; trust that one. Greyed rows are unreachable now.
-  </p>
-</main>
-
-<!-- ─── practice ──────────────────────────────────────────────────────── -->
-<main id="view-practice" class="view" hidden>
-  <p class="status" id="status"></p>
-  <p class="question" id="question">Connecting&hellip;</p>
-
-  <div class="stage">
-    <button id="mic" class="mic" disabled aria-label="Start answering"></button>
-    <p class="mic-label" id="mic-label">waiting for the interviewer</p>
-    <canvas id="level" width="240" height="28" aria-hidden="true"></canvas>
-    <p class="hint">space bar works too &middot; answer as if it were real, out loud</p>
-  </div>
-
-  <section id="result" hidden>
-    <div class="metrics" id="metrics"></div>
-    <div id="timeline"></div>
-    <p class="transcript" id="transcript"></p>
-    <div class="row">
-      <audio id="replay" controls preload="none"></audio>
-      <span class="hint">hear your own hesitation &mdash; it teaches faster than the number</span>
-    </div>
-    <article id="critique" class="critique" hidden></article>
-  </section>
-
-  <p class="notice" id="notice" hidden></p>
-  <button class="link end" data-go="setup" id="end">end session</button>
-</main>
-
-<!-- ─── history ───────────────────────────────────────────────────────── -->
-<main id="view-history" class="view" hidden>
-  <h1>Progress</h1>
-  <div id="trend"></div>
-  <p class="foot">Words per minute going up is good. Fillers, pauses and lead-in going
-  down is the whole point.</p>
-</main>
-
-<!-- ─── settings ──────────────────────────────────────────────────────── -->
-<main id="view-settings" class="view" hidden>
-  <h1>Settings</h1>
-  <form id="settings-form"></form>
-  <div class="row">
-    <button id="save" class="primary">Save</button>
-    <span class="saved" id="saved" hidden>saved</span>
-  </div>
-  <hr>
-  <h2>Your data</h2>
-  <p class="foot">Everything is on this machine: <code>practice.db</code> and
-  <code>recordings/</code>. Nothing is uploaded.</p>
-  <button id="forget" class="danger">Delete every session and recording</button>
-</main>
+<main id="app"></main>
 
 <script type="module" src="/static/app.js"></script>
 </body>

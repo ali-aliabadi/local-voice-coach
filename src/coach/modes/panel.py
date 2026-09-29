@@ -6,7 +6,7 @@ pushing back. Kokoro ships 54 voices, so a panel costs nothing extra to run.
 
 import re
 
-from .. import llm, settings, store
+from .. import llm, profile, settings, store
 
 HELP = "several interviewers, one voice each"
 ENDPOINT = "fast"
@@ -53,7 +53,7 @@ async def run(endpoint, transcriber, io) -> None:
     if not history:
         await io.send(type="thinking", text="The panel is getting ready")
         messages = [
-            {"role": "system", "content": settings.prompt("panel", PROMPT)},
+            {"role": "system", "content": profile.system_prompt("panel", PROMPT)},
             {"role": "user", "content": OPENER},
         ]
         name, voice, opening = None, DEFAULT_VOICE, llm.Reply("", None)
@@ -89,11 +89,11 @@ async def run(endpoint, transcriber, io) -> None:
             await io.send(type="notice", text="Didn't catch that. Move closer to the mic.")
             continue
 
-        turn = io.save_answer(audio, text, metrics, stt_ms)
+        turn = io.save_answer(audio, text, metrics, stt_ms, words)
         await io.send(type="transcript", text=text, metrics=metrics, words=words, turn=turn)
 
         history.append({"role": "user", "content": text})
-        messages = [{"role": "system", "content": settings.prompt("panel", PROMPT)}]
+        messages = [{"role": "system", "content": profile.system_prompt("panel", PROMPT)}]
         messages += history[-settings.get("history_turns") * 2 :]
 
         # The name only appears on the first sentence; the rest of the turn is one voice.

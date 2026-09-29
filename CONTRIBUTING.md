@@ -87,6 +87,18 @@ One row in `SPEC` in `src/coach/settings.py`. The settings screen renders itself
 that, so there is no frontend change and no hand-written form field. Secrets set
 `secret=True` and are never sent back to the browser.
 
+## Adding a profile field
+
+One row in `FIELDS` in `src/coach/profile.py`. It appears on the profile page and inside
+every system prompt automatically. `label` is the question the form asks; `term` is how it
+reads to the model.
+
+## Adding a page
+
+A module in `web/views/` exporting `render(root, params, query)`, and one `route()` line in
+`web/app.js`. Add an optional `leave()` if it holds anything that needs tearing down — the
+practice view uses it to close its socket and release the microphone.
+
 ## Tests
 
 Plain `assert` in `tests/test_coach.py`, run with `python tests/test_coach.py`. No
