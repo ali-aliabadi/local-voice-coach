@@ -77,19 +77,53 @@ def endpoint_for(backend, model_override: str | None = None) -> Endpoint:
     )
 
 
-def ready_to_speak(buffer: str) -> bool:
-    """True once the buffer holds something worth sending to the speaker."""
-    # ponytail: naive sentence heuristic; swap in a real segmenter if it mis-splits
-    text = buffer.strip()
-    if len(text) < 3:
-        return False
-    if "\n" in buffer or len(text) >= config.MAX_CHARS_BEFORE_FLUSH:
-        return True
-    if not text.endswith(TERMINATORS):
-        return False
-    if text.endswith(".") and text[-2].isdigit():  # "3.5"
-        return False
-    return not ABBREVIATIONS.search(text)
+# A sentence ends at .!?… when the next thing is whitespace or the end of the buffer.
+# "3.5" never matches, because the dot there is followed by a digit.
+TERMINATOR = re.compile(r"[.!?…]+[\"')\]]*(?=\s|$)")
+ABBREVIATION = re.compile(r"\b(?:Mr|Mrs|Ms|Dr|St|vs|etc|e\.g|i\.e|No|Inc|Ltd|Jr|Sr)\.$")
+
+
+def _boundaries(text: str):
+    """Offsets where a sentence genuinely ends. Abbreviations are not endings."""
+    settled = len(text.rstrip())
+    for match in TERMINATOR.finditer(text):
+        head = text[: match.end()]
+        if ABBREVIATION.search(head):
+            continue
+        # A trailing "3." may still become "3.5" once the next token lands.
+        if match.end() >= settled and len(head) >= 2 and head[-1] == "." and head[-2].isdigit():
+            continue
+        yield match.end()
+
+
+def split_for_speech(buffer: str, flush: bool = False) -> tuple[str, str]:
+    """Split the buffer into (speak now, keep buffering).
+
+    Splits at the LAST complete sentence inside the buffer, rather than only when the
+    buffer happens to end on one. Models stream several words per token, so a boundary
+    usually lands in the middle of a token ("own. Walk me"). A check that only looked at
+    the tail missed it, the buffer kept growing, and the length cap eventually cut a
+    sentence in half - which is why the interviewer stopped mid-sentence.
+
+    The returned buffer is never stripped: the trailing space is what keeps the next
+    token from being glued onto the last word.
+    """
+    if flush:
+        return buffer.strip(), ""
+    if not buffer.strip():
+        return "", buffer
+
+    cuts = list(_boundaries(buffer))
+    if cuts:
+        return buffer[: cuts[-1]].strip(), buffer[cuts[-1] :].lstrip()
+
+    # Nothing has ended yet. Only give up waiting once this has run on far too long, and
+    # then break between words - never inside one.
+    if len(buffer.strip()) >= config.MAX_CHARS_BEFORE_FLUSH:
+        space = buffer.rstrip().rfind(" ")
+        if space > 0:
+            return buffer[:space].strip(), buffer[space:].lstrip()
+    return "", buffer
 
 
 async def stream_sentences(ep: Endpoint, messages, max_tokens=None):
@@ -118,12 +152,12 @@ async def stream_sentences(ep: Endpoint, messages, max_tokens=None):
             first_ms = (time.perf_counter() - started) * 1000
         buffer += token
         full += token
-        if ready_to_speak(buffer):
-            if buffer.strip():
-                yield "sentence", buffer.strip()
-            buffer = ""
-    if buffer.strip():
-        yield "sentence", buffer.strip()
+        speak, buffer = split_for_speech(buffer)
+        if speak:
+            yield "sentence", speak
+    speak, _ = split_for_speech(buffer, flush=True)
+    if speak:
+        yield "sentence", speak
     yield "done", Reply(full.strip(), first_ms)
 
 

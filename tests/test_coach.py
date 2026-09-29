@@ -12,7 +12,7 @@ from coach import config  # noqa: I001
 config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "test.db")
 
 from coach import backends, settings, store  # noqa: E402
-from coach.llm import conversation, ready_to_speak  # noqa: E402
+from coach.llm import conversation, split_for_speech  # noqa: E402
 from coach.modes.panel import split_speaker  # noqa: E402
 from coach.stt import filler_pattern, fluency, word_rows  # noqa: E402
 
@@ -31,14 +31,52 @@ def say(*triples):
 
 
 # ---- sentence chunking ----
-assert ready_to_speak("Hello there.")
-assert ready_to_speak("Really?")
-assert not ready_to_speak("Hel")
-assert not ready_to_speak("Hello there")
-assert not ready_to_speak("It costs 3.5")
-assert not ready_to_speak("Ask Dr.")
-assert ready_to_speak("word " * 40)
-assert ready_to_speak("line one\n")
+# Models stream several words per token, so a sentence boundary usually arrives in the
+# middle of a token. Splitting only when the buffer *ended* on a boundary missed those,
+# and the length cap then cut sentences in half - the interviewer audibly stopped
+# mid-sentence. Feed tokens the way a model really sends them.
+def stream(tokens):
+    buffer, spoken = "", []
+    for token in tokens:
+        buffer += token
+        speak, buffer = split_for_speech(buffer)
+        if speak:
+            spoken.append(speak)
+    tail, _ = split_for_speech(buffer, flush=True)
+    if tail:
+        spoken.append(tail)
+    return spoken
+
+
+spoken = stream(
+    [
+        "That sounds",
+        " like a really",
+        " critical piece of the system to",
+        " own. Walk me",
+        " through how you handled two requests in the same millisecond?",
+    ]
+)
+assert spoken == [
+    "That sounds like a really critical piece of the system to own.",
+    "Walk me through how you handled two requests in the same millisecond?",
+], spoken
+
+# every chunk must end on a real sentence ending, never mid-sentence
+assert all(chunk[-1] in ".!?…" for chunk in spoken), spoken
+
+assert stream(["Hello. How are you? I am fine."]) == ["Hello. How are you? I am fine."]
+assert stream(["It costs 3.5 million", " and Dr. Chen signed", " it off."]) == [
+    "It costs 3.5 million and Dr. Chen signed it off."
+]
+assert stream(["Half a sen"]) == ["Half a sen"]  # flushed at the end of the stream
+assert split_for_speech("Half a sen") == ("", "Half a sen")  # but not before then
+assert split_for_speech("") == ("", "")
+
+# a run-on with no punctuation eventually breaks, but between words, never inside one
+run_on = stream([w + " " for w in ["word"] * 90])
+assert len(run_on) > 1 and all(" " in c for c in run_on[:-1])
+assert not any(c.endswith("wor") or c.startswith("rd") for c in run_on), run_on
 
 # ---- filler matching: a word counts however long it is drawn out ----
 pattern = filler_pattern("um uh er ah hmm mm")

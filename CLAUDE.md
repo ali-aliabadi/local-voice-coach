@@ -104,6 +104,19 @@ anything, so this only shows up on a local backend — it broke as soon as the i
 started speaking first. `llm.conversation()` normalises every outgoing message list at the
 single choke point; do not bypass it by calling `client.chat.completions.create` directly.
 
+### Sentence splitting must search the buffer, not just its tail
+Models stream several words per token, so a sentence boundary usually arrives in the
+middle of a token (`"own. Walk me"`). The old `ready_to_speak` only asked whether the
+buffer *ended* on a terminator, missed those boundaries entirely, and then
+`MAX_CHARS_BEFORE_FLUSH` cut sentences in half — the interviewer audibly stopped
+mid-sentence and it read as bad text-to-speech. `llm.split_for_speech` finds the last
+real boundary inside the buffer instead.
+
+Two traps it has to avoid: the returned buffer must **not** be stripped, or the trailing
+space disappears and the next token glues onto the last word (`"wordword"`); and the
+length cap is a backstop for output that never punctuates, not a routine cut — a low
+value reintroduces the original bug.
+
 ### numpy scalars must be coerced at the boundary
 faster-whisper returns numpy floats. `sum()` over comparisons of them yields `int64`,
 which is neither JSON serialisable nor accepted by sqlite3 — it broke every turn once.
@@ -152,7 +165,7 @@ budget, exactly like `gemini-3.8-flash` did at 120. `REVIEW_MAX_TOKENS` is 2500,
 | Bigger local model for conversation | 18GB M3 Pro: 4B makes errors, 9B too slow. Local models are offered for `review`, and as an offline fallback for `talk`. |
 | Vision-language models (GLM-4.6V Flash) | Nothing in this app looks at images. |
 | Speech-to-speech (Gemini Live) | ~$17/mo and a 15-min session cap = 4+ reconnects in an hour. |
-| Cloud TTS (Seed Audio, Gemini TTS) | $6–67/mo to replace Kokoro, which is free and already good. |
+| Cloud TTS (Seed Audio, Gemini TTS) | $6–67/mo to replace Kokoro. Kokoro sounding bad was a sentence-splitting bug, not the voice; check the chunks before blaming the model. |
 | `interview-coach-llama3-8b` style fine-tunes | Undocumented hobby LoRAs on a 2024 base. Fine-tuning teaches style, not knowledge. |
 | JEV / structured-decision models | Can't hold a conversation; the scoring it would do is arithmetic. |
 | LLM-based fluency scoring | Timestamps are exact and free. |

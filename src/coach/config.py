@@ -54,7 +54,10 @@ TTS_MODEL_PATH = "kokoro-v1.0.onnx"
 TTS_VOICES_PATH = "voices-v1.0.bin"
 TTS_VOICE = "am_puck"  # 54 voices ship in voices-v1.0.bin; see panel.py
 TTS_SPEED = 1.0
-MAX_CHARS_BEFORE_FLUSH = 160  # speak long run-on output without waiting for a full stop
+# Only fires when a sentence never ends. Sentence boundaries are found properly now, so
+# this is a backstop against pathological output - not a routine cut. Low values chop
+# ordinary long sentences in half, which is exactly the bug it used to cause.
+MAX_CHARS_BEFORE_FLUSH = 280
 
 # ---- Fluency scoring ----
 PAUSE_SECONDS = 0.6  # calibration knob: gap a listener notices as hesitation
