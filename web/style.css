@@ -1,39 +1,60 @@
 /* Calm and minimal: generous space, one accent, soft type.
    The user is already nervous. The interface should not add to it. */
 
+/* Sky blue, validated rather than eyeballed: every pair clears the CVD separation and
+   contrast checks in both modes. Accent/warn are blue and orange on purpose - the one
+   pair that stays distinct for every kind of colour blindness. */
 :root {
-  --bg: #fbfaf8;
+  --bg: #f4f9fd;
   --surface: #ffffff;
-  --ink: #23201c;
-  --muted: #7d766c;
-  --line: #e8e4dd;
-  --accent: #4a7c6f;
-  --accent-soft: #e6f0ec;
-  --warn: #b4532f;
-  --good: #3f7a5f;
-  --goal: #e4efe9;          /* the target band behind a trend line */
-  --quiet: #ece8e1;         /* silence before you started */
-  --gap: #f3e1d8;           /* a pause mid-answer */
+  --ink: #16232f;
+  --muted: #5c7285;
+  --line: #dde8f1;
+  --accent: #1c6fbe;
+  --accent-soft: #e4f0fb;
+  --good: #067d5f;
+  --warn: #b5501f;
+  --goal: #dbeaf8;          /* the target band behind a trend line */
+  --quiet: #e8eff5;         /* silence before you started */
+  --gap: #fae7da;           /* a pause mid-answer */
   --radius: 14px;
   --space: 1.5rem;
   color-scheme: light dark;
 }
 
+/* Cool and open rather than near-black: this is read for an hour at a time. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #171614;
-    --surface: #1f1e1b;
-    --ink: #eae6df;
-    --muted: #979084;
-    --line: #2e2c28;
-    --accent: #7db5a4;
-    --accent-soft: #23302c;
-    --warn: #e08a63;
-    --good: #8fc2a8;
-    --goal: #22302b;
-    --quiet: #2a2824;
-    --gap: #3a2c26;
+  :root:not([data-theme="light"]) {
+    --bg: #172029;
+    --surface: #1f2b36;
+    --ink: #e3edf6;
+    --muted: #92a8ba;
+    --line: #2f3e4d;
+    --accent: #4a97d4;
+    --accent-soft: #1c3040;
+    --good: #2d9d82;
+    --warn: #c8794a;
+    --goal: #1d3243;
+    --quiet: #26323e;
+    --gap: #382e26;
   }
+}
+
+/* Same values again for an explicit choice, so the toggle wins over the system in both
+   directions. Plain CSS cannot share them without a preprocessor. */
+:root[data-theme="dark"] {
+  --bg: #172029;
+  --surface: #1f2b36;
+  --ink: #e3edf6;
+  --muted: #92a8ba;
+  --line: #2f3e4d;
+  --accent: #4a97d4;
+  --accent-soft: #1c3040;
+  --good: #2d9d82;
+  --warn: #c8794a;
+  --goal: #1d3243;
+  --quiet: #26323e;
+  --gap: #382e26;
 }
 
 * { box-sizing: border-box; }

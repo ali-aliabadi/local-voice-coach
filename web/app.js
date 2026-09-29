@@ -1,4 +1,5 @@
 import { go, render, route } from "./router.js";
+import { apply } from "./theme.js";
 import * as history_ from "./views/history.js";
 import * as practice from "./views/practice.js";
 import * as profile from "./views/profile.js";
@@ -24,4 +25,5 @@ route("/", {
   },
 });
 
+apply();
 render();

@@ -124,6 +124,18 @@ space disappears and the next token glues onto the last word (`"wordword"`); and
 length cap is a backstop for output that never punctuates, not a routine cut — a low
 value reintroduces the original bug.
 
+### The palette is validated, not eyeballed
+Sky blue accent with an orange warn: blue and orange is the one pair that stays distinct
+under every kind of colour blindness. Both modes were run through the dataviz validator
+(lightness band, chroma floor, CVD separation, contrast) and every check passes; light
+mode colours also clear 4.5:1 on the page background, because the verdict text is small.
+Change a colour and re-run the validator rather than trusting your eye.
+
+Dark mode is a cool blue-grey, deliberately not near-black. The first version was a warm
+near-black and the first thing the user said about it was "very dark". `theme.js` also
+lets them override the system setting; the CSS carries the dark tokens twice, under the
+media query and under `[data-theme="dark"]`, so an explicit choice wins either way.
+
 ### Chart scales are fixed, never fitted to the data
 `chart.js` gives every metric a fixed domain and a goal band. Fitting the axis to
 min-max was the old behaviour and it lied: fillers going 3.0 → 3.1 → 2.9 was stretched to

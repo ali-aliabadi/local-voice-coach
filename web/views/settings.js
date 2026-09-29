@@ -1,4 +1,5 @@
 import { field, get, post, values } from "../form.js";
+import { CHOICES, current, set } from "../theme.js";
 
 const GROUPS = ["Backends", "Scoring", "Model", "Prompts"];
 
@@ -11,6 +12,15 @@ export async function render(root) {
   const items = await get("/api/settings");
   root.innerHTML = `
     <h1>Settings</h1>
+    <fieldset><legend>Appearance</legend>
+      <label for="theme"><span>Theme</span>
+        <select id="theme">
+          ${CHOICES.map((c) => `<option value="${c}"${c === current() ? " selected" : ""}>
+            ${c === "auto" ? "follow my system" : c}</option>`).join("")}
+        </select>
+        <small>Takes effect immediately.</small>
+      </label>
+    </fieldset>
     <form id="settings-form">
       ${GROUPS.map((group) => {
         const rows = items.filter((i) => i.group === group);
@@ -27,6 +37,8 @@ export async function render(root) {
     <h2>Your data</h2>
     <p class="foot">Everything is on this machine. Nothing is uploaded.</p>
     <button id="forget" class="danger">Delete every session and recording</button>`;
+
+  root.querySelector("#theme").addEventListener("change", (event) => set(event.target.value));
 
   root.querySelector("#save").addEventListener("click", async (event) => {
     event.preventDefault();
