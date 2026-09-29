@@ -3,10 +3,18 @@
 ## One command
 
 ```bash
-./scripts/check.sh
+make check
 ```
 
 Runs ruff, the formatter, the line budget and the tests. Green before you push.
+`make` on its own lists every target.
+
+## Running it
+
+`make run` is native and fastest. `make up` runs the same thing in Docker, which is the
+right choice if you want a clean environment or you are not on a Mac. The image carries
+no model weights: Kokoro is mounted from `models/` and Whisper downloads once into a
+named volume.
 
 ## Layout
 

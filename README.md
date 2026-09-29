@@ -19,16 +19,30 @@ speech-to-text is trained to tidy disfluencies away before anything sees them.
 ## Setup
 
 ```bash
-uv pip install -e .
-python main.py
+make install     # Python dependencies
+make run         # fetches the voice weights, then serves http://127.0.0.1:8000
 ```
 
-It opens `http://127.0.0.1:8000`. Add a Gemini key in Settings (free, no card, from
-[aistudio.google.com/apikey](https://aistudio.google.com/apikey)), or skip it entirely and
-use a local model through [LM Studio](https://lmstudio.ai/).
+Or in Docker:
 
-You also need `kokoro-v1.0.onnx` and `voices-v1.0.bin` in the repo root, from
-[kokoro-onnx releases](https://github.com/thewh1teagle/kokoro-onnx/releases).
+```bash
+make up          # build and start
+make logs        # watch it come up
+make down
+```
+
+`make` on its own lists everything.
+
+Add a Gemini key in Settings (free, no card, from
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey)), or skip it and use a
+local model through [LM Studio](https://lmstudio.ai/).
+
+**Native is faster than Docker on a Mac.** Docker runs Linux in a VM there, so Whisper
+gets less CPU and no access to the Neural Engine. Use Docker for a clean or shared
+environment; use `make run` for daily practice.
+
+The container reaches LM Studio on your machine at `host.docker.internal:1234` — already
+configured, since `localhost` inside a container means the container.
 
 ## Modes
 
@@ -93,8 +107,10 @@ if thinking eats it all. Raise "Review max tokens" in Settings if that happens.
 
 ## Your data
 
-`practice.db` and `recordings/` — both on your machine, both gitignored. Recordings
-auto-delete after 7 days (configurable), and Settings has a button that erases everything.
+Sessions, metrics and recordings live in `data/` (or the repo root when running natively
+without `DATA_DIR`). Both are gitignored and neither is ever uploaded. Recordings
+auto-delete after 7 days, Settings has a button that erases everything, and `make reset`
+does the same from the terminal.
 
 ## Contributing
 

@@ -5,13 +5,12 @@ which is the only reason modes needed changing at all.
 """
 
 import json
-import pathlib
 
 import numpy as np
 
 from .. import config, store, tts
 
-RECORDINGS = pathlib.Path("recordings")
+RECORDINGS = config.RECORDINGS
 
 
 class SessionClosed(Exception):

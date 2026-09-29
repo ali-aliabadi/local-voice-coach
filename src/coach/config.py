@@ -1,6 +1,7 @@
 """Every tunable in the project. Contributors: start here."""
 
 import os
+import pathlib
 
 
 def load_env(path: str = ".env") -> None:
@@ -49,9 +50,22 @@ DISFLUENCY_HINT = "Um, uh, hmm, er, mmm, so, well, you know, I mean."
 SAMPLE_RATE = 16000  # Whisper expects 16kHz
 MIN_RECORD_SECONDS = 0.3  # ignore accidental double-taps
 
+
 # ---- TTS (local) ----
-TTS_MODEL_PATH = "kokoro-v1.0.onnx"
-TTS_VOICES_PATH = "voices-v1.0.bin"
+def _weights(name: str, override: str) -> str:
+    """Find a model file. `make models` puts them in models/, but the repo root has
+    always worked too, so both are accepted rather than breaking an existing checkout."""
+    chosen = os.environ.get(override)
+    if chosen:
+        return chosen
+    for candidate in (pathlib.Path("models") / name, pathlib.Path(name)):
+        if candidate.exists():
+            return str(candidate)
+    return str(pathlib.Path("models") / name)  # where we will tell you to put it
+
+
+TTS_MODEL_PATH = _weights("kokoro-v1.0.onnx", "KOKORO_MODEL")
+TTS_VOICES_PATH = _weights("voices-v1.0.bin", "KOKORO_VOICES")
 TTS_VOICE = "am_puck"  # 54 voices ship in voices-v1.0.bin; see panel.py
 TTS_SPEED = 1.0
 # Only fires when a sentence never ends. Sentence boundaries are found properly now, so
@@ -62,4 +76,8 @@ MAX_CHARS_BEFORE_FLUSH = 280
 # ---- Fluency scoring ----
 PAUSE_SECONDS = 0.6  # calibration knob: gap a listener notices as hesitation
 
-DB_PATH = "practice.db"
+# Everything the user accumulates lives here. Set DATA_DIR to keep it outside the working
+# directory - the container mounts a volume at /data so a rebuild does not wipe it.
+DATA_DIR = pathlib.Path(os.environ.get("DATA_DIR", "."))
+DB_PATH = str(DATA_DIR / "practice.db")
+RECORDINGS = DATA_DIR / "recordings"

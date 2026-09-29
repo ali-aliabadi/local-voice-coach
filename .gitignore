@@ -9,14 +9,16 @@ wheels/
 # Virtual environments
 .venv
 
-# Model weights (337MB) — download separately
+# Model weights (~340MB) — `make models` fetches them
+models/
 *.onnx
 voices-*.bin
 
 # Secrets
 .env
 
-# Practice database
+# Practice data: sessions, metrics, recordings
+data/
 practice.db
 
 # Recordings (auto-purged, never uploaded)

@@ -31,12 +31,15 @@ AudioWorklet ──raw PCM 16kHz───► Whisper ──► fluency()   arith
 ## Commands
 
 ```bash
-uv pip install -e .
-python main.py                       # serves http://127.0.0.1:8000
-./scripts/check.sh                   # ruff + format + line budget + tests
+make install                         # dependencies
+make models                          # Kokoro weights into models/ (~340MB, once)
+make run                             # native, serves http://127.0.0.1:8000
+make up / down / logs                # the same thing in Docker
+make check                           # ruff + format + line budget + tests
 ```
 
-`python` may not be on PATH — use `./.venv/bin/python`.
+`make` with no target lists everything. `python` may not be on PATH — use
+`./.venv/bin/python`.
 
 ## Layout
 
@@ -53,6 +56,8 @@ python main.py                       # serves http://127.0.0.1:8000
 | `src/coach/server/` | Starlette app and the WebSocket session driver |
 | `src/coach/modes/` | one file per mode, discovered automatically |
 | `web/` | plain ES modules, no build step |
+| `models/` | Kokoro weights, gitignored, fetched by `make models` |
+| `data/` | sessions, metrics, recordings — gitignored, mounted as a volume |
 
 ## House rules
 
@@ -116,6 +121,12 @@ Two traps it has to avoid: the returned buffer must **not** be stripped, or the 
 space disappears and the next token glues onto the last word (`"wordword"`); and the
 length cap is a backstop for output that never punctuates, not a routine cut — a low
 value reintroduces the original bug.
+
+### Paths must honour DATA_DIR
+Everything the user accumulates goes under `config.DATA_DIR` (`.` natively, `/data` in the
+container). Never hardcode `practice.db` or `recordings/` again, or a rebuild wipes
+someone's history. Model weights resolve through `config._weights`, which accepts
+`models/` or the repo root so an existing checkout keeps working.
 
 ### numpy scalars must be coerced at the boundary
 faster-whisper returns numpy floats. `sum()` over comparisons of them yields `int64`,

@@ -1,0 +1,33 @@
+services:
+  coach:
+    build: .
+    image: local-voice-coach
+    container_name: voice-coach
+    restart: unless-stopped
+
+    # Bound to localhost only. This app records your voice; do not expose it to a
+    # network. Browsers also refuse getUserMedia over plain http from another host.
+    ports:
+      - "127.0.0.1:${PORT:-8000}:8000"
+
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # "localhost" inside a container is the container. This reaches LM Studio on the
+      # machine running Docker.
+      LM_STUDIO_URL: ${LM_STUDIO_URL:-http://host.docker.internal:1234/v1}
+
+    # Docker Desktop provides this name already; the mapping is what makes it work on
+    # plain Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      # Sessions, metrics and recordings. Survives rebuilds; delete it to start over.
+      - ./data:/data
+      # Kokoro weights, read-only. `make models` puts them here.
+      - ./models:/models:ro
+      # Whisper downloads itself on first use; keep it so that only happens once.
+      - whisper-cache:/cache
+
+volumes:
+  whisper-cache:

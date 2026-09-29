@@ -1,0 +1,18 @@
+.venv/
+.git/
+.github/
+__pycache__/
+*.pyc
+.ruff_cache/
+.pytest_cache/
+
+# Mounted as volumes, never baked into the image
+*.onnx
+*.bin
+data/
+recordings/
+practice.db
+.env
+
+*.md
+!README.md
