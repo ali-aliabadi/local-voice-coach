@@ -124,6 +124,22 @@ space disappears and the next token glues onto the last word (`"wordword"`); and
 length cap is a backstop for output that never punctuates, not a routine cut — a low
 value reintroduces the original bug.
 
+### Chart scales are fixed, never fitted to the data
+`chart.js` gives every metric a fixed domain and a goal band. Fitting the axis to
+min-max was the old behaviour and it lied: fillers going 3.0 → 3.1 → 2.9 was stretched to
+full height and read as a dramatic swing. A stable scale means a flat week looks flat.
+The domain only ever grows, to the next round step, when someone goes off the top of it.
+
+### A number without a verdict is not finished
+`verdict()` turns a value into "on target — barely noticeable" or "aiming for 2.0 or
+fewer". Every stat tile carries one. The app measures carefully and then has to say
+whether it was good, or it is just numbers.
+
+### Direction goes in words, not arrows
+`PHRASE` spells out "1.9 fewer fillers". An up arrow beside a falling filler count is
+ambiguous, and colour alone fails for colourblind readers. Use `moved()`, which also
+applies `MOVED` — the threshold below which a change is noise and is not mentioned at all.
+
 ### The profile is what makes it a trainer
 Every mode builds its system message through `profile.system_prompt(mode, PROMPT)`, which
 layers the mode's prompt, the user's override, who they are, and how they have been
@@ -180,6 +196,20 @@ budget, exactly like `gemini-3.8-flash` did at 120. `REVIEW_MAX_TOKENS` is 2500,
 - `websockets` is a hard dependency. Without it uvicorn refuses the upgrade and the whole
   app sits on "connecting" — and Starlette's `TestClient` will not catch it, because it
   fakes the socket in-process. Test the wire with a real client.
+
+## Frontend notes
+
+- `style.css` is page chrome and forms; `data.css` is anything that displays a
+  measurement. Both are linked from `index.html`.
+- **Scope global element selectors.** A bare `header {}` rule styled every `<header>`,
+  including the one inside each chart card — that was a 48px indent and a stray rule on
+  every chart. It is `body > header` now.
+- `tests/test_web.mjs` runs under plain `node` and is wired into `scripts/check.sh`. It
+  exists because a chart bug shipped that every Python test passed: `SERIES.wpm.format`
+  returned a Number and the review page called `.replace` on it.
+- Look at the rendered page before calling a UI change done. Several of the worst
+  problems here — the detached charts, the indent, a stuck spinner — were invisible in
+  the source and obvious in a screenshot.
 
 ## Conventions
 

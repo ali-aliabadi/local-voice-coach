@@ -97,6 +97,14 @@ The three things that justify a browser existing at all:
 
 Parity with a CLI would not have been worth building.
 
+### Charts must not flatter
+
+The first version scaled each trend line from its own minimum to its own maximum. That
+renders a week where nothing changed as a mountain range, and it is the same failure as
+presenting an estimate as a measurement — the app's whole claim is that its numbers are
+real. Scales are fixed now, with the target drawn as a band, so the reader can see both
+where they are and how far that is from where they want to be.
+
 ## Data
 
 | Thing | Where | Why |

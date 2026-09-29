@@ -107,6 +107,19 @@ pytest, no fixtures, no mocks beyond reassigning a module attribute.
 Non-trivial logic gets one test — a branch, a parser, a money or timing path. Trivial
 one-liners do not; YAGNI applies to tests too.
 
+## Charts
+
+Three rules, all learned the hard way:
+
+1. **Fixed scales.** Never fit an axis to min-max — it turns noise into a story. Domains
+   and goal bands live in `SERIES` in `web/chart.js`.
+2. **Every number gets a verdict.** `118 wpm` on its own tells the reader nothing.
+3. **Direction in words.** "1.9 fewer fillers", not "↑ 1.9". Arrows are ambiguous when
+   lower is better, and colour alone excludes colourblind readers.
+
+Add a metric by adding a row to `SERIES`; the charts, tiles and comparison sentences all
+build from it.
+
 ## Honesty rules
 
 Two things this project refuses to fudge, because the whole point is measuring something

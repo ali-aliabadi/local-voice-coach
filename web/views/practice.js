@@ -3,6 +3,7 @@
 // none.
 
 import { Mic, Playback, meter } from "../audio.js";
+import { get } from "../form.js";
 import * as draw from "../render.js";
 import { go } from "../router.js";
 
@@ -18,6 +19,7 @@ let answered = 0;
 let detail = "";
 let parts = [];
 let root = null;
+let lifetime = null;   // your running average, so each answer can be measured against it
 
 const $ = (sel) => root.querySelector(sel);
 
@@ -43,12 +45,12 @@ export async function render(node, _params, query) {
     <p class="status" id="status"></p>
     <p class="question" id="question">Waiting for the interviewer…</p>
     <div class="stage">
-      <button id="mic" class="mic" disabled aria-label="Answer"></button>
+      <button id="mic" class="mic" disabled aria-label="Answer" aria-pressed="false"></button>
       <p class="mic-label" id="mic-label">connecting</p>
       <canvas id="level" width="240" height="28" aria-hidden="true"></canvas>
       <p class="hint">space bar works too · answer out loud, as if it were real</p>
     </div>
-    <section id="result" hidden>
+    <section id="result" aria-live="polite" hidden>
       <div class="metrics" id="metrics"></div>
       <div id="timeline"></div>
       <p class="transcript" id="transcript"></p>
@@ -61,9 +63,16 @@ export async function render(node, _params, query) {
     <p class="notice" id="notice" hidden></p>
     <button class="link end" id="end">end session and review it</button>`;
 
+  playback.onBlocked = () => {
+    $("#notice").hidden = false;
+    $("#notice").textContent =
+      "Your browser blocked audio until you interact with the page. Click anywhere, "
+      + "then the interviewer will be audible from the next question.";
+  };
   $("#mic").addEventListener("click", toggle);
   $("#end").addEventListener("click", finish);
   connect(mode, backend, query.get("mode") ? null : saved?.session);
+  get("/api/progress").then(({ totals }) => { lifetime = totals.answers ? totals : null; });
 }
 
 export async function leave() {
@@ -137,7 +146,7 @@ function reset() {
 
 function showAnswer(event) {
   $("#result").hidden = false;
-  if (event.metrics) draw.metrics($("#metrics"), event.metrics);
+  if (event.metrics) draw.metrics($("#metrics"), event.metrics, lifetime);
   draw.timeline($("#timeline"), event.words);
   draw.transcript($("#transcript"), event.words, event.text);
   $("#replay").src = event.turn ? `/api/audio/${event.turn}` : "";
@@ -161,6 +170,7 @@ async function toggle() {
     }
     recording = true;
     reset();
+    $("#mic").setAttribute("aria-pressed", "true");
     $("#mic").classList.add("recording");
     $("#level").classList.add("on");
     stopMeter = meter($("#level"), mic);
@@ -169,6 +179,7 @@ async function toggle() {
     recording = false;
     mic.stop();
     stopMeter?.();
+    $("#mic").setAttribute("aria-pressed", "false");
     $("#mic").classList.remove("recording");
     $("#level").classList.remove("on");
     socket?.send(JSON.stringify({ type: "end_answer" }));

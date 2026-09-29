@@ -1,17 +1,19 @@
-// Everything, across every session. The point of the whole exercise is watching these
-// four numbers move.
+// Everything, across every session. Watching these four numbers move is the point.
 
+import * as chart from "../chart.js";
 import { get } from "../form.js";
-import * as render_ from "../render.js";
+import { metrics } from "../render.js";
 
-const CARDS = [
+const COUNTS = [
   ["sessions", "sessions"],
   ["answers", "answers given"],
   ["words", "words spoken"],
 ];
 
 export async function render(root) {
+  root.innerHTML = `<h1>Progress</h1><p class="foot loading">Reading your sessions…</p>`;
   const { totals, trend } = await get("/api/progress");
+
   if (!totals.answers) {
     root.innerHTML = `<h1>Progress</h1>
       <p class="foot">Nothing yet. <a href="/modes">Practise once</a> and this fills in.</p>`;
@@ -20,22 +22,17 @@ export async function render(root) {
 
   root.innerHTML = `
     <h1>Progress</h1>
-    <div class="metrics">
-      ${CARDS.map(([key, label]) =>
-        `<div class="metric"><b>${Math.round(totals[key] || 0).toLocaleString()}</b>
+    <div class="counts">
+      ${COUNTS.map(([key, label]) =>
+        `<div class="count"><b>${Math.round(totals[key] || 0).toLocaleString()}</b>
          <span>${label}</span></div>`).join("")}
     </div>
-    <h2>Across every session</h2>
-    <div class="metrics">
-      <div class="metric"><b>${Math.round(totals.wpm)}</b><span>words / min</span></div>
-      <div class="metric"><b>${totals.fillers.toFixed(1)}</b><span>fillers per answer</span></div>
-      <div class="metric"><b>${totals.pauses.toFixed(1)}</b><span>pauses per answer</span></div>
-      <div class="metric"><b>${totals.lead_in.toFixed(1)}s</b><span>before speaking</span></div>
-    </div>
-    <h2>Over time</h2>
-    <div id="trend"></div>
-    <p class="foot">Words per minute going up is good. Fillers, pauses and the silence
-    before you start going down is the whole point.</p>`;
+    <h2>Where you are now</h2>
+    <p class="foot lead">Averaged across every answer you have ever given.</p>
+    <div class="metrics" id="lifetime"></div>
+    <h2>How it has moved</h2>
+    <div id="trend"></div>`;
 
-  render_.trend(root.querySelector("#trend"), trend);
+  metrics(root.querySelector("#lifetime"), totals);
+  chart.trend(root.querySelector("#trend"), trend);
 }

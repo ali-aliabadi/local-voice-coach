@@ -50,6 +50,11 @@ export class Playback {
     this.element = new Audio();
     this.playing = false;
     this.waiters = [];
+    // Browsers block audio until the page has been interacted with. On a reload straight
+    // back into a session there has been no click, so the interviewer would speak into
+    // the void. Tell someone instead of swallowing it.
+    this.onBlocked = null;
+    this.blocked = false;
   }
 
   push(bytes) {
@@ -70,7 +75,13 @@ export class Playback {
     const advance = () => { URL.revokeObjectURL(url); this.#next(); };
     this.element.onended = advance;
     this.element.onerror = advance;
-    this.element.play().catch(advance);
+    this.element.play().then(() => { this.blocked = false; }).catch((error) => {
+      if (error?.name === "NotAllowedError" && !this.blocked) {
+        this.blocked = true;
+        this.onBlocked?.();
+      }
+      advance();
+    });
   }
 
   /** Resolves once everything queued has finished playing. */

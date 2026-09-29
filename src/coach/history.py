@@ -58,7 +58,31 @@ def detail(session_id: int) -> dict | None:
         "turns": [_turn(t) for t in turns],
         "answers": len(answers),
         "averages": _average(answers),
+        # What to measure this session against: the one before it, and your own running
+        # average. A number with nothing to compare it to says nothing.
+        "previous": previous(session_id),
+        "lifetime": {k: v for k, v in totals().items() if k in _KEYS},
     }
+
+
+_KEYS = ("wpm", "fillers", "pauses", "lead_in")
+
+
+def previous(before: int) -> dict:
+    """Averages of the session before this one, so a review can say what changed."""
+    row = (
+        store.db()
+        .execute(
+            "SELECT AVG(t.wpm) AS wpm, AVG(t.fillers) AS fillers, AVG(t.pauses) AS pauses,"
+            "  AVG(t.lead_in) AS lead_in FROM turns t WHERE t.role = 'you' AND t.wpm IS NOT NULL"
+            "  AND t.session_id = (SELECT MAX(s.id) FROM sessions s JOIN turns x"
+            "    ON x.session_id = s.id AND x.role = 'you' AND x.wpm IS NOT NULL"
+            "    WHERE s.id < ?)",
+            (before,),
+        )
+        .fetchone()
+    )
+    return dict(row) if row and row["wpm"] is not None else {}
 
 
 def totals() -> dict:

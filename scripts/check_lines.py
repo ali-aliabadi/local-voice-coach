@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Fail if a source file outgrows its line budget.
 
-Every line in this repo is context an agent has to read before it can help. A file that
+Covers the frontend too: a 900-line stylesheet costs a reader as much as a 900-line
+module. Every line in this repo is context an agent has to read before it can help. A file that
 stays under the budget stays cheap to reason about and cheap to change. When one crosses
 the line, split it along a real seam - a mode, a concern - rather than cutting it in half.
 
@@ -16,7 +17,8 @@ LIMIT = 300  # hard cap: over this, the build fails
 WARN = 240  # 80% of the cap: time to think about the seam
 
 ROOT = Path(__file__).resolve().parent.parent
-SEARCH = ["main.py", "src", "tests", "scripts"]
+SEARCH = ["main.py", "src", "tests", "scripts", "web"]
+SUFFIXES = (".py", ".js", ".mjs", ".css")
 SKIP = {".venv", "__pycache__", ".git", "build", "dist"}
 
 
@@ -29,8 +31,8 @@ def sources() -> list[Path]:
         elif target.is_dir():
             found += [
                 path
-                for path in target.rglob("*.py")
-                if not SKIP & set(path.relative_to(ROOT).parts)
+                for path in target.rglob("*")
+                if path.suffix in SUFFIXES and not SKIP & set(path.relative_to(ROOT).parts)
             ]
     return sorted(found)
 

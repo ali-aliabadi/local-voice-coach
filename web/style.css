@@ -10,6 +10,10 @@
   --accent: #4a7c6f;
   --accent-soft: #e6f0ec;
   --warn: #b4532f;
+  --good: #3f7a5f;
+  --goal: #e4efe9;          /* the target band behind a trend line */
+  --quiet: #ece8e1;         /* silence before you started */
+  --gap: #f3e1d8;           /* a pause mid-answer */
   --radius: 14px;
   --space: 1.5rem;
   color-scheme: light dark;
@@ -25,6 +29,10 @@
     --accent: #7db5a4;
     --accent-soft: #23302c;
     --warn: #e08a63;
+    --good: #8fc2a8;
+    --goal: #22302b;
+    --quiet: #2a2824;
+    --gap: #3a2c26;
   }
 }
 
@@ -38,18 +46,18 @@ body {
   padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
 }
 
-header {
+body > header {
   display: flex; justify-content: space-between; align-items: center;
   padding: 1rem clamp(1rem, 5vw, 3rem);
   border-bottom: 1px solid var(--line);
 }
 nav { display: flex; gap: 1.25rem; }
-header a {
+body > header a {
   color: var(--muted); text-decoration: none;
   border-bottom: 1px solid transparent; padding-bottom: 1px;
 }
-header a:hover { color: var(--ink); }
-header a.on { color: var(--ink); border-bottom-color: var(--accent); }
+body > header a:hover { color: var(--ink); }
+body > header a.on { color: var(--ink); border-bottom-color: var(--accent); }
 .brand { font-weight: 550; }
 
 #app {
@@ -134,9 +142,9 @@ button { font: inherit; cursor: pointer; }
 
 /* ---- result ---- */
 #result { margin-top: clamp(2.5rem, 8vh, 4rem); border-top: 1px solid var(--line); padding-top: 1.75rem; }
-.metrics { display: flex; flex-wrap: wrap; gap: 1.75rem; margin-bottom: 1.25rem; }
-.metric b { font-size: 1.35rem; font-weight: 550; font-variant-numeric: tabular-nums; }
-.metric span { display: block; color: var(--muted); font-size: 0.78rem; letter-spacing: 0.02em; }
+.counts { display: flex; flex-wrap: wrap; gap: 2.5rem; margin-bottom: 2.5rem; }
+.count b { font-size: 2rem; font-weight: 550; display: block; line-height: 1.1; }
+.count span { color: var(--muted); font-size: 0.8rem; }
 .transcript { line-height: 2; margin: 1.25rem 0; }
 .filler {
   background: color-mix(in srgb, var(--warn) 16%, transparent);
@@ -185,7 +193,8 @@ svg { display: block; max-width: 100%; }
 /* ---- a conversation, read back ---- */
 .turn { margin: 0 0 1.75rem; padding: 0 0 1.75rem; border-bottom: 1px solid var(--line); }
 .turn:last-child { border-bottom: 0; }
-.turn.them { color: var(--muted); }
+.turn.them { color: var(--ink); opacity: 0.86; }
+.turn .who.mine { color: var(--muted); }
 .turn .who {
   display: block; font-size: 0.72rem; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--accent); margin-bottom: 0.3rem;

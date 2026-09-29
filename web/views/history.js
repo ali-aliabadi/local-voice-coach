@@ -1,5 +1,6 @@
 // Every session you have done, and any one of them replayed in full.
 
+import { moved } from "../chart.js";
 import { escape, get } from "../form.js";
 import * as draw from "../render.js";
 
@@ -7,6 +8,7 @@ const when = (stamp) => (stamp || "").slice(0, 16).replace("T", " ");
 
 export const list = {
   async render(root) {
+    root.innerHTML = `<h1>History</h1><p class="foot loading">Loading…</p>`;
     const sessions = await get("/api/sessions");
     if (!sessions.length) {
       root.innerHTML = `<h1>History</h1>
@@ -31,55 +33,70 @@ export const list = {
   },
 };
 
-function answerBlock(turn) {
+/** The sentence a trainer opens with. Only mentions what actually moved. */
+function changed(now, before) {
+  if (!before || !Object.keys(before).length) return "";
+  const shifts = Object.keys(now).map((key) => moved(key, now[key], before[key])).filter(Boolean);
+  if (!shifts.length) return `<p class="callout">About the same as your last session.</p>`;
+
+  const good = shifts.filter((s) => s.better).map((s) => s.text);
+  const bad = shifts.filter((s) => !s.better).map((s) => s.text);
+  const parts = [];
+  if (good.length) parts.push(`<b>${good.join(", ")}</b> than last time`);
+  if (bad.length) parts.push(`${good.length ? "but " : ""}${bad.join(", ")}`);
+  return `<p class="callout">${parts.join(" — ")}</p>`;
+}
+
+function answerBlock(turn, index) {
   return `
     <article class="turn you">
+      <span class="who mine">Your answer ${index}</span>
       <div class="metrics" data-metrics="${turn.id}"></div>
       <div data-timeline="${turn.id}"></div>
       <p class="transcript" data-transcript="${turn.id}"></p>
       ${turn.has_audio
-        ? `<audio controls preload="none" src="/api/audio/${turn.id}"></audio>`
-        : `<p class="foot">Recording has expired — they are deleted after the retention
-           window in settings.</p>`}
+        ? `<audio controls preload="none" src="/api/audio/${turn.id}"></audio>` : ""}
     </article>`;
 }
 
 export const detail = {
   async render(root, params) {
+    root.innerHTML = `<p class="foot loading">Loading…</p>`;
     const session = await get(`/api/sessions/${params.id}`);
     if (session.error) {
       root.innerHTML = `<h1>Not found</h1><p class="foot">
         <a href="/history">Back to history</a></p>`;
       return;
     }
-    const avg = session.averages;
+    const answers = session.turns.filter((t) => t.role === "you");
+    const expired = answers.length && answers.every((t) => !t.has_audio);
 
     root.innerHTML = `
       <p class="crumbs"><a href="/history">history</a> › <b>${escape(session.mode)}</b></p>
       <h1>${when(session.started_at)}</h1>
       <p class="foot">${session.answers} answers · ${escape(session.model)}</p>
-      ${session.answers ? `<div class="metrics">
-        <div class="metric"><b>${Math.round(avg.wpm)}</b><span>words / min</span></div>
-        <div class="metric"><b>${avg.fillers.toFixed(1)}</b><span>fillers per answer</span></div>
-        <div class="metric"><b>${avg.pauses.toFixed(1)}</b><span>pauses per answer</span></div>
-        <div class="metric"><b>${avg.lead_in.toFixed(1)}s</b><span>before speaking</span></div>
-      </div>` : ""}
+      ${changed(session.averages, session.previous)}
+      ${session.answers ? '<div class="metrics" id="session-average"></div>' : ""}
       <h2>The conversation</h2>
-      ${session.turns.map((turn) => {
-        if (turn.role === "you") return answerBlock(turn);
+      ${expired ? `<p class="foot">Recordings from this session have expired — they are
+        deleted after the retention window in <a href="/settings">settings</a>.</p>` : ""}
+      ${(() => { let n = 0; return session.turns.map((turn) => {
+        if (turn.role === "you") return answerBlock(turn, ++n);
         if (turn.role === "review") {
           return `<article class="turn critique">${escape(turn.text)}</article>`;
         }
         const who = turn.role.startsWith("panel:") ? turn.role.slice(6) : "Interviewer";
         return `<article class="turn them"><span class="who">${escape(who)}</span>
           ${escape(turn.text)}</article>`;
-      }).join("")}`;
+      }).join(""); })()}`;
 
+    if (session.answers) {
+      draw.metrics(root.querySelector("#session-average"), session.averages, session.lifetime);
+    }
     // The per-word data was stored with the answer, so a session from weeks ago still
     // shows its highlighted fillers and its pauses, not just the totals.
-    for (const turn of session.turns.filter((t) => t.role === "you")) {
-      const metrics = root.querySelector(`[data-metrics="${turn.id}"]`);
-      if (turn.wpm !== null) draw.metrics(metrics, turn);
+    for (const turn of answers) {
+      if (turn.wpm !== null) draw.metrics(root.querySelector(`[data-metrics="${turn.id}"]`), turn);
       draw.timeline(root.querySelector(`[data-timeline="${turn.id}"]`), turn.word_rows);
       draw.transcript(
         root.querySelector(`[data-transcript="${turn.id}"]`), turn.word_rows, turn.text);
