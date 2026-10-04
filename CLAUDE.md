@@ -50,7 +50,8 @@ make check                           # ruff + format + line budget + tests
 | `src/coach/settings.py` | user-editable settings; SPEC drives the settings UI |
 | `src/coach/stt.py` | Whisper, `fluency()`, `word_rows()` |
 | `src/coach/tts.py` | Kokoro to WAV bytes; touches no audio device |
-| `src/coach/llm.py` | endpoints, streaming, sentence chunking |
+| `src/coach/llm.py` | endpoints, streaming, retries |
+| `src/coach/chunks.py` | where to cut a streaming reply so it can be spoken |
 | `src/coach/backends.py` | the model catalogue and reachability probing |
 | `src/coach/store.py` | SQLite: writing sessions, turns, settings, retention |
 | `src/coach/history.py` | reading it back: one session, all sessions, totals |
@@ -120,7 +121,7 @@ Models stream several words per token, so a sentence boundary usually arrives in
 middle of a token (`"own. Walk me"`). The old `ready_to_speak` only asked whether the
 buffer *ended* on a terminator, missed those boundaries entirely, and then
 `MAX_CHARS_BEFORE_FLUSH` cut sentences in half — the interviewer audibly stopped
-mid-sentence and it read as bad text-to-speech. `llm.split_for_speech` finds the last
+mid-sentence and it read as bad text-to-speech. `chunks.split_for_speech` finds the last
 real boundary inside the buffer instead.
 
 Two traps it has to avoid: the returned buffer must **not** be stripped, or the trailing

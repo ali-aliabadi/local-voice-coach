@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 import numpy as np
 
-from .. import coach, config, history, llm, settings, store, stt, tts
+from .. import chunks, coach, config, history, llm, settings, store, stt, tts
 
 RECORDINGS = config.RECORDINGS
 
@@ -144,7 +144,7 @@ class BrowserIO:
                     done = chunk
                     continue
                 if cast and name is None:
-                    name, chunk = llm.split_speaker(chunk, cast)
+                    name, chunk = chunks.split_speaker(chunk, cast)
                     voice = cast.get(name)
                     if not chunk:
                         continue
@@ -157,7 +157,7 @@ class BrowserIO:
             self.last_turn = self.save_turn(
                 f"{role}:{name or '?'}" if cast else role, done.text, done.ms
             )
-            spoken = llm.split_speaker(done.text, cast)[1] if cast else done.text
+            spoken = chunks.split_speaker(done.text, cast)[1] if cast else done.text
             self.last_reply = (spoken, voice)
         await self.send(type="turn_done", latency_ms=done.ms)
         return done

@@ -19,7 +19,8 @@ from coach import (  # noqa: E402
     settings,
     store,
 )
-from coach.llm import conversation, split_for_speech, split_speaker  # noqa: E402
+from coach.chunks import split_for_speech, split_speaker  # noqa: E402
+from coach.llm import conversation  # noqa: E402
 from coach.modes.panel import PANEL  # noqa: E402
 from coach.stt import filler_pattern, fluency, word_rows  # noqa: E402
 
@@ -168,6 +169,16 @@ class Rejected(Exception):
 
 said = asyncio.run(llm.explain(llm.Endpoint(None, "m", {}), Rejected("Error code: 400 - {...}")))
 assert said == "m: No models loaded.", said
+
+# ---- the first words of a reply may end at a clause: they are the wait you feel ----
+assert split_for_speech("Oh, nice one, getting home", eager=True) == (
+    "Oh, nice one,",
+    "getting home",
+)
+assert split_for_speech("Oh, ", eager=True) == ("", "Oh, ")  # too short to sound natural
+assert split_for_speech("About 1,000 people came", eager=True)[0] == ""  # not a clause
+assert split_for_speech("Oh, nice one, getting home") == ("", "Oh, nice one, getting home")
+assert split_for_speech("Done. And then, more", eager=True) == ("Done.", "And then, more")
 
 # ---- panel speaker routing ----
 assert split_speaker("MAYA: Tell me about yourself.", PANEL) == ("MAYA", "Tell me about yourself.")

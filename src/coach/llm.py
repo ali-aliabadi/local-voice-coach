@@ -1,7 +1,6 @@
 """The cloud interviewer. Gemini, spoken to through the OpenAI-compatible endpoint."""
 
 import asyncio
-import re
 import time
 from typing import NamedTuple
 
@@ -9,6 +8,7 @@ import openai
 from openai import AsyncOpenAI
 
 from . import config, settings
+from .chunks import split_for_speech
 
 
 class Reply(NamedTuple):
@@ -76,67 +76,6 @@ def endpoint_for(backend, model_override: str | None = None) -> Endpoint:
     )
 
 
-# A sentence ends at .!?… when the next thing is whitespace or the end of the buffer.
-# "3.5" never matches, because the dot there is followed by a digit.
-TERMINATOR = re.compile(r"[.!?…]+[\"')\]]*(?=\s|$)")
-ABBREVIATION = re.compile(r"\b(?:Mr|Mrs|Ms|Dr|St|vs|etc|e\.g|i\.e|No|Inc|Ltd|Jr|Sr)\.$")
-
-
-def _boundaries(text: str):
-    """Offsets where a sentence genuinely ends. Abbreviations are not endings."""
-    settled = len(text.rstrip())
-    for match in TERMINATOR.finditer(text):
-        head = text[: match.end()]
-        if ABBREVIATION.search(head):
-            continue
-        # A trailing "3." may still become "3.5" once the next token lands.
-        if match.end() >= settled and len(head) >= 2 and head[-1] == "." and head[-2].isdigit():
-            continue
-        yield match.end()
-
-
-def split_for_speech(buffer: str, flush: bool = False) -> tuple[str, str]:
-    """Split the buffer into (speak now, keep buffering).
-
-    Splits at the LAST complete sentence inside the buffer, rather than only when the
-    buffer happens to end on one. Models stream several words per token, so a boundary
-    usually lands in the middle of a token ("own. Walk me"). A check that only looked at
-    the tail missed it, the buffer kept growing, and the length cap eventually cut a
-    sentence in half - which is why the interviewer stopped mid-sentence.
-
-    The returned buffer is never stripped: the trailing space is what keeps the next
-    token from being glued onto the last word.
-    """
-    if flush:
-        return buffer.strip(), ""
-    if not buffer.strip():
-        return "", buffer
-
-    cuts = list(_boundaries(buffer))
-    if cuts:
-        return buffer[: cuts[-1]].strip(), buffer[cuts[-1] :].lstrip()
-
-    # Nothing has ended yet. Only give up waiting once this has run on far too long, and
-    # then break between words - never inside one.
-    if len(buffer.strip()) >= config.MAX_CHARS_BEFORE_FLUSH:
-        space = buffer.rstrip().rfind(" ")
-        if space > 0:
-            return buffer[:space].strip(), buffer[space:].lstrip()
-    return "", buffer
-
-
-SPEAKER = re.compile(r"^\s*([A-Z][A-Z]+)\s*:\s*")
-
-
-def split_speaker(text: str, cast) -> tuple[str | None, str]:
-    """Pull a leading 'NAME:' off a reply. Returns (name if it is in `cast`, rest)."""
-    match = SPEAKER.match(text)
-    if not match:
-        return None, text
-    name = match.group(1)
-    return (name if name in cast else None), text[match.end() :].strip()
-
-
 # Worth asking again: nothing came back, or the server broke. A rejected key is not.
 RETRYABLE = (TimeoutError, openai.APIConnectionError, openai.InternalServerError)
 
@@ -185,14 +124,16 @@ async def stream_sentences(ep: Endpoint, messages, max_tokens=None, deadline=Non
     # Measured from the first attempt: the wait the user actually sat through.
     first_ms = (time.perf_counter() - started) * 1000
     full = buffer
+    spoke = False  # until the first chunk is out, a clause is enough
     async for chunk in stream:
         token = chunk.choices[0].delta.content if chunk.choices else ""
         if not token:
             continue
         buffer += token
         full += token
-        speak, buffer = split_for_speech(buffer)
+        speak, buffer = split_for_speech(buffer, eager=not spoke)
         if speak:
+            spoke = True
             yield "sentence", speak
     speak, _ = split_for_speech(buffer, flush=True)
     if speak:
