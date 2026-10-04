@@ -18,6 +18,9 @@ dependencies = [
     "websockets>=13",
 ]
 
+[dependency-groups]
+dev = ["ruff>=0.6"]  # `uv sync` installs it; the Docker image leaves it out
+
 [build-system]
 requires = ["setuptools>=77"]  # the SPDX license string (PEP 639)
 build-backend = "setuptools.build_meta"

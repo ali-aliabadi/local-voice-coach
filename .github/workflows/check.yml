@@ -1,0 +1,17 @@
+# The same checks as `make check`, on every push and pull request.
+name: check
+on: [push, pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: uv sync --frozen
+      # tests/test_wire.py needs the Kokoro weights and a Whisper download, so it is
+      # `make e2e`, run by hand, rather than part of this.
+      - run: ./scripts/check.sh

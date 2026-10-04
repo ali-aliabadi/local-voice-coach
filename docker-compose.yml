@@ -1,7 +1,9 @@
 services:
   coach:
     build: .
-    image: local-voice-coach
+    # Set IMAGE to the published one (ghcr.io/<owner>/<repo>) and `make pull` to skip
+    # building; left unset, `make up` builds it here.
+    image: ${IMAGE:-local-voice-coach}
     container_name: voice-coach
     restart: unless-stopped
 

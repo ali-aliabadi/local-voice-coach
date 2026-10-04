@@ -104,8 +104,16 @@ practice view uses it to close its socket and release the microphone.
 
 ## Tests
 
-Plain `assert` in `tests/test_coach.py`, run with `python tests/test_coach.py`. No
-pytest, no fixtures, no mocks beyond reassigning a module attribute.
+Plain `assert`s, one file per area, each runnable on its own with `python tests/<file>`:
+`test_coach.py` (scoring, settings, store, the guard), `test_history.py` (reading it all
+back, the coach's notes), `test_modes.py` (chunking speech, the arithmetic behind the
+drills), `test_reports.py` (Telegram, with Relay faked) and `test_web.mjs` (the charts,
+under plain `node`). `make check` runs them all, as CI does. No pytest, no fixtures, no
+mocks beyond reassigning a module attribute.
+
+`make e2e` runs `tests/test_wire.py`: the real server over a real WebSocket, a spoken
+answer synthesised by Kokoro, and a fake model. It needs the Kokoro weights, so it is not
+part of `make check` - run it before you push anything that touches the session.
 
 Non-trivial logic gets one test — a branch, a parser, a money or timing path. Trivial
 one-liners do not; YAGNI applies to tests too.

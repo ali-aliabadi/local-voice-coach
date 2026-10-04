@@ -1,6 +1,6 @@
 # Spoken English practice. `make` on its own lists what you can do.
 .DEFAULT_GOAL := help
-.PHONY: help install models run check e2e fmt build up down restart logs shell clean reset
+.PHONY: help install models run check e2e fmt build pull up down restart logs shell clean reset
 
 PY      ?= ./.venv/bin/python
 COMPOSE ?= docker compose
@@ -12,8 +12,8 @@ help:  ## Show this help
 
 # ---- native ----
 
-install:  ## Install Python dependencies into .venv
-	uv pip install -e .
+install:  ## Install exactly what uv.lock pins into .venv
+	uv sync
 
 models:  ## Download the Kokoro voice weights (~340MB, once)
 	@mkdir -p models
@@ -36,12 +36,15 @@ e2e: models  ## Real server, real socket, a spoken answer (loads Whisper, ~30s)
 	$(PY) tests/test_wire.py
 
 fmt:  ## Reformat and autofix what ruff can
-	ruff check . --fix && ruff format .
+	$(PY) -m ruff check . --fix && $(PY) -m ruff format .
 
 # ---- docker ----
 
 build:  ## Build the container image
 	$(COMPOSE) build
+
+pull:  ## Fetch the published image instead of building (needs IMAGE=ghcr.io/...)
+	$(COMPOSE) pull
 
 up: models  ## Start the stack in the background
 	@mkdir -p data

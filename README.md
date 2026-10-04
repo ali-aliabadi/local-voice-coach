@@ -32,7 +32,8 @@ make logs        # watch it come up
 make down
 ```
 
-`make` on its own lists everything.
+`make` on its own lists everything. To skip building the image, use the published one:
+`IMAGE=ghcr.io/<owner>/local-voice-coach make pull up`.
 
 Add a Gemini key in Settings (free, no card, from
 [aistudio.google.com/apikey](https://aistudio.google.com/apikey)), or skip it and use a
@@ -181,7 +182,9 @@ Adding a mode is one file. Adding a model is one row. Adding a setting is one ro
 form builds itself. See [CONTRIBUTING.md](CONTRIBUTING.md) and [DESIGN.md](DESIGN.md).
 
 ```bash
-./scripts/check.sh      # ruff, formatter, 300-line budget, tests
+make install            # exactly what uv.lock pins, ruff included
+make check              # ruff, formatter, 300-line budget, tests - what CI runs
+make e2e                # the real server over a real socket (needs `make models`)
 ```
 
 ## License
