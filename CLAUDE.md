@@ -95,7 +95,7 @@ in `ENDPOINT`; `backends.CATALOGUE` does the rest.
 ### Fluency metrics are arithmetic, not a model
 `fluency()` counts words and measures gaps between timestamps. Deliberately not an LLM
 call: counting is exact, free, offline and instant. Do not replace it.
-`PAUSE_SECONDS` (0.6) is a calibration knob, not a magic number.
+The `pause_seconds` setting (0.6) is a calibration knob, not a magic number.
 
 ### Whisper deletes the thing being measured
 Whisper is trained to tidy speech up and silently drops "um"/"uh".
@@ -205,7 +205,7 @@ beat published ones; do not present an estimate as a measurement.
 
 ### Local reasoning models need a large token budget
 Bonsai-27B returned an **empty** reply at `max_tokens=500` — thinking consumed the whole
-budget, exactly like `gemini-3.8-flash` did at 120. `REVIEW_MAX_TOKENS` is 2500, and
+budget, exactly like `gemini-3.8-flash` did at 120. The `review_max_tokens` setting is 2500, and
 `llm.complete` prints an explanation on an empty reply rather than failing silently.
 
 ### Model choices

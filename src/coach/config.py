@@ -23,17 +23,9 @@ load_env()
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-# Which backend plays the interviewer now lives in backends.py, chosen at startup.
-# Set these in .env to skip the prompts entirely once you have settled on a favourite:
-#     MODE=talk
-#     BACKEND=flash-lite
-DEFAULT_MODE = os.environ.get("MODE", "")
-DEFAULT_BACKEND = os.environ.get("BACKEND", "")
+# Temperature, token budgets, history length, voice, speed, Whisper model and the pause
+# threshold are user-facing, so they live in settings.SPEC with their defaults.
 
-TEMPERATURE = 0.7
-REPLY_MAX_TOKENS = 200  # spoken replies measure ~20-40 tokens; headroom for thinking
-REVIEW_MAX_TOKENS = 2500  # written critique; local reasoners spend a lot on thinking
-HISTORY_TURNS = 8  # user+assistant pairs kept in context; drives token cost
 REQUEST_TIMEOUT = 45.0  # a cold call measured 16s and one hung at 51s, so this catches hangs
 # without aborting slow-but-working requests; the SDK retries twice on its own
 # In conversation, silence is the failure. A reply that has not started after this long is
@@ -42,7 +34,6 @@ REQUEST_TIMEOUT = 45.0  # a cold call measured 16s and one hung at 51s, so this 
 FIRST_WORD_SECONDS = 20.0
 
 # ---- STT (local) ----
-WHISPER_MODEL = "small.en"  # drop to "base.en" if transcription feels slow
 WHISPER_DEVICE = "cpu"
 WHISPER_COMPUTE = "int8"
 BEAM_SIZE = 1  # greedy; raise to 5 if accuracy suffers
@@ -70,15 +61,10 @@ def _weights(name: str, override: str) -> str:
 
 TTS_MODEL_PATH = _weights("kokoro-v1.0.onnx", "KOKORO_MODEL")
 TTS_VOICES_PATH = _weights("voices-v1.0.bin", "KOKORO_VOICES")
-TTS_VOICE = "am_puck"  # 54 voices ship in voices-v1.0.bin; see panel.py
-TTS_SPEED = 1.0
 # Only fires when a sentence never ends. Sentence boundaries are found properly now, so
 # this is a backstop against pathological output - not a routine cut. Low values chop
 # ordinary long sentences in half, which is exactly the bug it used to cause.
 MAX_CHARS_BEFORE_FLUSH = 280
-
-# ---- Fluency scoring ----
-PAUSE_SECONDS = 0.6  # calibration knob: gap a listener notices as hesitation
 
 # Everything the user accumulates lives here. Set DATA_DIR to keep it outside the working
 # directory - the container mounts a volume at /data so a rebuild does not wipe it.

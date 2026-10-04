@@ -10,9 +10,6 @@ from openai import AsyncOpenAI
 
 from . import config, settings
 
-TERMINATORS = (".", "!", "?", "…")
-ABBREVIATIONS = re.compile(r"\b(Mr|Mrs|Ms|Dr|St|vs|etc|e\.g|i\.e)\.$")
-
 
 class Reply(NamedTuple):
     """What a model said, and how long it made you wait for the first of it."""
@@ -217,7 +214,7 @@ async def complete(ep: Endpoint, messages, max_tokens=None) -> Reply:
     if not text:
         print(
             "⚠️  Empty reply — a thinking model likely spent the whole budget reasoning.\n"
-            "   Raise REVIEW_MAX_TOKENS in coach/config.py, or turn thinking off."
+            "   Raise 'Review max tokens' in Settings, or turn thinking off."
         )
     return Reply(text, (time.perf_counter() - started) * 1000)
 
