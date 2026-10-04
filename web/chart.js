@@ -99,7 +99,6 @@ function scale(spec, values) {
 
 function chart(key, rows) {
   const spec = SERIES[key];
-  const label = shortener(rows);
   const values = rows.map((r) => r[key] ?? 0);
   const s = scale(spec, values);
   const n = values.length;
@@ -139,36 +138,29 @@ function chart(key, rows) {
       <header>
         <b>${spec.format(last)}</b>
         <span class="name">${spec.label}</span>
-        <span class="delta ${improving ? "up" : "down"}">
-          ${change ? `${change} than your first session` : "your first session"}
+        <span class="delta ${n > 1 ? (improving ? "up" : "down") : ""}">
+          ${change ? `${change} than your first day` : "your first day"}
         </span>
       </header>
       <p class="verdict ${state.state}">${state.text}</p>
       <div class="plot">
       <svg viewBox="0 0 ${W} ${H}" role="img" preserveAspectRatio="xMidYMid meet"
-           aria-label="${spec.label} across ${n} sessions, currently ${spec.format(last)}">
+           aria-label="${spec.label} across ${n} days, currently ${spec.format(last)}">
         ${ticks}${band}${line}${dot}
         <line class="cross" y1="${PAD.top}" y2="${H - PAD.bottom}" stroke="var(--muted)"
               stroke-width="1" style="display:none"/>
         ${hits}
-        <text x="${PAD.left}" y="${H - 8}" class="tick">${label(rows[0])}</text>
+        <text x="${PAD.left}" y="${H - 8}" class="tick">${shortDay(rows[0])}</text>
         <text x="${W - PAD.right}" y="${H - 8}" class="tick" text-anchor="end">
-          ${label(rows[n - 1])}</text>
+          ${shortDay(rows[n - 1])}</text>
       </svg>
       <div class="tip" hidden></div>
       </div>
     </section>`;
 }
 
-/** Several sessions in one day are common, so fall back to the time when dates repeat. */
-function shortener(rows) {
-  const days = new Set(rows.map((r) => (r.started_at || "").slice(0, 10)));
-  const sameDay = days.size < rows.length;
-  return (row) => {
-    const stamp = row?.started_at || "";
-    return sameDay ? stamp.slice(11, 16) : stamp.slice(5, 10).replace("-", "/");
-  };
-}
+/** One row per day: "2026-10-04" reads as "10/04". */
+const shortDay = (row) => (row?.day || "").slice(5, 10).replace("-", "/");
 
 export function trend(target, rows) {
   if (!rows.length) {
@@ -182,10 +174,10 @@ export function trend(target, rows) {
       <summary>See the numbers</summary>
       <div class="scroll">
         <table>
-          <thead><tr><th>session</th><th>answers</th>
+          <thead><tr><th>day</th><th>answers</th>
             ${Object.values(SERIES).map((s) => `<th>${s.label}</th>`).join("")}</tr></thead>
           <tbody>${[...rows].reverse().map((r) => `<tr>
-            <td>${(r.started_at || "").slice(0, 16)}</td><td>${r.answers ?? ""}</td>
+            <td>${r.day ?? ""}</td><td>${r.answers ?? ""}</td>
             ${Object.entries(SERIES).map(([k, s]) => `<td>${s.format(r[k] ?? 0)}</td>`).join("")}
           </tr>`).join("")}</tbody>
         </table>
@@ -212,7 +204,7 @@ function attach(node, rows) {
     tip.hidden = false;
     tip.style.left = `${Math.min(88, Math.max(12, (x / W) * 100))}%`;
     tip.innerHTML = `<b>${spec.format(row[key] ?? 0)}</b>
-      ${(row.started_at || "").slice(0, 10)} · ${row.mode ?? ""}`;
+      ${row.day ?? ""} · ${row.answers} answer${row.answers === 1 ? "" : "s"}`;
   };
   const hide = () => { cross.style.display = "none"; tip.hidden = true; };
 

@@ -91,11 +91,14 @@ h2 { font-size: 1.05rem; font-weight: 550; margin: 2.5rem 0 1rem; }
 hr { border: 0; border-top: 1px solid var(--line); margin: 3rem 0 2rem; }
 
 button { font: inherit; cursor: pointer; }
+/* A class that sets display must never beat the hidden attribute. */
+[hidden] { display: none !important; }
 .link {
   background: none; border: 0; color: var(--muted); padding: 0;
   text-decoration: none; border-bottom: 1px solid transparent;
 }
 .link:hover { color: var(--ink); border-bottom-color: var(--line); }
+.more { display: block; margin: 1.25rem auto 0; }
 .primary {
   background: var(--accent); color: #fff; border: 0;
   border-radius: 9px; padding: 0.6rem 1.4rem;

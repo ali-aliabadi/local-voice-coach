@@ -94,6 +94,8 @@ store.record(second, "review", "3/5. Too vague.", reply_ms=8000.0)
 store.finish(second)
 
 assert [s["mode"] for s in history.sessions()] == ["review", "talk"]  # newest first
+newest = history.sessions()[0]["id"]
+assert [s["mode"] for s in history.sessions(before=newest)] == ["talk"]  # the next page
 totals = history.totals()
 assert totals["sessions"] == 2 and totals["answers"] == 2 and totals["words"] == 50
 # weighted by words: 50 words over 20/110 + 30/130 minutes, not the plain mean of 120

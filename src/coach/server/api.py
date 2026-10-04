@@ -90,8 +90,9 @@ async def save_settings(request):
     return JSONResponse({"ok": True})
 
 
-async def get_sessions(_request):
-    return JSONResponse(history.sessions())
+async def get_sessions(request):
+    before = request.query_params.get("before")
+    return JSONResponse(history.sessions(before=int(before) if before else None))
 
 
 async def get_session(request):

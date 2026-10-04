@@ -207,7 +207,7 @@ store.finish(two)
 assert len(store.session_scores(one)) == 1 and len(store.session_scores(two)) == 1
 assert store.measured_latency()["bonsai27"] == (9000.0, 1)
 trend = history.trend()
-assert len(trend) == 2 and trend[0]["mode"] == "talk" and trend[1]["mode"] == "review"
+assert len(trend) == 1 and trend[0]["sessions"] == 2  # one point per day, not per session
 
 store.forget_everything()
 assert history.trend() == [] and store.measured_latency() == {}

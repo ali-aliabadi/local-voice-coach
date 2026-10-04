@@ -44,16 +44,20 @@ def rates(m: dict | None) -> dict | None:
     }
 
 
-def sessions(limit: int = 50) -> list[dict]:
-    """Every session, newest first, with its averages. The list behind the history page."""
+PAGE = 50
+
+
+def sessions(before: int | None = None, limit: int = PAGE) -> list[dict]:
+    """Sessions newest first, with their rates, a page at a time: `before` is the oldest id
+    already shown. The list behind the history page."""
     rows = (
         store.db()
         .execute(
             "SELECT s.id, s.started_at, s.ended_at, s.mode, s.backend, s.model,"
             f"  COUNT(t.id) AS answers, {RATES}, SUM(t.wpm IS NOT NULL) AS scored "
             "FROM sessions s LEFT JOIN turns t ON t.session_id = s.id AND t.role = 'you' "
-            "GROUP BY s.id HAVING answers > 0 ORDER BY s.id DESC LIMIT ?",
-            (limit,),
+            "WHERE s.id < ? GROUP BY s.id HAVING answers > 0 ORDER BY s.id DESC LIMIT ?",
+            (before or 2**62, limit),
         )
         .fetchall()
     )
@@ -146,15 +150,17 @@ def recent(limit: int = 5) -> dict:
     return dict(row)
 
 
-def trend(limit: int = 60) -> list[dict]:
-    """Per-session rates, oldest first, so progress is visible."""
+def trend(days: int = 366) -> list[dict]:
+    """Rates per day, oldest first. A day is the unit of a daily habit, and it does not
+    fall off the chart after a few weeks the way a per-session list capped at 60 did."""
     rows = (
         store.db()
         .execute(
-            f"SELECT s.id, s.started_at, s.mode, s.backend, COUNT(t.id) AS answers, {RATES} "
+            "SELECT substr(s.started_at, 1, 10) AS day, COUNT(DISTINCT s.id) AS sessions,"
+            f"  COUNT(t.id) AS answers, {RATES} "
             "FROM sessions s JOIN turns t ON t.session_id = s.id "
-            f"WHERE {RATED} GROUP BY s.id ORDER BY s.id DESC LIMIT ?",
-            (limit,),
+            f"WHERE {RATED} GROUP BY day ORDER BY day DESC LIMIT ?",
+            (days,),
         )
         .fetchall()
     )

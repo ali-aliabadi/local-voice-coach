@@ -6,6 +6,17 @@ import * as draw from "../render.js";
 
 const when = (stamp) => (stamp || "").slice(0, 16).replace("T", " ");
 
+const PAGE = 50;   // matches history.PAGE: a full page means there may be more
+
+const row = (s) => `
+  <a class="pick" href="/history/${s.id}">
+    <b>${escape(s.mode)} <span class="tag">${when(s.started_at)}</span></b>
+    <span class="cost">${s.answers} answer${s.answers === 1 ? "" : "s"}</span>
+    <span class="meta">${s.wpm == null ? "not scored" : `${Math.round(s.wpm)} wpm ·
+      ${s.fillers.toFixed(1)} fillers per 100 words · ${s.pauses.toFixed(1)} pauses
+      a minute · ${s.lead_in.toFixed(1)}s before speaking`}</span>
+  </a>`;
+
 export const list = {
   async render(root) {
     root.innerHTML = `<h1>History</h1><p class="foot loading">Loading…</p>`;
@@ -18,18 +29,19 @@ export const list = {
     }
     root.innerHTML = `
       <h1>History</h1>
-      <p class="foot lead">${sessions.length} session${sessions.length === 1 ? "" : "s"}.
-      Open one to read the whole conversation back, with your own recordings.</p>
-      <div class="table">
-        ${sessions.map((s) => `
-          <a class="pick" href="/history/${s.id}">
-            <b>${escape(s.mode)} <span class="tag">${when(s.started_at)}</span></b>
-            <span class="cost">${s.answers} answer${s.answers === 1 ? "" : "s"}</span>
-            <span class="meta">${s.wpm == null ? "not scored" : `${Math.round(s.wpm)} wpm ·
-              ${s.fillers.toFixed(1)} fillers per 100 words · ${s.pauses.toFixed(1)} pauses
-              a minute · ${s.lead_in.toFixed(1)}s before speaking`}</span>
-          </a>`).join("")}
-      </div>`;
+      <p class="foot lead">Newest first. Open one to read the whole conversation back, with
+      your own recordings.</p>
+      <div class="table" id="sessions">${sessions.map(row).join("")}</div>
+      <button class="link more" id="older" ${sessions.length < PAGE ? "hidden" : ""}>
+        show older sessions</button>`;
+
+    let oldest = sessions[sessions.length - 1].id;
+    root.querySelector("#older").addEventListener("click", async (event) => {
+      const more = await get(`/api/sessions?before=${oldest}`);
+      root.querySelector("#sessions").insertAdjacentHTML("beforeend", more.map(row).join(""));
+      if (more.length) oldest = more[more.length - 1].id;
+      event.target.hidden = more.length < PAGE;
+    });
   },
 };
 
