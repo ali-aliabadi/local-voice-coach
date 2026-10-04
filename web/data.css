@@ -69,6 +69,17 @@
 .unclear { text-decoration: underline dotted var(--muted); text-underline-offset: 0.25em; }
 .unclear-key { display: block; color: var(--muted); font-size: 0.75rem; line-height: 1.4; }
 
+/* ---- a mode's own result: rounds compared, a sentence matched ---- */
+.card-result { margin-top: 2rem; padding: 1rem 1.25rem; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius); }
+.card-result h2 { font-size: 0.8rem; font-weight: 550; color: var(--muted); margin: 0 0 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.06em; }
+.card-result table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.card-result th { text-align: left; font-weight: 450; color: var(--muted); padding: 0.3rem 1rem 0.3rem 0; }
+.card-result td { padding: 0.3rem 1rem 0.3rem 0; }
+.card-result p { margin: 0.75rem 0 0; }
+.scene { color: var(--muted); font-size: 0.9rem; margin: 1rem 0 0; }
+
 /* ---- the coach's notes ---- */
 .coach h3 { font-size: 0.85rem; font-weight: 550; margin: 1.25rem 0 0.4rem; }
 .coach ol, .coach ul { margin: 0; padding-left: 1.2rem; line-height: 1.6; }

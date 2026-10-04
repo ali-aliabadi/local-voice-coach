@@ -106,8 +106,8 @@ assert history.detail(first)["summary"] is None
 recap = {"recap": "They watched Se7en at home with their wife.", "answers": 1}
 store.db().execute("UPDATE sessions SET summary = ? WHERE id = ?", (json.dumps(recap), first))
 store.db().commit()
-assert "Se7en" in profile.system_prompt("talk", "X", interview=False)
-assert "Se7en" not in profile.system_prompt("panel", "X")  # interviews get the CV instead
+assert "Se7en" in profile.system_prompt("talk", "X", interview=False, memory=True)
+assert "Se7en" not in profile.system_prompt("roleplay", "X", interview=False)  # asked for
 
 # ---- listening: replies you needed help to follow ----
 assert history.listening("", "", first) == {"replies": 0, "helped": 0}  # never tracked

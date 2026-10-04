@@ -15,6 +15,7 @@ export function mount(node) {
   root.innerHTML = `
     <div class="topline"><p class="status" id="status"></p><p class="clock" id="clock"></p></div>
     <div class="goalbar" aria-hidden="true"><i id="goalfill"></i></div>
+    <p class="scene" id="scene" hidden></p>
     <p class="question" id="question">Connecting…</p>
     <p class="listen-tools" id="listen-tools" hidden>
       <button class="link" id="again">again</button> ·
@@ -28,6 +29,7 @@ export function mount(node) {
       <p class="hint">space bar works too · answer out loud, as if it were real</p>
       <p class="notice" id="notice" role="alert" hidden></p>
     </div>
+    <section id="card" class="card-result" aria-live="polite" hidden></section>
     <section id="session" class="session" hidden>
       <h2>This session</h2>
       <div class="metrics" id="session-metrics"></div>
@@ -122,6 +124,24 @@ export function session(soFar, lifetime, series) {
   if (!soFar || !Object.keys(soFar).length) return;
   $("#session").hidden = false;
   draw.metrics($("#session-metrics"), soFar, lifetime, series);
+}
+
+/** The situation a mode has set up, e.g. a roleplay's scene. */
+export function scene(text) {
+  $("#scene").hidden = !text;
+  $("#scene").textContent = text || "";
+}
+
+/** A mode's own result - rounds compared, a sentence matched. Hidden by `card(null)`. */
+export function card(event) {
+  $("#card").hidden = !event;
+  if (!event) return;
+  const rows = (event.rows || []).map((r) =>
+    `<tr>${r.map((cell, i) => (i ? `<td>${escape(cell)}</td>` : `<th>${escape(cell)}</th>`))
+      .join("")}</tr>`).join("");
+  $("#card").innerHTML = `${event.title ? `<h2>${escape(event.title)}</h2>` : ""}
+    ${rows ? `<table>${rows}</table>` : ""}
+    ${event.text ? `<p>${escape(event.text)}</p>` : ""}`;
 }
 
 export function critique(text) {

@@ -37,6 +37,19 @@ export function start({ label, bar, elapsed, goal, reached }) {
   return () => clearInterval(timer);
 }
 
+/** "0:45 left" on `label`, then `done` at zero. Returns a function that stops it. */
+export function countdown(label, seconds, done) {
+  const ends = Date.now() + seconds * 1000;
+  const tick = () => {
+    const left = Math.max(0, Math.ceil((ends - Date.now()) / 1000));
+    label.textContent = `${Math.floor(left / 60)}:${pad(left % 60)} left · tap when you are done`;
+    if (left === 0) { clearInterval(timer); done(); }
+  };
+  const timer = setInterval(tick, 250);
+  tick();
+  return () => clearInterval(timer);
+}
+
 /** Two soft notes. Gentle on purpose: it should not startle you mid-thought. */
 export function chime() {
   try {

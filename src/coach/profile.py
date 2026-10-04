@@ -157,7 +157,7 @@ def coaching_note(recent: dict | None) -> str:
     )
 
 
-def memory(limit: int = 3) -> str:
+def recaps(limit: int = 3) -> str:
     """What earlier conversations were about, from the coach's recaps. Without it every
     session starts from nothing, and "do you remember?" gets a bluff."""
     rows = store.db().execute(
@@ -175,7 +175,9 @@ def memory(limit: int = 3) -> str:
     )
 
 
-def system_prompt(mode: str, default: str, pacing: bool = True, interview: bool = True) -> str:
+def system_prompt(
+    mode: str, default: str, pacing: bool = True, interview: bool = True, memory: bool = False
+) -> str:
     """The interviewer's full instructions: the mode's prompt, the user's override if
     there is one, who they are, and how they have been speaking lately.
 
@@ -183,12 +185,12 @@ def system_prompt(mode: str, default: str, pacing: bool = True, interview: bool 
     interviewer into one that knows the candidate.
 
     `pacing` is off for written critique, where delivery is not being judged.
-    `interview` is off for plain conversation, which gets their name and language, and
-    what you talked about last time, instead of their CV.
+    `interview` is off for plain conversation, which gets their name and language instead
+    of their CV. `memory` adds what earlier sessions were about.
     """
     prompt = settings.prompt(mode, default) + as_prompt(interview)
-    if not interview:
-        prompt += memory()
+    if memory:
+        prompt += recaps()
     if pacing:
         prompt += coaching_note(history.recent())
     return prompt

@@ -6,8 +6,11 @@ learner does most of the speaking. Uses the fast endpoint, because a conversatio
 lags stops feeling like one.
 """
 
+import random
+
 from .. import profile
 from ._converse import converse
+from ._topics import TOPICS
 
 HELP = "everyday conversation to build speaking and listening, every answer scored"
 ENDPOINT = "fast"
@@ -38,14 +41,15 @@ PROMPT = (
 )
 
 
-OPENER = "Start the conversation. Greet them casually and ask an easy, everyday question."
+# A random topic, so it does not open with "how's your day" every time.
+OPENER = "Start the conversation. Greet them casually, then bring up this topic naturally: {}."
 
 
 async def run(endpoint, io) -> None:
     await converse(
         endpoint,
         io,
-        lambda: profile.system_prompt("talk", PROMPT, interview=False),
-        OPENER,
+        lambda: profile.system_prompt("talk", PROMPT, interview=False, memory=True),
+        OPENER.format(random.choice(TOPICS)),
         getting_ready="Getting ready to talk",
     )

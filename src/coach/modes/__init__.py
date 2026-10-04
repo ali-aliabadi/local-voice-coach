@@ -12,7 +12,11 @@ A mode module declares these:
                     io is the browser, for one session:
                       await io.answer()            hear, score and save one answer
                       await io.reply(endpoint, m)  speak the model's reply as it streams
-                      await io.send(**event)       anything else the page should show
+                      await io.speak(text)         say a fixed line, no model
+                      await io.send(**event)       anything else the page should show:
+                        type="scene", text=...     the situation, shown at the top
+                        type="limit", seconds=N    a countdown on the next answer
+                        type="card", title=..., rows=[[label, value], ...], text=...
                       io.save_turn(role, text)     keep something written in the history
                       io.prior_turns()             what was said before a refresh
                     Loop forever - SessionClosed is raised through you and caught at the

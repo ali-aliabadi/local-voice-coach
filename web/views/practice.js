@@ -33,6 +33,8 @@ let helped = new Set();  // what you needed to follow this reply: again, slower,
 let handsFree = null;  // { silence } when the mic opens and closes by itself
 let stopWatch = null;
 let muted = false;     // you cut in: drop the rest of this reply
+let limit = 0;         // seconds the next answer may run, when a mode sets one
+let stopCountdown = null;
 
 const remember = (value) => {
   try {
@@ -134,6 +136,15 @@ function handle(event, mode, backend) {
     case "thinking":
       screen.wait(event.text);
       break;
+    case "scene":
+      screen.scene(event.text);
+      break;
+    case "card":
+      screen.card(event);
+      break;
+    case "limit":
+      limit = event.seconds;
+      break;
     case "critique":
       screen.critique(event.text);
       break;
@@ -190,6 +201,7 @@ async function toggle() {
     helped = new Set();
     $("#listen-tools").hidden = true;
     screen.reset();
+    screen.card(null);
     $("#session").classList.add("dim");
     $("#mic").setAttribute("aria-pressed", "true");
     $("#mic").classList.add("recording");
@@ -201,11 +213,16 @@ async function toggle() {
     } else {
       screen.mic(true, "tap when you are done");
     }
+    if (limit) {
+      stopCountdown = clock.countdown($("#mic-label"), limit, () => recording && toggle());
+      limit = 0;
+    }
   } else {
     recording = false;
     mic.stop();
     stopMeter?.();
     stopWatch?.();
+    stopCountdown?.();
     $("#session").classList.remove("dim");
     $("#mic").setAttribute("aria-pressed", "false");
     $("#mic").classList.remove("recording");

@@ -130,6 +130,7 @@ class BrowserIO:
         cast: dict[str, str] | None = None,
         thinking: str | None = None,
         deadline: float | None = None,
+        max_tokens: int | None = None,
     ) -> llm.Reply | None:
         """Speak the model's reply sentence by sentence, while it is still being written.
 
@@ -143,7 +144,9 @@ class BrowserIO:
         name, voice, done = None, self.accent, llm.Reply("", None)
         began, first, heard = time.perf_counter(), None, None
         try:
-            async for kind, chunk in llm.stream_sentences(endpoint, messages, deadline=deadline):
+            async for kind, chunk in llm.stream_sentences(
+                endpoint, messages, max_tokens=max_tokens, deadline=deadline
+            ):
                 if kind == "done":
                     done = chunk
                     continue
@@ -186,6 +189,14 @@ class BrowserIO:
             timing |= {"hearing": ms(self.heard_at, began), "total": ms(self.heard_at, heard)}
         self.heard_at = None
         return timing
+
+    async def speak(self, text: str) -> None:
+        """Say a fixed line as the partner - no model. For modes that run to a script."""
+        await self.send(type="sentence", text=text)
+        await self.say(text, self.accent)
+        self.last_turn = self.save_turn("interviewer", text)
+        self.last_reply = (text, self.accent)
+        await self.send(type="turn_done")
 
     async def _slower(self) -> None:
         """The last reply again, slower. Marked as a replay, so "again" keeps the original."""

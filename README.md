@@ -59,9 +59,18 @@ being corrected mid-answer is what makes people freeze.
 
 | Mode | What it is |
 |---|---|
-| **talk** | Everyday conversation, not an interview — a friendly partner chats about ordinary things and talks enough to give you something to listen to. Fast replies, every answer scored. |
+| **talk** | Everyday conversation, not an interview — a friendly partner chats about ordinary things and talks enough to give you something to listen to. It remembers your last few sessions. |
+| **roleplay** | A real-life scene — ordering with an allergy, booking a doctor, returning broken headphones, small talk with a new colleague — with the partner playing the other person. |
+| **retell** | It tells a short story; you tell it back in your own words, and it says what you caught and what you missed. Listening and speaking in one. |
+| **repeat** | The 4/3/2 drill: one topic three times, in 90, 60 and 45 seconds, then a table of how your numbers moved between the first telling and the last. |
+| **shadow** | It says a natural sentence; you say it straight back. Scored by the words you matched, and a sentence you mostly missed is said again. |
 | **panel** | Three interviewers with distinct voices — a hiring manager, a staff engineer, and a bar raiser who pushes back. Closer to a real onsite. |
 | **review** | One hard technical question, then a written critique: what held up, what was vague, what a real interviewer would probe next. Deliberately slow. |
+
+What the partner says is blurred until you tap **show text** — hear it first. **again**
+replays it, **slower** says it again at four fifths of the speed, and how often you needed
+either is tracked, so you can watch your ear improve. Each session gets a different
+American or British voice.
 
 Tap the circle to answer, tap again when you're done. Space works too.
 
