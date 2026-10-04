@@ -1,5 +1,6 @@
 """Run: python tests/test_coach.py"""
 
+import asyncio
 import json
 import pathlib
 import tempfile
@@ -11,7 +12,13 @@ from coach import config  # noqa: I001
 
 config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "test.db")
 
-from coach import backends, history, settings, store  # noqa: E402
+from coach import (  # noqa: E402
+    backends,
+    history,
+    llm,  # noqa: E402
+    settings,
+    store,
+)
 from coach.llm import conversation, split_for_speech, split_speaker  # noqa: E402
 from coach.modes.panel import PANEL  # noqa: E402
 from coach.stt import filler_pattern, fluency, word_rows  # noqa: E402
@@ -152,6 +159,15 @@ assert alternates(conversation([SYS, ASSISTANT, USER, ASSISTANT, USER]))  # rebu
 # the interviewer's opening question is kept, not dropped, so context survives
 assert any(ASSISTANT["content"] in m["content"] for m in conversation([SYS, ASSISTANT, USER]))
 assert len([m for m in conversation([SYS, SYS, USER]) if m["role"] == "system"]) == 1
+
+
+# ---- errors read as the server's words, not the SDK's wrapper ----
+class Rejected(Exception):
+    body = [{"error": {"message": "No models loaded."}}]
+
+
+said = asyncio.run(llm.explain(llm.Endpoint(None, "m", {}), Rejected("Error code: 400 - {...}")))
+assert said == "m: No models loaded.", said
 
 # ---- panel speaker routing ----
 assert split_speaker("MAYA: Tell me about yourself.", PANEL) == ("MAYA", "Tell me about yourself.")

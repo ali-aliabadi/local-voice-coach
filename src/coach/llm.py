@@ -236,4 +236,15 @@ async def explain(ep: Endpoint, exc: Exception) -> str:
             pass
     if "api key" in message.lower() or "401" in message or "403" in message:
         return "That API key was rejected. Check it in Settings."
-    return message
+    return f"{ep.model}: {_said(exc)}"
+
+
+def _said(exc: Exception) -> str:
+    """The server's own words, not the SDK's "Error code: 400 - {'error': ...}" wrapper."""
+    body = getattr(exc, "body", None)
+    if isinstance(body, list) and body:  # Gemini wraps its error in a list
+        body = body[0]
+    error = body.get("error", body) if isinstance(body, dict) else None
+    if isinstance(error, dict) and error.get("message"):
+        return str(error["message"])
+    return str(exc)
