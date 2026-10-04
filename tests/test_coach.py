@@ -166,6 +166,11 @@ settings.set("pause_seconds", "0.9")
 assert settings.get("pause_seconds") == 0.9  # coerced back to the default's type
 assert isinstance(settings.get("history_turns"), int)
 settings.set("pause_seconds", 0.6)
+# a default is never stored, or saving the form would freeze it and a better one never lands
+stored = "SELECT COUNT(*) FROM settings WHERE key = ?"
+assert store.db().execute(stored, ("pause_seconds",)).fetchone()[0] == 0
+settings.set_prompt("talk", "BUILT-IN", default="BUILT-IN")
+assert store.db().execute(stored, ("prompt:talk",)).fetchone()[0] == 0
 
 assert settings.prompt("talk", "BUILT-IN") == "BUILT-IN"
 settings.set_prompt("talk", "be brutal")

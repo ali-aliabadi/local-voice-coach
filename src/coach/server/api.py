@@ -76,13 +76,17 @@ async def get_settings(_request):
 
 
 async def save_settings(request):
+    defaults = {f["key"]: f["default"] for f in prompt_fields()}
     for key, value in (await request.json()).items():
         if key.startswith("prompt:"):
-            settings.set_prompt(key[len("prompt:") :], value)
+            settings.set_prompt(key[len("prompt:") :], value, defaults.get(key))
         elif key in settings.SPEC:
             if settings.SPEC[key].secret and value == "":
                 continue  # blank means "leave the stored secret alone"
-            settings.set(key, value)
+            try:
+                settings.set(key, value)
+            except ValueError:
+                return JSONResponse({"error": f"{key}: not a valid number"}, status_code=400)
     return JSONResponse({"ok": True})
 
 

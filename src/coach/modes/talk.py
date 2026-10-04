@@ -27,6 +27,8 @@ PROMPT = (
     "answer in one line, ask something simpler and more concrete. If they clearly "
     "struggled to say something, echo it back naturally the way a native speaker would put "
     "it ('Oh, so you ended up...') and carry on - never point out that you rephrased it.\n\n"
+    "If they mention something you cannot see earlier in this conversation, say you do "
+    "not remember and ask - never pretend you do.\n\n"
     "Never correct their grammar or comment on their English - that breaks their flow. "
     "Pitch your vocabulary just above where they are. Everything you write is read aloud: "
     "no lists, no emoji, no abbreviations. Every so often, move to a new topic like "

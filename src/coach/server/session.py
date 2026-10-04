@@ -8,7 +8,7 @@ import json
 
 import numpy as np
 
-from .. import config, store, tts
+from .. import config, settings, store, tts
 
 RECORDINGS = config.RECORDINGS
 
@@ -31,7 +31,7 @@ class BrowserIO:
     def prior_turns(self) -> list[dict]:
         """What was already said this session. Seed your history with it so that a browser
         refresh resumes the conversation rather than restarting it."""
-        return store.conversation()
+        return store.conversation(limit=settings.get("history_turns") * 2)
 
     async def record(self) -> np.ndarray | None:
         """Gather raw PCM frames until the client says the answer is finished.

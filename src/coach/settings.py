@@ -70,11 +70,12 @@ SPEC: dict[str, Setting] = {
     # ---- Model ----
     "temperature": Setting(0.7, "Temperature", "Model", kind="number", step=0.1),
     "history_turns": Setting(
-        8,
+        50,
         "History turns",
         "Model",
         kind="number",
-        help="Question/answer pairs kept in context. Higher costs more per turn.",
+        help="Answer/reply pairs the model can see. 50 covers a whole session; at 8 it "
+        "forgot what you said ten minutes ago. Lower it only to save tokens.",
     ),
     "reply_max_tokens": Setting(200, "Reply max tokens", "Model", kind="number"),
     "review_max_tokens": Setting(
@@ -122,15 +123,28 @@ def get(key: str) -> Any:
     return spec.default
 
 
+def _store(key: str, value: str | None) -> None:
+    """None deletes the row, so the declared default applies again."""
+    if value is None:
+        store.db().execute("DELETE FROM settings WHERE key = ?", (key,))
+    else:
+        store.db().execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+    store.db().commit()
+
+
 def set(key: str, value: Any) -> None:  # noqa: A001 - reads better than set_value here
+    """Only differences from the default are stored. The form posts every field, and
+    storing them all froze each default at whatever it was on the day you hit Save, so a
+    better default never reached you. Raises ValueError for a value of the wrong type."""
     if key not in SPEC:
         raise KeyError(key)
-    store.db().execute(
-        "INSERT INTO settings (key, value) VALUES (?, ?) "
-        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        (key, str(value)),
-    )
-    store.db().commit()
+    default = SPEC[key].default
+    raw = str(value)
+    _store(key, None if raw == "" or _coerce(raw, default) == default else raw)
 
 
 def prompt(name: str, default: str) -> str:
@@ -147,13 +161,9 @@ def prompt(name: str, default: str) -> str:
     return row["value"] if row and row["value"].strip() else default
 
 
-def set_prompt(name: str, value: str) -> None:
-    store.db().execute(
-        "INSERT INTO settings (key, value) VALUES (?, ?) "
-        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        (f"prompt:{name}", value),
-    )
-    store.db().commit()
+def set_prompt(name: str, value: str, default: str | None = None) -> None:
+    """Blank, or identical to the mode's own prompt, means no override."""
+    _store(f"prompt:{name}", None if not value.strip() or value == default else value)
 
 
 def as_form(voices: tuple[str, ...] = ()) -> list[dict]:
