@@ -6,12 +6,19 @@ import * as draw from "../render.js";
 
 const when = (stamp) => (stamp || "").slice(0, 16).replace("T", " ");
 
+/** "34 min of a 30 min goal": how long it ran, against what you set out to do. */
+const length = (s) => {
+  if (s.minutes == null) return "";
+  const ran = `${Math.max(1, Math.round(s.minutes))} min`;
+  return s.goal_minutes ? `${ran} of a ${s.goal_minutes} min goal` : ran;
+};
+
 const PAGE = 50;   // matches history.PAGE: a full page means there may be more
 
 const row = (s) => `
   <a class="pick" href="/history/${s.id}">
     <b>${escape(s.mode)} <span class="tag">${when(s.started_at)}</span></b>
-    <span class="cost">${s.answers} answer${s.answers === 1 ? "" : "s"}</span>
+    <span class="cost">${length(s)} · ${s.answers} answer${s.answers === 1 ? "" : "s"}</span>
     <span class="meta">${s.wpm == null ? "not scored" : `${Math.round(s.wpm)} wpm ·
       ${s.fillers.toFixed(1)} fillers per 100 words · ${s.pauses.toFixed(1)} pauses
       a minute · ${s.lead_in.toFixed(1)}s before speaking`}</span>
@@ -44,6 +51,14 @@ export const list = {
     });
   },
 };
+
+/** How much of the session was you talking: the partner should not be doing most of it. */
+function spoke(session) {
+  const mine = session.averages?.spoken;
+  if (!mine || !session.minutes) return "";
+  const share = Math.min(100, Math.round((mine / session.minutes) * 100));
+  return ` · you spoke for ${mine < 1 ? "under a minute" : `${Math.round(mine)} min`} (${share}%)`;
+}
 
 /** The sentence a trainer opens with. Only mentions what actually moved. */
 function changed(now, before) {
@@ -86,7 +101,8 @@ export const detail = {
     root.innerHTML = `
       <p class="crumbs"><a href="/history">history</a> › <b>${escape(session.mode)}</b></p>
       <h1>${when(session.started_at)}</h1>
-      <p class="foot">${session.answers} answers · ${escape(session.model)}</p>
+      <p class="foot">${session.answers} answers · ${length(session)}${spoke(session)}
+        · ${escape(session.model)}</p>
       ${changed(session.averages, session.previous)}
       ${session.answers ? '<div class="metrics" id="session-average"></div>' : ""}
       <h2>The conversation</h2>

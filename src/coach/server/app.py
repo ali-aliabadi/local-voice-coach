@@ -9,7 +9,7 @@ from starlette.responses import FileResponse
 from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 
-from .. import backends, clock, llm, store
+from .. import backends, clock, history, llm, store
 from . import models
 from .api import MODES, ROUTES, partner
 from .guard import MIDDLEWARE
@@ -34,7 +34,7 @@ async def websocket_session(websocket):
         endpoint = llm.endpoint_for(backend)
         resumed = opening.get("resume")
         session = (resumed and store.resume(int(resumed))) or store.start(
-            opening["mode"], backend.key, endpoint.model
+            opening["mode"], backend.key, endpoint.model, opening.get("goal")
         )
         io = BrowserIO(websocket, models.voice(), models.transcriber(), session)
         await io.send(
@@ -45,6 +45,11 @@ async def websocket_session(websocket):
             local=backend.local,
             session=session,
             answered=len(store.session_scores(session)),
+            # so a reloaded page picks up the clock, the goal and the session chart
+            elapsed=store.elapsed(session),
+            goal=store.goal(session),
+            answers=history.answers(session),
+            so_far=history.so_far(session),
         )
         await mode.run(endpoint, io)
     except SessionClosed:

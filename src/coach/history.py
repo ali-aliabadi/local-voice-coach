@@ -8,9 +8,6 @@ import json
 
 from . import store
 
-# Interviewer turns are stored per-panellist ("panel:MAYA"), so match on a prefix.
-SPOKE = "(t.role = 'interviewer' OR t.role LIKE 'panel:%')"
-
 # Rates, not counts. A long answer holds more fillers without being any worse, and talk
 # mode deliberately asks for long answers, so per-answer counts would chart improvement
 # as decline. Fillers are per 100 words, pauses per minute of speech, and everything is
@@ -28,7 +25,13 @@ RATES = (
     f"SUM({_when('t.words')}) / SUM({_MINUTES}) AS wpm, "
     f"100.0 * SUM({_when('t.fillers')}) / SUM({_when('t.words')}) AS fillers, "
     f"SUM({_when('t.pauses')}) / SUM({_MINUTES}) AS pauses, "
-    f"AVG({_when('t.lead_in')}) AS lead_in"
+    f"AVG({_when('t.lead_in')}) AS lead_in, "
+    f"SUM({_MINUTES}) AS spoken"  # minutes of your own speech
+)
+# Start to last turn, in minutes. Not ended_at: a tab left open would count as practice.
+LENGTH = (
+    "(julianday((SELECT MAX(x.at) FROM turns x WHERE x.session_id = s.id))"
+    " - julianday(s.started_at)) * 1440 AS minutes"
 )
 
 
@@ -54,6 +57,7 @@ def sessions(before: int | None = None, limit: int = PAGE) -> list[dict]:
         store.db()
         .execute(
             "SELECT s.id, s.started_at, s.ended_at, s.mode, s.backend, s.model,"
+            f"  s.goal_minutes, {LENGTH},"
             f"  COUNT(t.id) AS answers, {RATES}, SUM(t.wpm IS NOT NULL) AS scored "
             "FROM sessions s LEFT JOIN turns t ON t.session_id = s.id AND t.role = 'you' "
             "WHERE s.id < ? GROUP BY s.id HAVING answers > 0 ORDER BY s.id DESC LIMIT ?",
@@ -69,7 +73,8 @@ def detail(session_id: int) -> dict | None:
     head = (
         store.db()
         .execute(
-            "SELECT id, started_at, ended_at, mode, backend, model FROM sessions WHERE id = ?",
+            "SELECT s.id, s.started_at, s.ended_at, s.mode, s.backend, s.model, s.goal_minutes,"
+            f" {LENGTH} FROM sessions s WHERE s.id = ?",
             (session_id,),
         )
         .fetchone()
@@ -91,7 +96,7 @@ def detail(session_id: int) -> dict | None:
         **dict(head),
         "turns": [_turn(t) for t in turns],
         "answers": len(answers),
-        "averages": _rated(f"SELECT {RATES} FROM turns t WHERE t.session_id = ?", (session_id,)),
+        "averages": so_far(session_id),
         # What to measure this session against: the one before it, and your own running
         # average. A number with nothing to compare it to says nothing.
         "previous": previous(session_id),
@@ -109,6 +114,21 @@ def previous(before: int) -> dict:
         "  JOIN turns x ON x.session_id = s.id AND x.role = 'you' AND x.wpm > 0 WHERE s.id < ?)",
         (before,),
     )
+
+
+def so_far(session_id: int) -> dict:
+    """This session's rates across every answer so far."""
+    return _rated(f"SELECT {RATES} FROM turns t WHERE t.session_id = ?", (session_id,))
+
+
+def answers(session_id: int) -> list[dict]:
+    """Each scored answer's rates in order: the session chart, one point per answer."""
+    rows = store.db().execute(
+        "SELECT words, wpm, fillers, pauses, lead_in FROM turns t"
+        f" WHERE t.session_id = ? AND {RATED} ORDER BY t.id",
+        (session_id,),
+    )
+    return [rates(dict(r)) for r in rows]
 
 
 def _rated(sql: str, args: tuple) -> dict:

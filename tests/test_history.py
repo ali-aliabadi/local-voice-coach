@@ -82,6 +82,15 @@ assert detail["averages"]["lead_in"] == 2.2
 assert detail["averages"]["fillers"] == 15.0  # 3 fillers in 20 words
 assert spoken["fillers"] == 15.0  # each answer is shown as a rate as well
 
+# the session clock and the per-answer series the practice page draws
+assert detail["goal_minutes"] is None and detail["minutes"] >= 0
+assert round(detail["averages"]["spoken"], 3) == round(20 / 110, 3)  # 20 words at 110 wpm
+assert [a["fillers"] for a in history.answers(first)] == [15.0]
+assert history.so_far(first)["wpm"] == 110
+assert 0 <= store.elapsed(first) < 60
+goaled = store.start("talk", "flash-lite", "m", goal=30)
+assert store.goal(goaled) == 30 and store.goal(first) is None
+
 # ---- a second session, and the totals across both ----
 second = store.start("review", "bonsai27", "prism-ml/bonsai-27b")
 store.record(

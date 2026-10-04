@@ -81,9 +81,17 @@ trend line, and a CDN would break the offline promise.
 
 ## Interface
 
-**Focus mode.** One question on screen and nothing else. Metrics appear *after* the answer,
-never during. The alternative — a dashboard visible while you speak — gives you somewhere to
-hide and something to perform for. Real interviews have neither.
+**Focus while you speak.** While you are answering there is only the mic: the session
+panel dims and nothing changes on screen. A dashboard you can read mid-answer gives you
+somewhere to hide and something to perform for.
+
+**The session between answers.** Between answers the page shows the whole session so far —
+each metric with a sparkline, one point per answer — the clock against the goal you set,
+and your last answer in detail. Per-answer numbers alone could not show whether an hour of
+practice was getting better or worse; this was asked for after the first real session.
+
+**Listen first.** What the partner says is blurred until you choose "show text". Reading it
+would turn a listening exercise into a reading one.
 
 **Calm and minimal.** Generous white space, one accent colour, soft type. The user is
 already nervous; the tool should not add to it.

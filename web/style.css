@@ -161,6 +161,27 @@ button { font: inherit; cursor: pointer; }
 .mic.recording { border-color: var(--warn); background: var(--surface); }
 .mic.recording::after { border-radius: 3px; background: var(--warn); width: 17px; height: 17px; }
 .mic-label { color: var(--muted); font-size: 0.9rem; margin: 0; }
+.topline { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.topline p { margin: 0; }
+.clock { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.9rem; }
+.goalbar { height: 3px; background: var(--line); border-radius: 2px; margin-top: 0.6rem; }
+.goalbar i { display: block; height: 100%; width: 0; background: var(--accent);
+  border-radius: 2px; transition: width 1s linear; }
+.question.veiled { filter: blur(7px); user-select: none; }
+.reveal { display: block; margin: -2.5rem auto 2.5rem; font-size: 0.85rem; }
+.session { margin-top: clamp(2rem, 6vh, 3rem); transition: opacity .3s; }
+.session.dim { opacity: 0.25; }
+.session h2, #result h2 { font-size: 0.8rem; font-weight: 550; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 1rem; }
+.spark { display: block; width: 100%; max-width: 8rem; height: 26px; margin-top: 0.5rem; }
+.notice.good { color: var(--good); }
+
+/* ---- goal picker ---- */
+.goals { border: 0; padding: 0; margin: 0 0 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.goals legend { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem; padding: 0; }
+.chip-button { background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 99px; padding: 0.35rem 0.9rem; font-size: 0.85rem; }
+.chip-button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 #level { opacity: 0; transition: opacity .2s; }
 #level.on { opacity: 1; }
 

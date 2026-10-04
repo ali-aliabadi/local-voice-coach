@@ -93,7 +93,12 @@ class BrowserIO:
             return None
         turn = self._save_answer(audio, text, metrics, stt_ms, words)
         await self.send(
-            type="transcript", text=text, metrics=history.rates(metrics), words=words, turn=turn
+            type="transcript",
+            text=text,
+            metrics=history.rates(metrics),
+            words=words,
+            turn=turn,
+            session=history.so_far(self.session),
         )
         return Answer(text, metrics)
 

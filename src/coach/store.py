@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     ended_at   TEXT,
     mode       TEXT NOT NULL,
     backend    TEXT NOT NULL,
-    model      TEXT NOT NULL
+    model      TEXT NOT NULL,
+    goal_minutes INTEGER                -- what the user set out to do, or NULL
 );
 CREATE TABLE IF NOT EXISTS turns (
     id            INTEGER PRIMARY KEY,
@@ -50,7 +51,10 @@ _db: sqlite3.Connection | None = None
 
 # Columns added after the first release. CREATE TABLE IF NOT EXISTS will not add them to
 # a database that already exists, so they are applied here instead.
-ADDED_COLUMNS = {"turns": {"words": "INTEGER", "word_rows": "TEXT"}}
+ADDED_COLUMNS = {
+    "turns": {"words": "INTEGER", "word_rows": "TEXT"},
+    "sessions": {"goal_minutes": "INTEGER"},
+}
 
 
 def _migrate(connection: sqlite3.Connection) -> None:
@@ -75,13 +79,26 @@ def db() -> sqlite3.Connection:
 
 # Session ids are passed in, never held here: two tabs each own a session, and a global
 # "current session" filed one tab's answers under the other's.
-def start(mode: str, backend: str, model: str) -> int:
+def start(mode: str, backend: str, model: str, goal: int | None = None) -> int:
     cur = db().execute(
-        "INSERT INTO sessions (started_at, mode, backend, model) VALUES (?, ?, ?, ?)",
-        (time.strftime("%Y-%m-%d %H:%M:%S"), mode, backend, model),
+        "INSERT INTO sessions (started_at, mode, backend, model, goal_minutes)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (time.strftime("%Y-%m-%d %H:%M:%S"), mode, backend, model, goal or None),
     )
     db().commit()
     return cur.lastrowid
+
+
+def elapsed(session_id: int) -> float:
+    """Seconds since the session started, so a reloaded page keeps counting from there."""
+    row = db().execute("SELECT started_at FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    started = time.mktime(time.strptime(row["started_at"], "%Y-%m-%d %H:%M:%S"))
+    return time.time() - started
+
+
+def goal(session_id: int) -> int | None:
+    row = db().execute("SELECT goal_minutes FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    return row["goal_minutes"] if row else None
 
 
 def resume(session_id: int) -> int | None:

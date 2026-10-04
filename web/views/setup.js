@@ -1,6 +1,7 @@
 // Two steps, two routes: /modes then /models. Separate pages so each choice can be
 // linked to, reloaded, and backed out of.
 
+import { GOALS, keepGoal, lastGoal } from "../clock.js";
 import { get } from "../form.js";
 import { go } from "../router.js";
 
@@ -29,6 +30,10 @@ export const models = {
     root.innerHTML = `
       <p class="crumbs"><a href="/modes">mode</a> › <b>${mode}</b></p>
       <h1>Which model plays the ${chosen.partner}?</h1>
+      <fieldset class="goals"><legend>Today's goal</legend>
+        ${GOALS.map((g) => `<button class="chip-button" data-goal="${g}"
+          aria-pressed="${g === lastGoal()}">${g ? `${g} min` : "no goal"}</button>`).join("")}
+      </fieldset>
       <div class="table">
         ${data.backends.map((b) => {
           const yours = b.samples
@@ -48,8 +53,14 @@ export const models = {
         : `Nothing reachable: no internet, and LM Studio is not serving a usable model.
            Add an API key in <a href="/settings">settings</a>, or start LM Studio.`}</p>`;
 
+    root.querySelectorAll(".chip-button").forEach((button) =>
+      button.addEventListener("click", () => {
+        keepGoal(Number(button.dataset.goal));
+        root.querySelectorAll(".chip-button").forEach((b) =>
+          b.setAttribute("aria-pressed", String(b === button)));
+      }));
     root.querySelectorAll(".pick").forEach((button) =>
       button.addEventListener("click", () =>
-        go(`/practice?mode=${mode}&backend=${button.dataset.key}`)));
+        go(`/practice?mode=${mode}&backend=${button.dataset.key}&goal=${lastGoal()}`)));
   },
 };

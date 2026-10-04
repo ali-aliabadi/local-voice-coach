@@ -5,6 +5,11 @@
 
 import assert from "node:assert/strict";
 import { MOVED, PHRASE, SERIES, moved, verdict } from "../web/chart.js";
+import { mmss } from "../web/clock.js";
+
+// ---- the session clock reads naturally past an hour ----
+assert.equal(mmss(75), "01:15");
+assert.equal(mmss(21331), "5:55:31");
 
 // ---- every format returns a string, whatever the metric ----
 for (const [key, spec] of Object.entries(SERIES)) {

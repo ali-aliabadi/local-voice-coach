@@ -20,7 +20,7 @@ const LABEL = {
  * A bare "118 wpm" tells you nothing - the whole reason to measure is to know whether
  * that was good. `compare` is your own running average, when there is one to beat.
  */
-export function metrics(target, m, compare = null) {
+export function metrics(target, m, compare = null, series = null) {
   target.innerHTML = Object.keys(SERIES).map((key) => {
     const value = m[key] ?? 0;
     const state = verdict(key, value);
@@ -34,8 +34,29 @@ export function metrics(target, m, compare = null) {
       <span>${LABEL[key]}</span>
       <span class="verdict ${state.state}">${state.text}</span>
       ${against}
+      ${series ? spark(key, series.map((s) => s[key] ?? 0)) : ""}
     </div>`;
   }).join("");
+}
+
+/**
+ * One metric across this session's answers, a point per answer. Fixed scale with the goal
+ * band, like the trend charts: a flat session has to look flat.
+ */
+function spark(key, values) {
+  if (values.length < 2) return "";
+  const { domain: [lo, hi], goal: [glo, ghi] } = SERIES[key];
+  const W = 120, H = 26;
+  const y = (v) => H - ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * H;
+  const x = (i) => (i / (values.length - 1)) * W;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
+      role="img" aria-label="${SERIES[key].label}, answer by answer">
+    <rect x="0" y="${y(ghi)}" width="${W}" height="${Math.max(1, y(glo) - y(ghi))}"
+      fill="var(--goal)"/>
+    <polyline points="${values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}"
+      fill="none" stroke="var(--accent)" stroke-width="1.5" vector-effect="non-scaling-stroke"
+      stroke-linejoin="round"/>
+  </svg>`;
 }
 
 /** The answer as text, with every filler marked. You see them, not a count. */

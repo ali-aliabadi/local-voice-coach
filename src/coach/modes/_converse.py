@@ -29,6 +29,8 @@ async def converse(
     history: list[dict] = io.prior_turns()
     # Owed a reply: a fresh session (the partner opens), or one that died mid-turn.
     said = io.RETRY if not history or history[-1]["role"] == "user" else None
+    if said is None:
+        await io.send(type="turn_done")  # resumed on the user's turn: open the mic
 
     while True:
         if said is not None:
