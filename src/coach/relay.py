@@ -81,13 +81,18 @@ def image(png: bytes, caption: str) -> dict:
     }
 
 
+FILE_LIMIT = 5 * 1024 * 1024  # Relay's cap on one file; past it, say where to find it
+
+
 def file(data: bytes, filename: str, content_type: str, caption: str) -> dict:
-    """A document. Shaped like `image`; a Relay without file support answers 400 or 422."""
+    """A document to download: one per message, up to FILE_LIMIT. The filename is shown
+    to the reader, so it carries nothing personal. A Relay from before file blocks
+    answers 400 or 422."""
     return {
         "type": "file",
         "base64": base64.b64encode(data).decode(),
         "content_type": content_type,
-        "filename": filename,
+        "filename": filename[:128],
         "caption": caption[:1024],
     }
 

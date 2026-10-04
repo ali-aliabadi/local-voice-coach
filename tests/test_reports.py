@@ -23,7 +23,8 @@ takes_files = True  # an older Relay refuses the file block
 
 
 def fake_call(method, path, body=None):
-    if method == "POST" and not takes_files and body["blocks"][0]["type"] == "file":
+    files = [b for b in (body or {}).get("blocks", []) if b["type"] == "file"]
+    if method == "POST" and not takes_files and files:
         raise RuntimeError("relay 422 invalid_request blocks[0].type: unknown")
     if method == "POST":
         sent.append(body)
@@ -161,9 +162,17 @@ assert len(sheet.render(one).pages) >= 2  # the session's answers, charted at th
 relay.remember(f"session:{one}", "")  # report the session again, now with its sheet
 before = len(sent)
 run(reports.after_session(one))
-assert [b["type"] for b in sent[-1]["blocks"]] == ["file"], "the sheet goes as a PDF"
-assert sent[-1]["blocks"][0]["filename"].endswith(".pdf")
+# Relay's recipe for a file: a line saying what it is, then the file
+assert [b["type"] for b in sent[-1]["blocks"]] == ["text", "file"], "the sheet goes as a PDF"
+assert sent[-1]["blocks"][1]["filename"].endswith(".pdf")
+assert sent[-1]["blocks"][1]["content_type"] == "application/pdf"
 assert "breath of fresh air" not in json.dumps(sent[before]), "the sheet carries the lessons"
+
+before = len(sent)
+run(reports.after_session(one))
+assert len(sent) == before, "reported once by itself"
+run(reports.after_session(one, again=True))  # the session page's "send it to Telegram"
+assert len(sent) == before + 2 and sent[-2]["idempotency_key"] != f"session-{one}-4"
 
 takes_files = False
 relay.remember(f"session:{one}", "")

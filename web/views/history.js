@@ -115,10 +115,12 @@ function coaching(session) {
   const failed = session.coach_error
     ? `<p class="notice">The coach could not finish: ${escape(session.coach_error)}</p>` : "";
   if (session.summary) {
+    const send = session.telegram
+      ? ` · <button class="link" id="telegram">send it to Telegram</button>` : "";
     const take = session.sheet
       ? `<p class="callout"><a href="/api/sessions/${session.id}/sheet.pdf" target="_blank">
-          Open your study sheet (PDF)</a> — the fixes worth the most, phrases for your
-          conversations, and what to practise tomorrow.</p>`
+          Open your study sheet (PDF)</a>${send} — the fixes worth the most, phrases for
+          your conversations, and what to practise tomorrow.</p>`
       : session.can_sheet
         ? `<p class="foot"><button class="link" id="sheet-now">Write your study sheet</button>
             — a page or two to keep, as a PDF.</p>` : "";
@@ -186,6 +188,11 @@ export const detail = {
     root.querySelector("#coach-now")?.addEventListener("click", async () => {
       await post(`/api/sessions/${params.id}/coach`, {});
       again();
+    });
+    root.querySelector("#telegram")?.addEventListener("click", async (event) => {
+      event.target.disabled = true;
+      await post(`/api/sessions/${params.id}/telegram`, {});
+      event.target.textContent = "sent — check Telegram in a moment";
     });
     root.querySelector("#sheet-now")?.addEventListener("click", async (event) => {
       event.target.textContent = "Writing your study sheet…";

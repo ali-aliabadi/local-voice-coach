@@ -134,8 +134,9 @@ are anchored the same way: *instead of "I don't like cinema" → "not really my 
 With [Relay](https://github.com/ali-aliabadi/relay) set up, the app sends to Telegram:
 
 - **after each session**: how long it ran against your goal, the four numbers against
-  last time, a chart of every answer, and your study sheet as a PDF (as page images, on
-  a Relay that does not take files)
+  last time, a chart of every answer, and your study sheet as a PDF to download (as page
+  images, on a Relay from before file blocks). Any session can be sent again from its
+  page with **send it to Telegram**.
 - **a daily reminder** if you have not practised by your chosen time, with *Starting
   now* / *In 30 min* / *Skip today* buttons
 - **a weekly report** on Sunday evening: each day, against the week before
