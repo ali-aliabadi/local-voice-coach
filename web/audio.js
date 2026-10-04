@@ -113,6 +113,29 @@ export class Playback {
   }
 }
 
+/**
+ * Hands-free: call `done` once you have spoken and then been quiet for `silence` seconds,
+ * or after `patience` seconds if you never start. Returns a function that stops watching.
+ * `silence` should sit well above the pause threshold: a pause mid-thought is exactly
+ * what is being practised, and cutting it off would punish it.
+ */
+export const VOICE_LEVEL = 0.015;  // calibration knob: the mic level that counts as speech
+export function untilSilence(mic, { silence, patience = 30, done, tick = 100 }) {
+  const began = Date.now();
+  let spoke = false;
+  let quietSince = null;
+  const timer = setInterval(() => {
+    const now = Date.now();
+    if (mic.level > VOICE_LEVEL) { spoke = true; quietSince = null; return; }
+    quietSince ??= now;
+    if ((spoke && now - quietSince >= silence * 1000) || (!spoke && now - began >= patience * 1000)) {
+      clearInterval(timer);
+      done();
+    }
+  }, tick);
+  return () => clearInterval(timer);
+}
+
 /** The little bar under the mic button. Rendered from Mic.level. */
 export function meter(canvas, mic) {
   const context = canvas.getContext('2d');

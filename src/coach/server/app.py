@@ -9,7 +9,7 @@ from starlette.responses import FileResponse
 from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 
-from .. import backends, clock, coach, history, llm, reports, store
+from .. import backends, clock, coach, history, llm, reports, settings, store
 from . import models
 from .api import MODES, ROUTES, partner
 from .guard import MIDDLEWARE
@@ -50,6 +50,8 @@ async def websocket_session(websocket):
             goal=store.goal(session),
             answers=history.answers(session),
             so_far=history.so_far(session),
+            hands_free=settings.get("hands_free") == "on",
+            silence=settings.get("hands_free_silence"),
         )
         await mode.run(endpoint, io)
     except SessionClosed:

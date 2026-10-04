@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { MOVED, PHRASE, SERIES, moved, verdict } from "../web/chart.js";
 import { mmss } from "../web/clock.js";
+import { untilSilence } from "../web/audio.js";
 
 // ---- the session clock reads naturally past an hour ----
 assert.equal(mmss(75), "01:15");
@@ -69,5 +70,20 @@ for (const [key, phrase] of Object.entries(PHRASE)) {
     assert.ok(!text.includes("NaN"), `${key} produced NaN`);
   }
 }
+
+// ---- hands-free: stops after you have spoken and gone quiet, never before you start ----
+
+const fakeMic = { level: 0 };
+let stopped = false;
+untilSilence(fakeMic, { silence: 0.2, patience: 5, tick: 10, done: () => { stopped = true; } });
+await new Promise((r) => setTimeout(r, 300));
+assert.equal(stopped, false, "silence before you start is thinking time, not the end");
+fakeMic.level = 0.2;
+await new Promise((r) => setTimeout(r, 100));
+fakeMic.level = 0;
+await new Promise((r) => setTimeout(r, 120));
+assert.equal(stopped, false, "a short pause mid-answer does not end it");
+await new Promise((r) => setTimeout(r, 200));
+assert.equal(stopped, true, "quiet for longer than `silence` after speaking ends it");
 
 console.log("ok");

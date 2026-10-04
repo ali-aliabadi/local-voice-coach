@@ -96,6 +96,26 @@ SPEC: dict[str, Setting] = {
         help="American and British, men and women, so your ear is not tuned to one voice. "
         "Off uses the Voice above every time.",
     ),
+    # ---- Practice ----
+    "hands_free": Setting(
+        "off",
+        "Hands-free",
+        "Practice",
+        kind="select",
+        choices=("on", "off"),
+        help="The mic opens by itself when the partner finishes, and closes after you have "
+        "been quiet for a while. 'Before you spoke' then counts from the end of their "
+        "sentence - the real time it takes you to start.",
+    ),
+    "hands_free_silence": Setting(
+        3.0,
+        "Hands-free: quiet before it stops",
+        "Practice",
+        kind="number",
+        step=0.5,
+        help="Seconds of silence that end your answer. Keep it well above the pause "
+        "threshold, so thinking mid-sentence is not cut off.",
+    ),
     # ---- Coach ----
     "coach_backend": Setting(
         "flash-lite",
@@ -137,7 +157,7 @@ SPEC: dict[str, Setting] = {
         kind="select",
         restart=True,
         choices=WHISPER_CHOICES,
-        help="Smaller is faster and less accurate. Takes effect after a restart.",
+        help="Smaller is faster and less accurate.",
     ),
 }
 

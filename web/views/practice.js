@@ -5,7 +5,7 @@
 //
 // This file is the conversation: the socket, its events, the mic. screen.js draws.
 
-import { Mic, Playback, meter } from "../audio.js";
+import { Mic, Playback, meter, untilSilence } from "../audio.js";
 import * as clock from "../clock.js";
 import { get } from "../form.js";
 import { go } from "../router.js";
@@ -30,6 +30,9 @@ let goal = 0;          // minutes the user set out to practise
 let goalPending = false;
 let stopClock = null;
 let helped = new Set();  // what you needed to follow this reply: again, slower, text
+let handsFree = null;  // { silence } when the mic opens and closes by itself
+let stopWatch = null;
+let muted = false;     // you cut in: drop the rest of this reply
 
 const remember = (value) => {
   try {
@@ -79,8 +82,10 @@ function connect(mode, backend, resume, goalMinutes) {
   socket.binaryType = "arraybuffer";
   socket.onopen = () =>
     socket.send(JSON.stringify({ mode, backend, resume, goal: goalMinutes }));
-  socket.onmessage = (e) =>
-    (typeof e.data === "string" ? handle(JSON.parse(e.data), mode, backend) : playback.push(e.data));
+  socket.onmessage = (e) => {
+    if (typeof e.data === "string") handle(JSON.parse(e.data), mode, backend);
+    else if (!muted) playback.push(e.data);
+  };
   socket.onerror = () => {
     screen.say("Could not reach the server.", false);
     screen.mic(false, "is it still running?");
@@ -101,6 +106,7 @@ function handle(event, mode, backend) {
       stopClock = clock.start({
         label: $("#clock"), bar: $("#goalfill"), elapsed: event.elapsed, goal, reached,
       });
+      handsFree = event.hands_free ? { silence: event.silence } : null;
       series = event.answers || [];
       if (series.length) screen.session(event.so_far, lifetime, series);
       break;
@@ -108,9 +114,10 @@ function handle(event, mode, backend) {
       playback.keep = !event.replay;
       break;
     case "sentence":
+      if (muted) break;
       if (parts.length === 0) {
         screen.reset();
-        screen.mic(false, "listen");
+        screen.mic(true, "listen · tap to cut in");
         playback.newTurn();
         helped = new Set();
       }
@@ -132,7 +139,13 @@ function handle(event, mode, backend) {
       break;
     case "turn_done":
       if (event.wait_ms) waited = event.wait_ms;
-      playback.idle().then(() => { parts = []; screen.mic(true, "tap to answer"); });
+      muted = false;
+      playback.idle().then(() => {
+        parts = [];
+        if (recording) return;  // you cut in: already answering
+        if (handsFree) toggle();
+        else screen.mic(true, "tap to answer");
+      });
       break;
     case "notice":
     case "error":
@@ -169,7 +182,8 @@ async function toggle() {
       return;
     }
     recording = true;
-    playback.stop();  // a replay must not end up in the recording
+    if (playback.playing) muted = true;  // cutting in: the rest of this reply is dropped
+    playback.stop();  // and a replay must not end up in the recording
     if (screen.reading()) helped.add("text");
     // Sent even when empty: "followed by ear" has to be recorded, not assumed.
     socket?.send(JSON.stringify({ type: "helped", kinds: [...helped] }));
@@ -181,11 +195,17 @@ async function toggle() {
     $("#mic").classList.add("recording");
     $("#level").classList.add("on");
     stopMeter = meter($("#level"), mic);
-    screen.mic(true, "tap when you are done");
+    if (handsFree) {
+      stopWatch = untilSilence(mic, { silence: handsFree.silence, done: () => recording && toggle() });
+      screen.mic(true, "listening · just talk");
+    } else {
+      screen.mic(true, "tap when you are done");
+    }
   } else {
     recording = false;
     mic.stop();
     stopMeter?.();
+    stopWatch?.();
     $("#session").classList.remove("dim");
     $("#mic").setAttribute("aria-pressed", "false");
     $("#mic").classList.remove("recording");
