@@ -148,6 +148,11 @@ Measured on a real turn: 995 input tokens, 20 output. At ~40 answers (about an h
 Free tier covers roughly 500 requests/day, well above the ~40 an hour needs. Run a local
 model and it's free and offline regardless.
 
+Those figures were measured with 8 turns of history and no coach. The partner now sees the
+whole session — so it remembers what you said twenty minutes ago — and the coach adds one
+Flash-Lite call per answer, so a turn costs several times the 995 tokens above. Still
+well inside the free tier for an hour a day; the billed price has not been re-measured.
+
 The picker shows published latency next to **Yours** — the average measured from your own
 past sessions. Trust that column, not the estimate.
 
