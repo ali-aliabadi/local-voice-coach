@@ -4,7 +4,8 @@ import { CHOICES, current, set } from "../theme.js";
 const GROUPS = ["Backends", "Scoring", "Model", "Prompts"];
 
 const INTRO = {
-  Prompts: "Aim the interviewer at a specific company, role or seniority. "
+  Prompts: "Change how each mode behaves: steer the talk partner toward topics you care "
+    + "about, or aim the interviewer at a company, role or seniority. "
     + "Clear a box to restore the built-in prompt.",
 };
 

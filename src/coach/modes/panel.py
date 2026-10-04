@@ -9,6 +9,7 @@ from ._converse import converse
 
 HELP = "several interviewers, one voice each"
 ENDPOINT = "fast"
+PARTNER = "panel"
 
 # name -> (kokoro voice, what they care about). Add a row and they join the panel.
 PANEL = {

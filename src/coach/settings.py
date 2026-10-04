@@ -85,7 +85,7 @@ SPEC: dict[str, Setting] = {
         kind="number",
         help="Thinking models spend this budget reasoning before they write. Keep it generous.",
     ),
-    "tts_voice": Setting("am_puck", "Interviewer voice", "Model", kind="select"),
+    "tts_voice": Setting("am_puck", "Voice", "Model", kind="select"),
     "tts_speed": Setting(1.0, "Speech speed", "Model", kind="number", step=0.1),
     "whisper_model": Setting(
         "small.en",

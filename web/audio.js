@@ -51,7 +51,7 @@ export class Playback {
     this.playing = false;
     this.waiters = [];
     // Browsers block audio until the page has been interacted with. On a reload straight
-    // back into a session there has been no click, so the interviewer would speak into
+    // back into a session there has been no click, so the reply would play into
     // the void. Tell someone instead of swallowing it.
     this.onBlocked = null;
     this.blocked = false;

@@ -34,10 +34,20 @@ def prompt_fields() -> list[dict]:
     return fields
 
 
+def partner(mode: str) -> str:
+    """Who the user talks to in a mode, as the pages name them."""
+    return getattr(MODES.get(mode), "PARTNER", "interviewer")
+
+
 async def get_modes(_request):
     return JSONResponse(
         [
-            {"name": name, "help": module.HELP, "endpoint": module.ENDPOINT}
+            {
+                "name": name,
+                "help": module.HELP,
+                "endpoint": module.ENDPOINT,
+                "partner": partner(name),
+            }
             for name, module in sorted(MODES.items())
         ]
     )
@@ -99,7 +109,7 @@ async def get_session(request):
     found = history.detail(int(request.path_params["session"]))
     if found is None:
         return JSONResponse({"error": "no such session"}, status_code=404)
-    return JSONResponse(found)
+    return JSONResponse({**found, "partner": partner(found["mode"])})
 
 
 async def get_progress(_request):

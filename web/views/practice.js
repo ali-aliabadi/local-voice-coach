@@ -44,7 +44,7 @@ export async function render(node, _params, query) {
 
   root.innerHTML = `
     <p class="status" id="status"></p>
-    <p class="question" id="question">Waiting for the interviewer…</p>
+    <p class="question" id="question">Connecting…</p>
     <div class="stage">
       <button id="mic" class="mic" disabled aria-label="Answer" aria-pressed="false"></button>
       <p class="mic-label" id="mic-label">connecting</p>
@@ -66,7 +66,7 @@ export async function render(node, _params, query) {
 
   playback.onBlocked = () => notice(
     "Your browser blocked audio until you interact with the page. Click anywhere, "
-    + "then the interviewer will be audible from the next question.");
+    + "and you will hear the next reply.");
   $("#mic").addEventListener("click", toggle);
   $("#end").addEventListener("click", finish);
   connect(mode, backend, query.get("mode") ? null : saved?.session);
@@ -99,6 +99,7 @@ function handle(event, mode, backend) {
     case "ready":
       session = event.session;
       answered = event.answered || 0;
+      if (!parts.length) $("#question").textContent = `Waiting for the ${event.partner}…`;
       detail = `${event.model} · ${event.local ? "on this machine" : "cloud"}`;
       remember({ mode, backend, session });
       break;

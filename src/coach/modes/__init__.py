@@ -1,10 +1,12 @@
 """Modes are self-registering. Drop a .py file in this folder and it appears in the app.
 
-A mode module declares three things:
+A mode module declares these:
 
     HELP      str   one line, shown on the mode picker
     ENDPOINT  str   "fast" for conversation (latency matters)
                     "deep" for analysis (quality matters, latency does not)
+    PARTNER   str   optional: who the user is talking to, as the pages name them.
+                    "interviewer" when left out.
     async def run(endpoint, io)
                     endpoint bundles .client, .model and .extra for your ENDPOINT.
                     io is the browser, for one session:

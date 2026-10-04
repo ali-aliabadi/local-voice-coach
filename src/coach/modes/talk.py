@@ -11,6 +11,7 @@ from ._converse import converse
 
 HELP = "everyday conversation to build speaking and listening, every answer scored"
 ENDPOINT = "fast"
+PARTNER = "partner"
 
 PROMPT = (
     "You are a friendly native English speaker chatting with someone whose first language "

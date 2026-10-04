@@ -11,7 +11,7 @@ from starlette.staticfiles import StaticFiles
 
 from .. import backends, clock, llm, store
 from . import models
-from .api import MODES, ROUTES
+from .api import MODES, ROUTES, partner
 from .guard import MIDDLEWARE
 from .session import BrowserIO, SessionClosed
 
@@ -40,6 +40,7 @@ async def websocket_session(websocket):
         await io.send(
             type="ready",
             mode=opening["mode"],
+            partner=partner(opening["mode"]),
             model=endpoint.model,
             local=backend.local,
             session=session,

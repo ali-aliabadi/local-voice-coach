@@ -10,7 +10,8 @@ export const modes = {
     root.innerHTML = `
       <h1>What are we practising?</h1>
       ${isSet ? "" : `<p class="callout">Fill in <a href="/profile">your profile</a> first
-        and the interviewer will pitch questions at your level instead of guessing.</p>`}
+        so it knows what to call you, your first language, and — for the interview modes —
+        your level and what you work on.</p>`}
       <div class="cards">
         ${list.map((m) => `<a class="card" href="/models?mode=${m.name}">
           <b>${m.name}</b><span>${m.help}</span></a>`).join("")}
@@ -27,7 +28,7 @@ export const models = {
 
     root.innerHTML = `
       <p class="crumbs"><a href="/modes">mode</a> › <b>${mode}</b></p>
-      <h1>Who plays the interviewer?</h1>
+      <h1>Which model plays the ${chosen.partner}?</h1>
       <div class="table">
         ${data.backends.map((b) => {
           const yours = b.samples

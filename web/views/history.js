@@ -97,7 +97,7 @@ export const detail = {
         if (turn.role === "review") {
           return `<article class="turn critique">${escape(turn.text)}</article>`;
         }
-        const who = turn.role.startsWith("panel:") ? turn.role.slice(6) : "Interviewer";
+        const who = turn.role.startsWith("panel:") ? turn.role.slice(6) : session.partner;
         return `<article class="turn them"><span class="who">${escape(who)}</span>
           ${escape(turn.text)}</article>`;
       }).join(""); })()}`;
