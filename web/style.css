@@ -168,7 +168,8 @@ button { font: inherit; cursor: pointer; }
 .goalbar i { display: block; height: 100%; width: 0; background: var(--accent);
   border-radius: 2px; transition: width 1s linear; }
 .question.veiled { filter: blur(7px); user-select: none; }
-.reveal { display: block; margin: -2.5rem auto 2.5rem; font-size: 0.85rem; }
+.listen-tools { text-align: center; margin: -2.5rem auto 2.5rem; font-size: 0.85rem;
+  color: var(--muted); }
 .session { margin-top: clamp(2rem, 6vh, 3rem); transition: opacity .3s; }
 .session.dim { opacity: 0.25; }
 .session h2, #result h2 { font-size: 0.8rem; font-weight: 550; color: var(--muted);

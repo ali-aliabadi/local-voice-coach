@@ -11,9 +11,22 @@ const COUNTS = [
   ["words", "words spoken"],
 ];
 
+/** Listening, as a share of replies you followed by ear, against the week before. */
+function ear({ week, before }) {
+  if (!week.replies) return "";
+  const share = (l) => Math.round(((l.replies - l.helped) / l.replies) * 100);
+  const now = share(week);
+  const then = before.replies ? share(before) : null;
+  const change = then == null || Math.abs(now - then) < 5 ? ""
+    : now > then ? `, up from ${then}% the week before` : `, down from ${then}% the week before`;
+  return `<h2>Listening</h2>
+    <p class="foot lead">This week you followed <b>${now}%</b> of replies by ear alone,
+    without hearing them again, slower, or reading them${change}.</p>`;
+}
+
 export async function render(root) {
   root.innerHTML = `<h1>Progress</h1><p class="foot loading">Reading your sessions…</p>`;
-  const { totals, trend, mistakes } = await get("/api/progress");
+  const { totals, trend, mistakes, listening } = await get("/api/progress");
 
   if (!totals.answers) {
     root.innerHTML = `<h1>Progress</h1>
@@ -31,6 +44,7 @@ export async function render(root) {
     <h2>Where you are now</h2>
     <p class="foot lead">Averaged across every answer you have ever given.</p>
     <div class="metrics" id="lifetime"></div>
+    ${ear(listening)}
     ${mistakes.length ? `<h2>Mistakes you repeat</h2>
       <p class="foot lead">What the coach corrected most over the last 7 days. The patterns,
       not the one-off slips, are what is worth practising.</p>${repeats(mistakes)}` : ""}

@@ -1,5 +1,6 @@
 """The JSON API. One endpoint per thing the browser needs, kept out of app.py."""
 
+import datetime as dt
 import pathlib
 
 from starlette.responses import FileResponse, JSONResponse
@@ -124,8 +125,17 @@ async def coach_session(request):
 
 
 async def get_progress(_request):
+    day = lambda back: (dt.date.today() - dt.timedelta(days=back)).isoformat()  # noqa: E731
     return JSONResponse(
-        {"totals": history.totals(), "trend": history.trend(), "mistakes": history.mistakes(7)}
+        {
+            "totals": history.totals(),
+            "trend": history.trend(),
+            "mistakes": history.mistakes(7),
+            "listening": {
+                "week": history.listening(day(6), day(0)),
+                "before": history.listening(day(13), day(7)),
+            },
+        }
     )
 
 

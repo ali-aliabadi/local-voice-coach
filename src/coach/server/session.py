@@ -25,6 +25,12 @@ class Answer(NamedTuple):
 
 # What `answer()` returns when the user asked for the last reply again instead of speaking.
 RETRY = "retry"
+# Accents a session can be given, so the ear is not trained on one voice. The better-rated
+# Kokoro voices: American and British, women and men.
+ACCENTS = (
+    "af_heart", "bm_george", "am_michael", "bf_emma",
+    "af_bella", "bm_fable", "am_puck", "bf_isabella",
+)  # fmt: skip
 
 
 class BrowserIO:
@@ -41,6 +47,11 @@ class BrowserIO:
         self.voice = voice
         self.transcriber = transcriber
         self.session = session
+        # The same accent for the whole session, and again after a reload.
+        on = settings.get("vary_voice") == "on"
+        self.accent = ACCENTS[session % len(ACCENTS)] if on else None
+        self.last_reply: tuple[str, str | None] = ("", None)  # for "say it slower"
+        self.last_turn: int | None = None  # the reply the user is answering
 
     def prior_turns(self) -> list[dict]:
         """What was already said this session. Seed your history with it so that a browser
@@ -66,6 +77,10 @@ class BrowserIO:
                     raise SessionClosed
                 if event.get("type") == "retry" and not chunks:
                     return RETRY
+                if event.get("type") == "slower":
+                    await self._slower()
+                if event.get("type") == "helped" and self.last_turn:
+                    store.helped(self.last_turn, [str(k) for k in event.get("kinds", [])][:3])
                 if event.get("type") == "end_answer":
                     break
         if not chunks:
@@ -122,7 +137,7 @@ class BrowserIO:
         """
         if thinking:
             await self.send(type="thinking", text=thinking)
-        name, voice, done = None, None, llm.Reply("", None)
+        name, voice, done = None, self.accent, llm.Reply("", None)
         try:
             async for kind, chunk in llm.stream_sentences(endpoint, messages, deadline=deadline):
                 if kind == "done":
@@ -139,9 +154,21 @@ class BrowserIO:
             await self.send(type="error", text=await llm.explain(endpoint, exc), retry=True)
             return None
         if done.text:
-            self.save_turn(f"{role}:{name or '?'}" if cast else role, done.text, done.ms)
+            self.last_turn = self.save_turn(
+                f"{role}:{name or '?'}" if cast else role, done.text, done.ms
+            )
+            spoken = llm.split_speaker(done.text, cast)[1] if cast else done.text
+            self.last_reply = (spoken, voice)
         await self.send(type="turn_done", latency_ms=done.ms)
         return done
+
+    async def _slower(self) -> None:
+        """The last reply again, slower. Marked as a replay, so "again" keeps the original."""
+        text, voice = self.last_reply
+        if text:
+            wav = await self.voice.wav(text, voice, slower=True)
+            await self.send(type="audio", bytes=len(wav), replay=True)
+            await self.websocket.send_bytes(wav)
 
     async def say(self, text: str, voice: str | None = None) -> None:
         """Synthesise and ship it. The browser queues playback; nothing plays here."""

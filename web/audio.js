@@ -55,11 +55,26 @@ export class Playback {
     // the void. Tell someone instead of swallowing it.
     this.onBlocked = null;
     this.blocked = false;
+    this.turn = [];     // the current reply's clips, kept so "again" needs no round trip
+    this.keep = true;   // false for a replay, so "again" replays the original speed
   }
 
   push(bytes) {
-    this.queue.push(new Blob([bytes], { type: 'audio/wav' }));
+    const blob = new Blob([bytes], { type: 'audio/wav' });
+    if (this.keep) this.turn.push(blob);
+    this.keep = true;
+    this.queue.push(blob);
     if (!this.playing) this.#next();
+  }
+
+  /** A new reply is starting: forget the last one's clips. */
+  newTurn() { this.turn = []; }
+
+  /** The current reply again, from the top. */
+  again() {
+    this.stop();
+    this.queue.push(...this.turn);
+    this.#next();
   }
 
   #next() {

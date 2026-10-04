@@ -16,7 +16,11 @@ export function mount(node) {
     <div class="topline"><p class="status" id="status"></p><p class="clock" id="clock"></p></div>
     <div class="goalbar" aria-hidden="true"><i id="goalfill"></i></div>
     <p class="question" id="question">Connecting…</p>
-    <button class="link reveal" id="reveal" hidden>show text</button>
+    <p class="listen-tools" id="listen-tools" hidden>
+      <button class="link" id="again">again</button> ·
+      <button class="link" id="slower">slower</button> ·
+      <button class="link" id="reveal">show text</button>
+    </p>
     <div class="stage">
       <button id="mic" class="mic" disabled aria-label="Answer" aria-pressed="false"></button>
       <p class="mic-label" id="mic-label">connecting</p>
@@ -47,6 +51,9 @@ export function mount(node) {
   });
 }
 
+/** Whether you can read the partner's words right now: reading counts as help. */
+export const reading = () => $("#question").dataset.spoken === "1" && showText;
+
 export function mic(enabled, label) {
   clearInterval(ticking);
   $("#mic").disabled = !enabled;
@@ -74,7 +81,7 @@ export function say(text, spoken) {
 function veil() {
   const spoken = $("#question").dataset.spoken === "1";
   $("#question").classList.toggle("veiled", spoken && !showText);
-  $("#reveal").hidden = !spoken;
+  $("#listen-tools").hidden = !spoken;
   $("#reveal").textContent = showText ? "hide text" : "show text";
 }
 

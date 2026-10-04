@@ -109,6 +109,16 @@ store.db().commit()
 assert "Se7en" in profile.system_prompt("talk", "X", interview=False)
 assert "Se7en" not in profile.system_prompt("panel", "X")  # interviews get the CV instead
 
+# ---- listening: replies you needed help to follow ----
+assert history.listening("", "", first) == {"replies": 0, "helped": 0}  # never tracked
+reply = store.record(first, "interviewer", "And then?", reply_ms=1.0)
+store.helped(reply, ["text", "again"])
+by_ear = store.record(first, "interviewer", "Nice.", reply_ms=1.0)
+store.helped(by_ear, [])
+assert history.listening("", "", first) == {"replies": 2, "helped": 1}
+day = store.db().execute("SELECT substr(at, 1, 10) FROM turns LIMIT 1").fetchone()[0]
+assert history.listening(day, day)["helped"] == 1
+
 # ---- a second session, and the totals across both ----
 second = store.start("review", "bonsai27", "prism-ml/bonsai-27b")
 store.record(

@@ -125,7 +125,9 @@ async def until(ws, kind: str) -> dict:
             return json.loads(message)
 
 
-async def speak(ws, text: str) -> dict:
+async def speak(ws, text: str, helped=()) -> dict:
+    """Answer as the browser does: first what was needed to follow the reply, then audio."""
+    await ws.send(json.dumps({"type": "helped", "kinds": list(helped)}))
     await ws.send(speech(text))
     await ws.send(json.dumps({"type": "end_answer"}))
     return await until(ws, "transcript")
@@ -140,7 +142,11 @@ async def main() -> None:
         assert (await until(ws, "sentence"))["text"] == "Hi there."  # the partner opens
         await until(ws, "turn_done")
 
-        heard = await speak(ws, "I watched a film at home with my wife.")
+        # "slower": the same reply, re-spoken, marked as a replay
+        await ws.send(json.dumps({"type": "slower"}))
+        assert (await until(ws, "audio"))["replay"] is True
+
+        heard = await speak(ws, "I watched a film at home with my wife.", ["slower", "text"])
         assert "film" in heard["text"].lower(), heard["text"]
         assert heard["metrics"]["wpm"] > 0 and heard["turn"]
         await until(ws, "turn_done")
@@ -165,6 +171,12 @@ async def main() -> None:
     )
     roles = [row[0] for row in saved]
     assert roles == ["interviewer", "you", "interviewer", "you", "interviewer"], roles
+    marks = sqlite3.connect(config.DB_PATH).execute(
+        "SELECT helped FROM turns WHERE session_id = ? AND role = 'interviewer' ORDER BY id",
+        (session,),
+    )
+    # the reply it was sent for; the next one was followed by ear; the last is unanswered
+    assert [m[0] for m in marks] == ["slower,text", "", None], marks
 
     # the coach wrote notes on both answers in the background, then summarised on close
     for _ in range(50):

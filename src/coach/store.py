@@ -39,7 +39,9 @@ CREATE TABLE IF NOT EXISTS turns (
     audio_path    TEXT,                   -- recording on disk, or NULL once purged
     word_rows     TEXT,                   -- per-word timings, so a past answer can still
                                           -- show its highlighted transcript and timeline
-    notes         TEXT                    -- the coach's notes on an answer, JSON
+    notes         TEXT,                   -- the coach's notes on an answer, JSON
+    helped        TEXT                    -- on a reply: what the user needed to follow it,
+                                          -- "again,text"; "" by ear; NULL never tracked
 );
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
@@ -54,7 +56,7 @@ _db: sqlite3.Connection | None = None
 # Columns added after the first release. CREATE TABLE IF NOT EXISTS will not add them to
 # a database that already exists, so they are applied here instead.
 ADDED_COLUMNS = {
-    "turns": {"words": "INTEGER", "word_rows": "TEXT", "notes": "TEXT"},
+    "turns": {"words": "INTEGER", "word_rows": "TEXT", "notes": "TEXT", "helped": "TEXT"},
     "sessions": {"goal_minutes": "INTEGER", "summary": "TEXT"},
 }
 
@@ -187,6 +189,12 @@ def last_said(session_id: int) -> str:
         .fetchone()
     )
     return row["text"] if row else ""
+
+
+def helped(turn_id: int, kinds: list[str]) -> None:
+    """Mark a reply as one the user needed help to follow: heard again, slower, or read."""
+    db().execute("UPDATE turns SET helped = ? WHERE id = ?", (",".join(sorted(kinds)), turn_id))
+    db().commit()
 
 
 def audio_path(turn_id: int) -> str | None:

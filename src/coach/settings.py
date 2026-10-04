@@ -87,6 +87,15 @@ SPEC: dict[str, Setting] = {
     ),
     "tts_voice": Setting("am_puck", "Voice", "Model", kind="select"),
     "tts_speed": Setting(1.0, "Speech speed", "Model", kind="number", step=0.1),
+    "vary_voice": Setting(
+        "on",
+        "A different accent each session",
+        "Model",
+        kind="select",
+        choices=("on", "off"),
+        help="American and British, men and women, so your ear is not tuned to one voice. "
+        "Off uses the Voice above every time.",
+    ),
     # ---- Coach ----
     "coach_backend": Setting(
         "flash-lite",

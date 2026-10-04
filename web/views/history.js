@@ -61,6 +61,13 @@ function spoke(session) {
   return ` · you spoke for ${mine < 1 ? "under a minute" : `${Math.round(mine)} min`} (${share}%)`;
 }
 
+/** How often you needed help to follow the partner: the listening half of the practice. */
+function heard(l) {
+  if (!l?.replies) return "";
+  return `<p class="foot">You followed ${l.replies - l.helped} of ${l.replies} replies by ear
+    alone${l.helped ? `; for ${l.helped} you heard it again, slower, or read the text` : ""}.</p>`;
+}
+
 /** The sentence a trainer opens with. Only mentions what actually moved. */
 function changed(now, before) {
   if (!before || !Object.keys(before).length) return "";
@@ -121,6 +128,7 @@ export const detail = {
       <h1>${when(session.started_at)}</h1>
       <p class="foot">${session.answers} answers · ${length(session)}${spoke(session)}
         · ${escape(session.model)}</p>
+      ${heard(session.listening)}
       ${changed(session.averages, session.previous)}
       ${session.answers ? '<div class="metrics" id="session-average"></div>' : ""}
       ${coaching(session)}

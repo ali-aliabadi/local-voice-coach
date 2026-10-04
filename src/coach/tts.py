@@ -35,10 +35,11 @@ class Voice:
     def names(self) -> tuple[str, ...]:
         return tuple(sorted(self.kokoro.get_voices()))
 
-    async def wav(self, text: str, voice: str | None = None) -> bytes:
+    async def wav(self, text: str, voice: str | None = None, slower: bool = False) -> bytes:
+        """`slower` is for "say that again, slower": a fifth off whatever speed is set."""
         loop = asyncio.get_running_loop()
         chosen = voice or settings.get("tts_voice")
-        speed = settings.get("tts_speed")
+        speed = settings.get("tts_speed") * (0.8 if slower else 1.0)
         samples, rate = await loop.run_in_executor(
             None, lambda: self.kokoro.create(text, voice=chosen, speed=speed)
         )

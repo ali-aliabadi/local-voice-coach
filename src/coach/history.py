@@ -95,6 +95,7 @@ def detail(session_id: int) -> dict | None:
     return {
         **dict(head),
         "summary": json.loads(head["summary"]) if head["summary"] else None,
+        "listening": listening("", "", session_id),
         "turns": [_turn(t) for t in turns],
         "answers": len(answers),
         "averages": so_far(session_id),
@@ -168,6 +169,24 @@ def recent(limit: int = 5) -> dict:
     )
     if not row or not row["answers"]:
         return {}
+    return dict(row)
+
+
+def listening(first_day: str, last_day: str, session_id: int | None = None) -> dict:
+    """How many replies you needed help to follow - heard again, slower, or read - out of
+    how many were tracked. Replies from before tracking began are left out rather than
+    counted as followed: that would be a number nobody measured."""
+    where = "session_id = ?" if session_id else "substr(at, 1, 10) BETWEEN ? AND ?"
+    args = (session_id,) if session_id else (first_day, last_day)
+    row = (
+        store.db()
+        .execute(
+            "SELECT COUNT(helped) AS replies, COALESCE(SUM(helped != ''), 0) AS helped FROM turns"
+            f" WHERE role NOT IN ('you', 'review') AND {where}",
+            args,
+        )
+        .fetchone()
+    )
     return dict(row)
 
 

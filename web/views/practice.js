@@ -28,6 +28,7 @@ let series = [];       // this session's answers, one point each on the session 
 let goal = 0;          // minutes the user set out to practise
 let goalPending = false;
 let stopClock = null;
+let helped = new Set();  // what you needed to follow this reply: again, slower, text
 
 const remember = (value) => {
   try {
@@ -52,6 +53,12 @@ export async function render(node, _params, query) {
     + "and you will hear the next reply.");
   $("#mic").addEventListener("click", toggle);
   $("#end").addEventListener("click", finish);
+  $("#again").addEventListener("click", () => { helped.add("again"); playback.again(); });
+  $("#slower").addEventListener("click", () => {
+    helped.add("slower");
+    playback.stop();
+    socket?.send(JSON.stringify({ type: "slower" }));
+  });
   const fresh = query.get("mode");
   connect(mode, backend, fresh ? null : saved?.session, Number(query.get("goal")) || 0);
   get("/api/progress").then(({ totals }) => { lifetime = totals.answers ? totals : null; });
@@ -96,8 +103,16 @@ function handle(event, mode, backend) {
       series = event.answers || [];
       if (series.length) screen.session(event.so_far, lifetime, series);
       break;
+    case "audio":
+      playback.keep = !event.replay;
+      break;
     case "sentence":
-      if (parts.length === 0) { screen.reset(); screen.mic(false, "listen"); }
+      if (parts.length === 0) {
+        screen.reset();
+        screen.mic(false, "listen");
+        playback.newTurn();
+        helped = new Set();
+      }
       parts.push(event.speaker ? `${event.speaker}: ${event.text}` : event.text);
       screen.say(parts.join(" "), true);
       break;
@@ -152,6 +167,12 @@ async function toggle() {
       return;
     }
     recording = true;
+    playback.stop();  // a replay must not end up in the recording
+    if (screen.reading()) helped.add("text");
+    // Sent even when empty: "followed by ear" has to be recorded, not assumed.
+    socket?.send(JSON.stringify({ type: "helped", kinds: [...helped] }));
+    helped = new Set();
+    $("#listen-tools").hidden = true;
     screen.reset();
     $("#session").classList.add("dim");
     $("#mic").setAttribute("aria-pressed", "true");
