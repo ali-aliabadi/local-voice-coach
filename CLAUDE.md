@@ -28,16 +28,19 @@ AudioWorklet ──raw PCM 16kHz───► Whisper ──► fluency()   arith
   transcript / timeline / charts ◄─ JSON events over one WebSocket
                                      │
                                  SQLite + recordings/
+                                     │
+                     coach.py (notes, after)   reports.py ──► Relay ──► Telegram
 ```
 
 ## Commands
 
 ```bash
-make install                         # dependencies
+make install                         # uv sync: exactly what uv.lock pins, ruff included
 make models                          # Kokoro weights into models/ (~340MB, once)
 make run                             # native, serves http://127.0.0.1:8000
 make up / down / logs                # the same thing in Docker
-make check                           # ruff + format + line budget + tests
+make check                           # ruff + format + line budget + tests (what CI runs)
+make e2e                             # real server, real socket, a spoken answer
 ```
 
 `make` with no target lists everything. `python` may not be on PATH — use
@@ -56,11 +59,17 @@ make check                           # ruff + format + line budget + tests
 | `src/coach/chunks.py` | where to cut a streaming reply so it can be spoken |
 | `src/coach/backends.py` | the model catalogue and reachability probing |
 | `src/coach/store.py` | SQLite: writing sessions, turns, settings, retention |
-| `src/coach/history.py` | reading it back: one session, all sessions, totals |
-| `src/coach/profile.py` | who the candidate is, and the system prompt built from it |
-| `src/coach/server/` | `app.py` assembly + websocket, `api.py` JSON routes, `models.py` loaded models |
-| `src/coach/modes/` | one file per mode, discovered automatically |
-| `web/` | plain ES modules, no build step; `views/` is one file per route |
+| `src/coach/history.py` | reading it back: one session, all sessions, totals; `RATES` |
+| `src/coach/today.py` | today's minutes, the streak, the last session's advice |
+| `src/coach/profile.py` | who the user is, past-session recaps, the system prompt |
+| `src/coach/coach.py` | the second model: notes on each answer, the session summary |
+| `src/coach/clock.py` | jobs that run on a timer while the server is up |
+| `src/coach/relay.py` | the Relay client: Telegram, off unless `RELAY_*` is set |
+| `src/coach/reports.py` | what goes to Telegram and when |
+| `src/coach/picture.py` | the charts as PNG, for Telegram (Pillow) |
+| `src/coach/server/` | `app.py` assembly + websocket, `api.py` JSON routes, `session.py` the `io` modes talk to, `guard.py` localhost-only, `models.py` loaded models |
+| `src/coach/modes/` | one file per mode, discovered automatically; `_`-prefixed files are helpers |
+| `web/` | plain ES modules, no build step; `views/` is one file per route; `screen.js` draws the practice page that `views/practice.js` drives |
 | `models/` | Kokoro weights, gitignored, fetched by `make models` |
 | `data/` | sessions, metrics, recordings — gitignored, mounted as a volume |
 
