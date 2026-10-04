@@ -1,5 +1,6 @@
 """Profile, session history and progress. Run: python tests/test_history.py"""
 
+import json
 import pathlib
 import sqlite3
 import tempfile
@@ -8,7 +9,7 @@ from coach import config  # noqa: I001
 
 config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "history.db")
 
-from coach import history, profile, settings, store  # noqa: E402
+from coach import coach, history, profile, settings, store  # noqa: E402
 
 METRICS = {"words": 20, "wpm": 110, "fillers": 3, "pauses": 2, "longest_pause": 1.4, "lead_in": 2.2}
 WORDS = [
@@ -90,6 +91,23 @@ assert history.so_far(first)["wpm"] == 110
 assert 0 <= store.elapsed(first) < 60
 goaled = store.start("talk", "flash-lite", "m", goal=30)
 assert store.goal(goaled) == 30 and store.goal(first) is None
+
+# ---- the coach: notes parse however the model wraps them, and repeats are counted ----
+assert coach.parse('```json\n{"fixes": []}\n```') == {"fixes": []}
+assert coach.parse('Sure! Here you go: {"praise": "clear"} Hope it helps.') == {"praise": "clear"}
+assert coach.parse("no json at all") is None and coach.parse("") is None
+kinds = {"fixes": [{"kind": "articles"}, {"kind": "articles"}, {"kind": "tense"}]}
+store.db().execute("UPDATE turns SET notes = ? WHERE id = ?", (json.dumps(kinds), answer))
+store.db().commit()
+assert history.mistakes() == [("articles", 2), ("tense", 1)]
+assert history.detail(first)["turns"][1]["notes"]["fixes"][1]["kind"] == "articles"
+assert history.detail(first)["summary"] is None
+# the coach's recap is what the next conversation remembers
+recap = {"recap": "They watched Se7en at home with their wife.", "answers": 1}
+store.db().execute("UPDATE sessions SET summary = ? WHERE id = ?", (json.dumps(recap), first))
+store.db().commit()
+assert "Se7en" in profile.system_prompt("talk", "X", interview=False)
+assert "Se7en" not in profile.system_prompt("panel", "X")  # interviews get the CV instead
 
 # ---- a second session, and the totals across both ----
 second = store.start("review", "bonsai27", "prism-ml/bonsai-27b")

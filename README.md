@@ -90,6 +90,39 @@ Filler counts are a floor, not a census: Whisper drops some disfluencies even wi
 prompt biasing it toward verbatim. Pauses, wpm and lead-in come from word timestamps and
 are exact.
 
+## The coach
+
+A second model reads each answer in the background while you keep talking, and leaves
+notes you read after the session: grammar fixes as *what you said → a better version*, a
+more natural way to say the whole thing, phrases and idioms that fit the topic, and one
+thing you did well. The session gets a summary at the top — the three things to work on,
+phrases worth learning, and phrases to buy thinking time instead of "um". The coach is
+told to be kind, to skip anything a native listener would let pass, and to ignore what
+speech recognition probably misheard. The fixes it keeps making are counted on the
+progress page, so a pattern stands out from a one-off slip.
+
+The partner you talk to never corrects you — being corrected mid-answer is what makes
+people freeze. Correction lives with the coach, written, after the fact.
+
+`talk` also remembers your last few sessions from the coach's recaps, so "do you
+remember the film I told you about?" gets a real answer. Choose the coach's model, or
+turn it off, in Settings.
+
+## On your phone
+
+With [Relay](https://github.com/ali-aliabadi/relay) set up, the app sends to Telegram:
+
+- **after each session**: how long it ran against your goal, the four numbers against
+  last time, a chart of every answer, and the coach's lessons
+- **a daily reminder** if you have not practised by your chosen time, with *Starting
+  now* / *In 30 min* / *Skip today* buttons
+- **a weekly report** on Sunday evening: each day, against the week before
+
+Put `RELAY_URL`, `RELAY_API_KEY` and `RELAY_APP` in `.env`; each message has an on/off in
+Settings. Only numbers, a chart and — if you allow it — the coach's lessons are sent.
+Audio never is. It needs the server running at reminder time, which Docker's restart
+policy takes care of.
+
 ## Cost
 
 Measured on a real turn: 995 input tokens, 20 output. At ~40 answers (about an hour) a day:

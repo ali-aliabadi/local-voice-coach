@@ -1,7 +1,7 @@
 import { field, get, post, values } from "../form.js";
 import { CHOICES, current, set } from "../theme.js";
 
-const GROUPS = ["Backends", "Scoring", "Model", "Prompts"];
+const GROUPS = ["Backends", "Scoring", "Model", "Coach", "Telegram", "Prompts"];
 
 const INTRO = {
   Prompts: "Change how each mode behaves: steer the talk partner toward topics you care "

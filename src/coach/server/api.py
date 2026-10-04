@@ -5,7 +5,7 @@ import pathlib
 from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Route
 
-from .. import backends, history, profile, settings, store
+from .. import backends, coach, history, profile, settings, store
 from ..modes import discover
 from . import models
 
@@ -82,7 +82,11 @@ async def save_profile(request):
 
 
 async def get_settings(_request):
-    return JSONResponse(settings.as_form(models.voice_names()) + prompt_fields())
+    choices = {
+        "tts_voice": models.voice_names(),
+        "coach_backend": ("off", *backends.BY_KEY),
+    }
+    return JSONResponse(settings.as_form(choices) + prompt_fields())
 
 
 async def save_settings(request):
@@ -109,11 +113,20 @@ async def get_session(request):
     found = history.detail(int(request.path_params["session"]))
     if found is None:
         return JSONResponse({"error": "no such session"}, status_code=404)
-    return JSONResponse({**found, "partner": partner(found["mode"])})
+    coaching = "pending" if coach.pending(found["id"]) else "on" if coach.endpoint() else "off"
+    return JSONResponse({**found, "partner": partner(found["mode"]), "coaching": coaching})
+
+
+async def coach_session(request):
+    """Notes for answers that have none, then the summary. Old sessions get a report too."""
+    coach.catch_up(int(request.path_params["session"]))
+    return JSONResponse({"ok": True})
 
 
 async def get_progress(_request):
-    return JSONResponse({"totals": history.totals(), "trend": history.trend()})
+    return JSONResponse(
+        {"totals": history.totals(), "trend": history.trend(), "mistakes": history.mistakes(7)}
+    )
 
 
 async def get_audio(request):
@@ -137,6 +150,7 @@ ROUTES = [
     Route("/api/settings", save_settings, methods=["POST"]),
     Route("/api/sessions", get_sessions),
     Route("/api/sessions/{session:int}", get_session),
+    Route("/api/sessions/{session:int}/coach", coach_session, methods=["POST"]),
     Route("/api/progress", get_progress),
     Route("/api/audio/{turn:int}", get_audio),
     Route("/api/forget", forget, methods=["POST"]),

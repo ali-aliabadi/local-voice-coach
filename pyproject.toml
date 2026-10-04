@@ -10,6 +10,7 @@ dependencies = [
     "numpy>=2.4.6",
     "onnxruntime>=1.26.0",
     "openai>=2.41.0",
+    "pillow>=11",
     "starlette>=0.41",
     "uvicorn>=0.32",
     "websockets>=13",

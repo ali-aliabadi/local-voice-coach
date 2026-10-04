@@ -1,7 +1,8 @@
 // Every session you have done, and any one of them replayed in full.
 
 import { moved } from "../chart.js";
-import { escape, get } from "../form.js";
+import { escape, get, post } from "../form.js";
+import * as notes from "../notes.js";
 import * as draw from "../render.js";
 
 const when = (stamp) => (stamp || "").slice(0, 16).replace("T", " ");
@@ -83,7 +84,24 @@ function answerBlock(turn, index) {
       <p class="transcript" data-transcript="${turn.id}"></p>
       ${turn.has_audio
         ? `<audio controls preload="none" src="/api/audio/${turn.id}"></audio>` : ""}
+      ${notes.answer(turn.notes)}
     </article>`;
+}
+
+/** Where the coach's summary goes: the summary, a "still writing" line, or a way to ask. */
+function coaching(session) {
+  if (session.coaching === "pending") {
+    const done = session.turns.filter((t) => t.role === "you" && t.notes).length;
+    return `<p class="callout">The coach is still writing: ${done} of ${session.answers}
+      answers have notes so far. This page fills in by itself.</p>`;
+  }
+  if (session.summary) return `<h2>Coach</h2>${notes.summary(session.summary)}`;
+  if (!session.answers) return "";
+  return session.coaching === "off"
+    ? `<p class="foot">The coach is off. Choose a coach model in <a href="/settings">settings</a>
+       to get notes on grammar, word choice and phrases for every answer.</p>`
+    : `<p class="foot"><button class="link" id="coach-now">Write coach notes for this
+       session</button> — grammar, word choice and phrases for each answer.</p>`;
 }
 
 export const detail = {
@@ -105,6 +123,7 @@ export const detail = {
         · ${escape(session.model)}</p>
       ${changed(session.averages, session.previous)}
       ${session.answers ? '<div class="metrics" id="session-average"></div>' : ""}
+      ${coaching(session)}
       <h2>The conversation</h2>
       ${expired ? `<p class="foot">Recordings from this session have expired — they are
         deleted after the retention window in <a href="/settings">settings</a>.</p>` : ""}
@@ -129,5 +148,15 @@ export const detail = {
       draw.transcript(
         root.querySelector(`[data-transcript="${turn.id}"]`), turn.word_rows, turn.text);
     }
+
+    const again = () => setTimeout(() => {
+      // Only while this page is still the one showing: navigating away ends the polling.
+      if (location.pathname === `/history/${params.id}`) detail.render(root, params);
+    }, 4000);
+    root.querySelector("#coach-now")?.addEventListener("click", async () => {
+      await post(`/api/sessions/${params.id}/coach`, {});
+      again();
+    });
+    if (session.coaching === "pending") again();
   },
 };

@@ -5,6 +5,7 @@ Stored in the settings table under `profile:` keys, the same way prompt override
 interviewer asks generic questions.
 """
 
+import json
 from dataclasses import dataclass, field
 
 from . import history, settings, store
@@ -156,6 +157,24 @@ def coaching_note(recent: dict | None) -> str:
     )
 
 
+def memory(limit: int = 3) -> str:
+    """What earlier conversations were about, from the coach's recaps. Without it every
+    session starts from nothing, and "do you remember?" gets a bluff."""
+    rows = store.db().execute(
+        "SELECT started_at, summary FROM sessions WHERE summary IS NOT NULL"
+        " ORDER BY id DESC LIMIT ?",
+        (limit,),
+    )
+    recaps = [(r["started_at"][:10], json.loads(r["summary"]).get("recap")) for r in rows]
+    lines = [f"- {day}: {recap}" for day, recap in recaps if recap]
+    if not lines:
+        return ""
+    return (
+        "\n\nEarlier conversations with them, most recent first. Bring one up only when it "
+        "fits naturally, the way a friend would:\n" + "\n".join(lines)
+    )
+
+
 def system_prompt(mode: str, default: str, pacing: bool = True, interview: bool = True) -> str:
     """The interviewer's full instructions: the mode's prompt, the user's override if
     there is one, who they are, and how they have been speaking lately.
@@ -164,9 +183,12 @@ def system_prompt(mode: str, default: str, pacing: bool = True, interview: bool 
     interviewer into one that knows the candidate.
 
     `pacing` is off for written critique, where delivery is not being judged.
-    `interview` is off for plain conversation, which only gets their name and language.
+    `interview` is off for plain conversation, which gets their name and language, and
+    what you talked about last time, instead of their CV.
     """
     prompt = settings.prompt(mode, default) + as_prompt(interview)
+    if not interview:
+        prompt += memory()
     if pacing:
         prompt += coaching_note(history.recent())
     return prompt

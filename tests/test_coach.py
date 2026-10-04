@@ -194,7 +194,7 @@ assert settings.prompt("talk", "BUILT-IN") == "be brutal"
 settings.set_prompt("talk", "   ")  # blank means fall back to the mode's own prompt
 assert settings.prompt("talk", "BUILT-IN") == "BUILT-IN"
 
-form = {f["key"]: f for f in settings.as_form(voices=("am_puck", "af_heart"))}
+form = {f["key"]: f for f in settings.as_form({"tts_voice": ("am_puck", "af_heart")})}
 assert form["gemini_api_key"]["value"] == ""  # secrets are never sent to the browser
 assert form["tts_voice"]["choices"] == ["am_puck", "af_heart"]  # filled at request time
 assert form["whisper_model"]["restart"] is True

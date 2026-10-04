@@ -87,6 +87,40 @@ SPEC: dict[str, Setting] = {
     ),
     "tts_voice": Setting("am_puck", "Voice", "Model", kind="select"),
     "tts_speed": Setting(1.0, "Speech speed", "Model", kind="number", step=0.1),
+    # ---- Coach ----
+    "coach_backend": Setting(
+        "flash-lite",
+        "Coach model",
+        "Coach",
+        kind="select",
+        help="Writes notes on each answer in the background, read after the session: "
+        "grammar, word choice, phrases to use. 'off' turns it off. Flash-Lite wrote notes "
+        "as useful as Flash in 2s instead of 20s, and its free tier covers an hour a day; "
+        "Flash's free tier allows 5 requests a minute. bonsai27 keeps it offline.",
+    ),
+    # ---- Telegram, through Relay (see relay.py; switched on by RELAY_* in .env) ----
+    "remind_at": Setting(
+        "19:00",
+        "Daily reminder",
+        "Telegram",
+        help="If you have not practised by this time (HH:MM), Telegram asks whether to start. "
+        "Empty turns it off. Telegram needs RELAY_URL, RELAY_API_KEY and RELAY_APP in .env.",
+    ),
+    "relay_session_report": Setting(
+        "on", "Report after each session", "Telegram", kind="select", choices=("on", "off")
+    ),
+    "relay_weekly": Setting(
+        "on", "Weekly report, Sunday evening", "Telegram", kind="select", choices=("on", "off")
+    ),
+    "relay_lessons": Setting(
+        "on",
+        "Include the coach's lessons",
+        "Telegram",
+        kind="select",
+        choices=("on", "off"),
+        help="The lessons quote your own sentences, so that text ends up in your Telegram "
+        "chat. Audio never does.",
+    ),
     "whisper_model": Setting(
         "small.en",
         "Whisper model",
@@ -98,7 +132,11 @@ SPEC: dict[str, Setting] = {
     ),
 }
 
-_ENV_FALLBACK = {"gemini_api_key": "GEMINI_API_KEY", "lm_studio_url": "LM_STUDIO_URL"}
+_ENV_FALLBACK = {
+    "gemini_api_key": "GEMINI_API_KEY",
+    "lm_studio_url": "LM_STUDIO_URL",
+    "coach_backend": "COACH_BACKEND",
+}
 
 
 def _coerce(raw: str, default: Any) -> Any:
@@ -166,11 +204,14 @@ def set_prompt(name: str, value: str, default: str | None = None) -> None:
     _store(f"prompt:{name}", None if not value.strip() or value == default else value)
 
 
-def as_form(voices: tuple[str, ...] = ()) -> list[dict]:
-    """The whole settings form as data, for the browser to render. Secrets are masked."""
+def as_form(choices: dict[str, tuple[str, ...]] | None = None) -> list[dict]:
+    """The whole settings form as data, for the browser to render. Secrets are masked.
+
+    `choices` fills selects whose options are only known at request time: the voices
+    Kokoro loaded, the models in the catalogue."""
     out = []
     for key, spec in SPEC.items():
-        choices = voices if key == "tts_voice" else spec.choices
+        options = (choices or {}).get(key, spec.choices)
         value = "" if spec.secret else get(key)
         out.append(
             {
@@ -181,7 +222,7 @@ def as_form(voices: tuple[str, ...] = ()) -> list[dict]:
                 "help": spec.help,
                 "restart": spec.restart,
                 "step": spec.step,
-                "choices": list(choices),
+                "choices": list(options),
                 "value": value,
                 "isSet": bool(get(key)) if spec.secret else None,
             }

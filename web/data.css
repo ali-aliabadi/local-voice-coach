@@ -66,6 +66,24 @@
 .chip.fill { background: var(--warn); }
 .legend .dur { margin-left: auto; font-variant-numeric: tabular-nums; }
 
+/* ---- the coach's notes ---- */
+.coach h3 { font-size: 0.85rem; font-weight: 550; margin: 1.25rem 0 0.4rem; }
+.coach ol, .coach ul { margin: 0; padding-left: 1.2rem; line-height: 1.6; }
+.good-news { color: var(--good); }
+.notes { margin-top: 1rem; padding: 0.9rem 1rem; border-left: 2px solid var(--accent);
+  background: var(--surface); border-radius: 0 9px 9px 0; font-size: 0.92rem; }
+.notes p { margin: 0 0 0.6rem; }
+.fixes { list-style: none; padding: 0; margin: 0 0 0.6rem; line-height: 1.7; }
+.fixes .said { text-decoration: line-through; color: var(--muted); }
+.fixes .why { color: var(--muted); font-size: 0.85rem; margin-left: 0.4rem; }
+.natural span { color: var(--muted); display: block; font-size: 0.8rem; }
+.phrases { margin: 0.4rem 0 0; display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
+.phrases dt { font-weight: 550; }
+.phrases dd { margin: 0; color: var(--muted); }
+.repeats { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+.repeats b { font-weight: 550; }
+.repeats span { color: var(--muted); font-size: 0.85rem; }
+
 .loading { opacity: 0.6; }
 
 @media (max-width: 30rem) {

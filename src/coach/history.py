@@ -74,7 +74,7 @@ def detail(session_id: int) -> dict | None:
         store.db()
         .execute(
             "SELECT s.id, s.started_at, s.ended_at, s.mode, s.backend, s.model, s.goal_minutes,"
-            f" {LENGTH} FROM sessions s WHERE s.id = ?",
+            f" s.summary, {LENGTH} FROM sessions s WHERE s.id = ?",
             (session_id,),
         )
         .fetchone()
@@ -85,7 +85,7 @@ def detail(session_id: int) -> dict | None:
         store.db()
         .execute(
             "SELECT id, at, role, text, words, wpm, fillers, pauses, longest_pause, lead_in,"
-            "  stt_ms, reply_ms, word_rows, audio_path IS NOT NULL AS has_audio "
+            "  stt_ms, reply_ms, word_rows, notes, audio_path IS NOT NULL AS has_audio "
             "FROM turns WHERE session_id = ? ORDER BY id",
             (session_id,),
         )
@@ -94,6 +94,7 @@ def detail(session_id: int) -> dict | None:
     answers = [t for t in turns if t["role"] == "you" and t["wpm"] is not None]
     return {
         **dict(head),
+        "summary": json.loads(head["summary"]) if head["summary"] else None,
         "turns": [_turn(t) for t in turns],
         "answers": len(answers),
         "averages": so_far(session_id),
@@ -170,6 +171,22 @@ def recent(limit: int = 5) -> dict:
     return dict(row)
 
 
+def mistakes(days: int = 7) -> list[tuple[str, int]]:
+    """The kinds of fix the coach made most over the last `days`, most frequent first: the
+    patterns worth practising, as opposed to one-off slips."""
+    rows = store.db().execute(
+        "SELECT notes FROM turns WHERE role = 'you' AND notes IS NOT NULL"
+        " AND at >= datetime('now', 'localtime', ?)",
+        (f"-{days} days",),
+    )
+    counts: dict[str, int] = {}
+    for row in rows:
+        for fix in json.loads(row["notes"]).get("fixes") or []:
+            kind = str(fix.get("kind") or "other")
+            counts[kind] = counts.get(kind, 0) + 1
+    return sorted(counts.items(), key=lambda kv: -kv[1])
+
+
 def trend(days: int = 366) -> list[dict]:
     """Rates per day, oldest first. A day is the unit of a daily habit, and it does not
     fall off the chart after a few weeks the way a per-session list capped at 60 did."""
@@ -190,4 +207,5 @@ def trend(days: int = 366) -> list[dict]:
 def _turn(row) -> dict:
     turn = dict(row)
     turn["word_rows"] = json.loads(turn["word_rows"]) if turn["word_rows"] else []
+    turn["notes"] = json.loads(turn["notes"]) if turn["notes"] else None
     return rates(turn) if turn["role"] == "you" and turn["wpm"] is not None else turn

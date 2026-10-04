@@ -43,8 +43,26 @@ script: list[str] = []
 received: list[list[dict]] = []
 
 
+NOTES = {"fixes": [{"said": "I watched", "better": "we watched", "why": "x", "kind": "tense"}]}
+SUMMARY = {"recap": "They talked about films.", "work_on": ["tenses"], "went_well": "clear"}
+
+
 async def completions(request):
     body = await request.json()
+    system = body["messages"][0]["content"]
+    if "English coach" in system:  # the coach, in the background: answer it at once
+        canned = SUMMARY if "session summary" in system else NOTES
+        return JSONResponse(
+            {
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": json.dumps(canned)},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
     received.append(body["messages"])
     text = script.pop(0)
 
@@ -86,6 +104,7 @@ def serve(application, port: int) -> None:
 # the fake model is wired in through the environment, not settings.set().
 fake_port, app_port = free_port(), free_port()
 os.environ["LM_STUDIO_URL"] = f"http://127.0.0.1:{fake_port}/v1"
+os.environ["COACH_BACKEND"] = "gemma4-e4b"  # a local model, so the coach uses the fake too
 serve(fake, fake_port)
 serve(app, app_port)  # loads Whisper and Kokoro before it reports started
 
@@ -146,6 +165,22 @@ async def main() -> None:
     )
     roles = [row[0] for row in saved]
     assert roles == ["interviewer", "you", "interviewer", "you", "interviewer"], roles
+
+    # the coach wrote notes on both answers in the background, then summarised on close
+    for _ in range(50):
+        db = sqlite3.connect(config.DB_PATH)
+        notes = db.execute(
+            "SELECT notes FROM turns WHERE session_id = ? AND role = 'you'", (session,)
+        ).fetchall()
+        summary = db.execute("SELECT summary FROM sessions WHERE id = ?", (session,)).fetchone()
+        if all(n[0] for n in notes) and summary[0]:
+            break
+        await asyncio.sleep(0.2)
+    assert all(json.loads(n[0]) == NOTES for n in notes), notes
+    assert (
+        json.loads(summary[0])["recap"] == SUMMARY["recap"]
+        and json.loads(summary[0])["answers"] == 2
+    )
 
 
 asyncio.run(main())

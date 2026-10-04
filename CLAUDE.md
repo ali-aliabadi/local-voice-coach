@@ -175,6 +175,26 @@ language): stack, role and focus pulled every chat back to engineering. It may e
 garbled sentence back naturally ("Oh, so you ended up...") but never points it out, so
 the no-correction rule still holds.
 
+### Correction lives with the coach, not the partner
+The conversation partner never corrects the user — being corrected mid-answer is what
+makes people freeze. `coach.py` is a second model that reads each answer in the
+background (never awaited by the conversation) and writes notes read after the session,
+then a session summary whose `recap` becomes `talk`'s memory of past sessions. Its
+prompts forbid blaming the speaker for speech-recognition errors: a "fix" for a word
+Whisper misheard, or for the transcriber's spelling, is the worst kind of note. Coach
+requests go one at a time and wait out 429s — the free tier for Gemini 3.8 Flash is 5
+requests a minute, and catching up a 23-answer session at once had 20 refused. The
+default is Flash-Lite: notes as useful as Flash's, in 2s instead of 20s.
+
+### Telegram through Relay is optional and environment-only
+`relay.py` is off unless `RELAY_URL`, `RELAY_API_KEY` and `RELAY_APP` are set. The key
+is read from the environment only — never a setting, never logged; logs carry message
+ids, never contents. `reports.py` holds what is sent and when; each message remembers
+what it sent under `relay:` keys in the settings table, so a restart never repeats one.
+The charts are drawn server-side by `picture.py` (Pillow) so a report never depends on
+a browser tab still being open; `picture.SERIES` mirrors `SERIES` in `chart.js`, and
+a test fails if they drift.
+
 ### Schema changes need a migration
 `CREATE TABLE IF NOT EXISTS` will not add a column to a database that already exists, and
 users have real practice history in theirs. Add the column to `SCHEMA` *and* to

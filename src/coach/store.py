@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     mode       TEXT NOT NULL,
     backend    TEXT NOT NULL,
     model      TEXT NOT NULL,
-    goal_minutes INTEGER                -- what the user set out to do, or NULL
+    goal_minutes INTEGER,               -- what the user set out to do, or NULL
+    summary    TEXT                     -- the coach's summary, JSON
 );
 CREATE TABLE IF NOT EXISTS turns (
     id            INTEGER PRIMARY KEY,
@@ -36,8 +37,9 @@ CREATE TABLE IF NOT EXISTS turns (
     stt_ms        REAL,
     reply_ms      REAL,                   -- first token for streams, whole call otherwise
     audio_path    TEXT,                   -- recording on disk, or NULL once purged
-    word_rows     TEXT                    -- per-word timings, so a past answer can still
+    word_rows     TEXT,                   -- per-word timings, so a past answer can still
                                           -- show its highlighted transcript and timeline
+    notes         TEXT                    -- the coach's notes on an answer, JSON
 );
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
@@ -52,8 +54,8 @@ _db: sqlite3.Connection | None = None
 # Columns added after the first release. CREATE TABLE IF NOT EXISTS will not add them to
 # a database that already exists, so they are applied here instead.
 ADDED_COLUMNS = {
-    "turns": {"words": "INTEGER", "word_rows": "TEXT"},
-    "sessions": {"goal_minutes": "INTEGER"},
+    "turns": {"words": "INTEGER", "word_rows": "TEXT", "notes": "TEXT"},
+    "sessions": {"goal_minutes": "INTEGER", "summary": "TEXT"},
 }
 
 
@@ -171,6 +173,20 @@ def record(
     )
     db().commit()
     return cursor.lastrowid
+
+
+def last_said(session_id: int) -> str:
+    """What the partner said last: the thing an answer is replying to."""
+    row = (
+        db()
+        .execute(
+            "SELECT text FROM turns WHERE session_id = ? AND role NOT IN ('you', 'review')"
+            " ORDER BY id DESC LIMIT 1",
+            (session_id,),
+        )
+        .fetchone()
+    )
+    return row["text"] if row else ""
 
 
 def audio_path(turn_id: int) -> str | None:

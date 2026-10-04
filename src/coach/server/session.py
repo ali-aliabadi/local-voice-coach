@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 import numpy as np
 
-from .. import config, history, llm, settings, store, stt, tts
+from .. import coach, config, history, llm, settings, store, stt, tts
 
 RECORDINGS = config.RECORDINGS
 
@@ -91,7 +91,9 @@ class BrowserIO:
         if not text:
             await self.send(type="notice", text="Didn't catch that. Move closer to the mic.")
             return None
+        asked = store.last_said(self.session)
         turn = self._save_answer(audio, text, metrics, stt_ms, words)
+        coach.note(self.session, turn, asked, text)  # in the background, never waited on
         await self.send(
             type="transcript",
             text=text,

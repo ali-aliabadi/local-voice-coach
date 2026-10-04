@@ -8,7 +8,7 @@ every time or checks for itself whether it is due.
 
 import asyncio
 
-from . import settings, store
+from . import reports, settings, store
 
 TICK_SECONDS = 600
 
@@ -19,7 +19,7 @@ def expire_recordings() -> None:
         print(f"  expired {gone} recording(s)")
 
 
-JOBS = [expire_recordings]
+JOBS = [expire_recordings, reports.remind, reports.weekly]
 
 
 async def run() -> None:
