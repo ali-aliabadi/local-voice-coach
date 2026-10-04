@@ -97,6 +97,61 @@ def _tiles(averages: dict) -> list[tuple[str, str, str, bool]]:
     return tiles
 
 
+def _time_tiles(d: dict) -> list[tuple[str, str, str, bool | None]]:
+    """How the session's time went: its length against the goal, how much of it was you,
+    how fast replies came, how many you followed by ear. Only what was measured."""
+    tiles = []
+    minutes, goal = d.get("minutes") or 0, d.get("goal_minutes")
+    if minutes:
+        note = (
+            (f"goal {goal} min, reached" if minutes >= goal else f"goal was {goal} min")
+            if goal
+            else "start to last answer"
+        )
+        tiles.append((f"{round(minutes)} min", "session", note, minutes >= goal if goal else None))
+    spoken = (d.get("averages") or {}).get("spoken")
+    if spoken and minutes:
+        shown = f"{spoken:.0f} min" if spoken >= 1 else "<1 min"
+        tiles.append(
+            (shown, "you speaking", f"{round(spoken / minutes * 100)}% of the session", None)
+        )
+    wait = _waits(d)
+    if wait:
+        tiles.append((f"{wait['total']:.1f}s", "until a reply began", "after you stopped", None))
+    heard = d.get("listening") or {}
+    if heard.get("replies"):
+        followed = heard["replies"] - heard["helped"]
+        tiles.append(
+            (f"{followed}/{heard['replies']}", "replies followed by ear", "no replay or text", None)
+        )
+    return tiles
+
+
+def _waits(d: dict) -> dict | None:
+    """The average reply wait and where it went, over the replies that were timed."""
+    timed = [t["timing"] for t in d["turns"] if (t.get("timing") or {}).get("total")]
+    if not timed:
+        return None
+    return {k: sum(t.get(k, 0) for t in timed) / len(timed) / 1000 for k in timed[0]}
+
+
+def _charts(doc: layout.Doc, session_id: int, d: dict) -> None:
+    """The session answer by answer, and the last fortnight day by day, on the app's
+    fixed scales - a flat stretch has to look flat."""
+    series, days = history.answers(session_id), history.trend(14)
+    if len(series) < 2 and len(days) < 2:
+        return
+    doc.heading("In charts")
+    if len(series) > 1:
+        chart = picture.panels(series, ["answer 1", f"answer {len(series)}"], d["averages"])
+        doc.image(chart, "This session, one point per answer. The shaded band is the target; the "
+                  "big number is the whole session.")  # fmt: skip
+    if len(days) > 1:
+        chart = picture.panels(days, [days[0]["day"][5:], days[-1]["day"][5:]], days[-1])
+        doc.image(chart, f"Your last {len(days)} days of practice, up to today, one point per "
+                  "day. The big number is the latest day.")  # fmt: skip
+
+
 def render(session_id: int) -> layout.Doc | None:
     s, d = stored(session_id), history.detail(session_id)
     if not s or not d:
@@ -109,6 +164,18 @@ def render(session_id: int) -> layout.Doc | None:
     if s.get("went_well"):
         doc.text(s["went_well"], 27, color=layout.GOOD, after=26)
     doc.tiles(_tiles(d["averages"]))
+    time = _time_tiles(d)
+    if time:
+        doc.tiles(time)
+    wait = _waits(d)
+    if wait and {"hearing", "thinking", "voicing"} <= wait.keys():
+        doc.text(
+            f"Each reply began {wait['total']:.1f}s after you stopped: {wait['hearing']:.1f}s "
+            f"hearing you, {wait['thinking']:.1f}s thinking, {wait['voicing']:.1f}s voicing.",
+            21,
+            color=picture.MUTED,
+            after=10,
+        )
     if s.get("fixes"):
         doc.heading("Say it better")
         for fix in s["fixes"]:
@@ -133,4 +200,5 @@ def render(session_id: int) -> layout.Doc | None:
         doc.heading("For tomorrow")
         for n, task in enumerate(s["practice"], 1):
             doc.bullet(task, marker=f"{n}.")
+    _charts(doc, session_id, d)
     return doc

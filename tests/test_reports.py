@@ -140,7 +140,23 @@ llm.patiently = model  # the model is faked by reassigning the one call that rea
 run(sheet.write(one))
 assert sheet.stored(one)["title"] == "A good session"
 pdf = sheet.render(one).pdf()
-assert pdf[:4] == b"%PDF" and len(sheet.render(one).pngs()) == 1
+assert pdf[:4] == b"%PDF" and len(sheet.render(one).pngs()) >= 1
+
+# time on the sheet: only what was measured, and a reached goal is good news
+timed = {"total": 3000, "hearing": 1000, "thinking": 1500, "voicing": 500}
+detail = {
+    "minutes": 34.2, "goal_minutes": 30, "averages": {"spoken": 14.6},
+    "turns": [{"timing": timed}, {"timing": None}, {"timing": {**timed, "total": 5000}}],
+    "listening": {"replies": 20, "helped": 3},
+}  # fmt: skip
+tiles = sheet._time_tiles(detail)
+assert tiles[0] == ("34 min", "session", "goal 30 min, reached", True)
+assert tiles[1][0] == "15 min" and tiles[1][2] == "43% of the session"
+assert tiles[2][0] == "4.0s"  # the mean of the two timed replies; the untimed one is left out
+assert tiles[3][0] == "17/20"
+bare = sheet._time_tiles({"minutes": 12, "goal_minutes": None, "averages": {}, "turns": []})
+assert bare == [("12 min", "session", "start to last answer", None)]  # nothing invented
+assert len(sheet.render(one).pages) >= 2  # the session's answers, charted at the end
 
 relay.remember(f"session:{one}", "")  # report the session again, now with its sheet
 before = len(sent)

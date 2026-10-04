@@ -90,8 +90,9 @@ class Doc:
         )
         self.text(text, indent=44, after=10, **style)
 
-    def tiles(self, items: list[tuple[str, str, str, bool]]) -> None:
-        """A row of numbers: (value, what it is, a verdict, whether the verdict is good)."""
+    def tiles(self, items: list[tuple[str, str, str, bool | None]]) -> None:
+        """A row of numbers: (value, what it is, a note, whether the note is good news).
+        None is neither - "44% of the session" is a fact, not a verdict."""
         gap = 24
         width = (WIDTH - gap * (len(items) - 1)) / len(items)
         self.room(170)
@@ -103,11 +104,21 @@ class Doc:
                 self.draw.text(
                     (x + 20, self.y + 76 + n * 24), line, font=self.font(19), fill=picture.MUTED
                 )
-            colour = GOOD if good else FAR
+            colour = picture.MUTED if good is None else GOOD if good else FAR
             self.draw.text(
                 (x + 20, self.y + 128), self.clean(note), font=self.font(19), fill=colour
             )
         self.y += 184
+
+    def image(self, png: bytes, caption: str = "") -> None:
+        """A picture at the full text width, kept on one page with its caption."""
+        img = Image.open(io.BytesIO(png)).convert("RGB")
+        height = round(img.height * WIDTH / img.width)
+        self.room(height + 70)
+        self.pages[-1].paste(img.resize((WIDTH, height), Image.LANCZOS), (MARGIN, self.y))
+        self.y += height + 12
+        if caption:
+            self.text(caption, 20, color=picture.MUTED, after=28)
 
     def _numbered(self) -> list[Image.Image]:
         if getattr(self, "stamped", False):  # pdf() and pngs() on the same doc

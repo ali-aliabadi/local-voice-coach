@@ -123,7 +123,9 @@ turn it off, in Settings.
 After every session of three answers or more, a model writes your **study sheet**: a page
 or two to keep — what went well, the fixes worth the most, phrases for the conversations
 you actually have (each shown against what you said, with an example), what to say
-instead of "um", and three small things to practise tomorrow. Open it as a PDF from the
+instead of "um", three small things to practise tomorrow, how the session's time went
+(its length against your goal, how much of it was you speaking, how fast replies came,
+how many you followed by ear) and charts of every answer and of your last two weeks. Open it as a PDF from the
 session page; with Telegram set up it is sent to you too. Phrases in the coach's notes
 are anchored the same way: *instead of "I don't like cinema" → "not really my thing"*.
 
