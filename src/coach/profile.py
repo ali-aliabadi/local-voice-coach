@@ -149,10 +149,10 @@ def coaching_note(recent: dict | None) -> str:
         return ""
     return (
         f"\n\nFor pacing only, their recent delivery: {recent['wpm']:.0f} words per minute, "
-        f"{recent['fillers']:.1f} filler words and {recent['lead_in']:.1f}s of silence "
-        "before starting, per answer. If they are hesitating a lot, ask shorter and more "
-        "concrete questions. Never mention these numbers or their speech. Never correct "
-        "their English."
+        f"{recent['fillers']:.1f} filler words per 100 words, and {recent['lead_in']:.1f}s "
+        "of silence before starting each answer. If they are hesitating a lot, ask shorter "
+        "and more concrete questions. Never mention these numbers or their speech. Never "
+        "correct their English."
     )
 
 

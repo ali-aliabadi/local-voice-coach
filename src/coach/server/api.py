@@ -102,7 +102,7 @@ async def get_session(request):
 
 
 async def get_progress(_request):
-    return JSONResponse({"totals": history.totals(), "trend": store.trend(limit=60)})
+    return JSONResponse({"totals": history.totals(), "trend": history.trend()})
 
 
 async def get_audio(request):

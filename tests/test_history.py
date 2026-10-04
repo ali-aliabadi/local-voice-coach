@@ -79,6 +79,8 @@ spoken = detail["turns"][1]
 assert [w["word"] for w in spoken["word_rows"] if w["filler"]] == ["um"]
 assert detail["turns"][0]["word_rows"] == []  # the interviewer has none
 assert detail["averages"]["lead_in"] == 2.2
+assert detail["averages"]["fillers"] == 15.0  # 3 fillers in 20 words
+assert spoken["fillers"] == 15.0  # each answer is shown as a rate as well
 
 # ---- a second session, and the totals across both ----
 second = store.start("review", "bonsai27", "prism-ml/bonsai-27b")
@@ -94,9 +96,17 @@ store.finish(second)
 assert [s["mode"] for s in history.sessions()] == ["review", "talk"]  # newest first
 totals = history.totals()
 assert totals["sessions"] == 2 and totals["answers"] == 2 and totals["words"] == 50
-assert totals["wpm"] == 120  # mean of 110 and 130
+# weighted by words: 50 words over 20/110 + 30/130 minutes, not the plain mean of 120
+assert round(totals["wpm"], 1) == 121.2
+assert totals["fillers"] == 8.0  # 4 fillers in 50 words is 8 per 100, however they split
 assert history.recent()["answers"] == 2
-assert history.recent(limit=1)["fillers"] == 1  # only the newest session
+assert round(history.recent(limit=1)["fillers"], 2) == 3.33  # 1 in 30 words, newest only
+
+# rates, not counts: the same fillers in a longer answer is better, not equal
+short = history.rates({"words": 10, "wpm": 120, "fillers": 2, "pauses": 1})
+long = history.rates({"words": 100, "wpm": 120, "fillers": 2, "pauses": 1})
+assert short["fillers"] == 20.0 and long["fillers"] == 2.0
+assert long["pauses"] == 1.2  # one pause in 100 words at 120 wpm: 50 seconds of speech
 
 # a session with no answers is not a session worth listing
 empty = store.start("talk", "flash-lite", "m")

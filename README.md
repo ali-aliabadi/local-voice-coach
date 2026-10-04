@@ -70,8 +70,8 @@ Tap the circle to answer, tap again when you're done. Space works too.
 | Metric | Meaning | Direction |
 |---|---|---|
 | **wpm** | words per minute while actually speaking | up — native conversational is ~140–160 |
-| **fillers** | "um", "uh", "mmm", "er", "hmm" | down |
-| **pauses** | silences past your threshold (0.6s) mid-answer | down |
+| **fillers** | "um", "uh", "mmm", "er", "hmm" — per 100 words | down — 2 or fewer is barely noticeable |
+| **pauses** | silences past your threshold (0.6s) mid-answer — per minute | down |
 | **lead-in** | seconds before your first word | down — this is *"sentences take long to form"* |
 
 After each answer you get the transcript with **every filler highlighted**, a **timeline**
@@ -81,6 +81,10 @@ of your answer with the silences drawn as gaps, and **playback of your own voice
 whole conversation, each answer scored, the highlighted transcript and timeline for each,
 and your recordings. `/history` lists them all; `/progress` totals everything you have
 ever done and charts the four numbers over time.
+
+Fillers and pauses are rates, not counts per answer: a long answer has more of them in it
+without being any worse, and averages are weighted by words so one short answer cannot
+swing a session.
 
 Filler counts are a floor, not a census: Whisper drops some disfluencies even with the
 prompt biasing it toward verbatim. Pauses, wpm and lead-in come from word timestamps and

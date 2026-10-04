@@ -9,8 +9,8 @@ const escape = (text) =>
 
 const LABEL = {
   wpm: "words / min",
-  fillers: "filler words",
-  pauses: "pauses",
+  fillers: "fillers / 100 words",
+  pauses: "pauses / minute",
   lead_in: "before you spoke",
 };
 

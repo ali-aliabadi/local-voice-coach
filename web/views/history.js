@@ -25,9 +25,9 @@ export const list = {
           <a class="pick" href="/history/${s.id}">
             <b>${escape(s.mode)} <span class="tag">${when(s.started_at)}</span></b>
             <span class="cost">${s.answers} answer${s.answers === 1 ? "" : "s"}</span>
-            <span class="meta">${Math.round(s.wpm)} wpm ·
-              ${s.fillers.toFixed(1)} fillers · ${s.pauses.toFixed(1)} pauses ·
-              ${s.lead_in.toFixed(1)}s before speaking</span>
+            <span class="meta">${s.wpm == null ? "not scored" : `${Math.round(s.wpm)} wpm ·
+              ${s.fillers.toFixed(1)} fillers per 100 words · ${s.pauses.toFixed(1)} pauses
+              a minute · ${s.lead_in.toFixed(1)}s before speaking`}</span>
           </a>`).join("")}
       </div>`;
   },

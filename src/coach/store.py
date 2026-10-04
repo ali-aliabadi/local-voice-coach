@@ -212,21 +212,3 @@ def session_scores(session_id: int) -> list[dict]:
         .fetchall()
     )
     return [dict(r) for r in rows]
-
-
-def trend(limit: int = 20) -> list[dict]:
-    """Per-session averages, oldest first, so progress is visible."""
-    rows = (
-        db()
-        .execute(
-            "SELECT s.id, s.started_at, s.mode, s.backend, COUNT(t.id) AS answers,"
-            " AVG(t.wpm) AS wpm, AVG(t.fillers) AS fillers, AVG(t.pauses) AS pauses,"
-            " AVG(t.lead_in) AS lead_in "
-            "FROM sessions s JOIN turns t ON t.session_id = s.id "
-            "WHERE t.role = 'you' AND t.wpm IS NOT NULL "
-            "GROUP BY s.id ORDER BY s.id DESC LIMIT ?",
-            (limit,),
-        )
-        .fetchall()
-    )
-    return [dict(r) for r in reversed(rows)]

@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 import numpy as np
 
-from .. import config, llm, settings, store, stt, tts
+from .. import config, history, llm, settings, store, stt, tts
 
 RECORDINGS = config.RECORDINGS
 
@@ -92,7 +92,9 @@ class BrowserIO:
             await self.send(type="notice", text="Didn't catch that. Move closer to the mic.")
             return None
         turn = self._save_answer(audio, text, metrics, stt_ms, words)
-        await self.send(type="transcript", text=text, metrics=metrics, words=words, turn=turn)
+        await self.send(
+            type="transcript", text=text, metrics=history.rates(metrics), words=words, turn=turn
+        )
         return Answer(text, metrics)
 
     async def reply(

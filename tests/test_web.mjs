@@ -52,8 +52,9 @@ for (const [key, threshold] of Object.entries(MOVED)) {
 }
 
 // ---- the phrasing says the direction in words, never leaving it to an arrow ----
-assert.equal(PHRASE.fillers(-1.9, true), "1.9 fewer fillers");
-assert.equal(PHRASE.fillers(1.9, false), "1.9 more fillers");
+assert.equal(PHRASE.fillers(-1.9, true), "1.9 fewer fillers per 100 words");
+assert.equal(PHRASE.fillers(1.9, false), "1.9 more fillers per 100 words");
+assert.equal(PHRASE.pauses(-2, true), "2.0 fewer pauses a minute");
 assert.equal(PHRASE.wpm(12.4, true), "12 wpm faster");
 assert.equal(PHRASE.lead_in(-0.9, true), "0.9s quicker to start");
 for (const [key, phrase] of Object.entries(PHRASE)) {

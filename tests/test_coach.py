@@ -11,7 +11,7 @@ from coach import config  # noqa: I001
 
 config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "test.db")
 
-from coach import backends, settings, store  # noqa: E402
+from coach import backends, history, settings, store  # noqa: E402
 from coach.llm import conversation, split_for_speech, split_speaker  # noqa: E402
 from coach.modes.panel import PANEL  # noqa: E402
 from coach.stt import filler_pattern, fluency, word_rows  # noqa: E402
@@ -184,7 +184,7 @@ assert form["tts_voice"]["choices"] == ["am_puck", "af_heart"]  # filled at requ
 assert form["whisper_model"]["restart"] is True
 
 # ---- store: persistence, latency and retention ----
-assert store.measured_latency() == {} and store.trend() == []
+assert store.measured_latency() == {} and history.trend() == []
 
 one = store.start("talk", "flash-lite", "gemini-3.5-flash-lite")
 first = store.record(one, "you", "an answer", smooth, stt_ms=800, audio_path="/tmp/gone.wav")
@@ -206,11 +206,11 @@ store.finish(two)
 # each session is its own: two tabs no longer file answers under one another
 assert len(store.session_scores(one)) == 1 and len(store.session_scores(two)) == 1
 assert store.measured_latency()["bonsai27"] == (9000.0, 1)
-trend = store.trend()
+trend = history.trend()
 assert len(trend) == 2 and trend[0]["mode"] == "talk" and trend[1]["mode"] == "review"
 
 store.forget_everything()
-assert store.trend() == [] and store.measured_latency() == {}
+assert history.trend() == [] and store.measured_latency() == {}
 
 # ---- the guard: only this machine's own pages may change anything ----
 import warnings  # noqa: E402

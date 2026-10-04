@@ -16,13 +16,15 @@ export const SERIES = {
     goalNote: "natural conversational pace",
     format: (v) => String(Math.round(v)),
   },
+  // Rates, not per-answer counts: a long answer holds more fillers without being worse.
+  // The goals are calibration knobs, not research findings - move them if they feel wrong.
   fillers: {
-    label: "filler words per answer", domain: [0, 8], goal: [0, 2], better: "down",
+    label: "filler words per 100 words", domain: [0, 10], goal: [0, 2], better: "down",
     goalNote: "barely noticeable",
     format: (v) => v.toFixed(1),
   },
   pauses: {
-    label: "pauses per answer", domain: [0, 8], goal: [0, 2], better: "down",
+    label: "pauses per minute", domain: [0, 20], goal: [0, 5], better: "down",
     goalNote: "sounds fluent",
     format: (v) => v.toFixed(1),
   },
@@ -44,13 +46,14 @@ const clamp = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
  */
 export const PHRASE = {
   wpm: (d, better) => `${Math.round(Math.abs(d))} wpm ${better ? "faster" : "slower"}`,
-  fillers: (d, better) => `${Math.abs(d).toFixed(1)} ${better ? "fewer" : "more"} fillers`,
-  pauses: (d, better) => `${Math.abs(d).toFixed(1)} ${better ? "fewer" : "more"} pauses`,
+  fillers: (d, better) =>
+    `${Math.abs(d).toFixed(1)} ${better ? "fewer" : "more"} fillers per 100 words`,
+  pauses: (d, better) => `${Math.abs(d).toFixed(1)} ${better ? "fewer" : "more"} pauses a minute`,
   lead_in: (d, better) => `${Math.abs(d).toFixed(1)}s ${better ? "quicker" : "slower"} to start`,
 };
 
 /** How much a number has to move before it is worth mentioning rather than noise. */
-export const MOVED = { wpm: 4, fillers: 0.4, pauses: 0.4, lead_in: 0.3 };
+export const MOVED = { wpm: 4, fillers: 0.4, pauses: 0.8, lead_in: 0.3 };
 
 export function moved(key, now, before) {
   const diff = (now ?? 0) - (before ?? 0);
