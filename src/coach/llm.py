@@ -31,7 +31,7 @@ def _client(base_url: str, api_key: str) -> AsyncOpenAI:
     return AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=config.REQUEST_TIMEOUT)
 
 
-OPENING_NUDGE = "Begin the interview."
+OPENING_NUDGE = "Begin."
 
 
 def conversation(messages: list[dict]) -> list[dict]:

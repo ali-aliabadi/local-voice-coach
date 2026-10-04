@@ -59,7 +59,7 @@ being corrected mid-answer is what makes people freeze.
 
 | Mode | What it is |
 |---|---|
-| **talk** | One interviewer, fast replies, every answer scored. Built for reps. |
+| **talk** | Everyday conversation, not an interview — a friendly partner chats about ordinary things and talks enough to give you something to listen to. Fast replies, every answer scored. |
 | **panel** | Three interviewers with distinct voices — a hiring manager, a staff engineer, and a bar raiser who pushes back. Closer to a real onsite. |
 | **review** | One hard technical question, then a written critique: what held up, what was vague, what a real interviewer would probe next. Deliberately slow. |
 

@@ -40,6 +40,9 @@ assert "Never read this back" in prompt  # it must not recite the profile at the
 
 full = profile.system_prompt("talk", "BASE PROMPT")
 assert full.startswith("BASE PROMPT") and "Ali" in full
+# plain conversation keeps their name but not the engineering, or every chat drifts back to it
+chat = profile.system_prompt("talk", "BASE PROMPT", interview=False)
+assert "Ali" in chat and "Backend engineer" not in chat and "System design." not in chat
 
 settings.set_prompt("talk", "MY OWN PROMPT")
 assert profile.system_prompt("talk", "BASE PROMPT").startswith("MY OWN PROMPT")

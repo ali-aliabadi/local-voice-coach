@@ -162,6 +162,15 @@ knowing the candidate.
 pacing only* and forbids mentioning them. Being told you say "um" mid-answer is exactly
 what makes someone freeze, and the whole app exists to stop that.
 
+### `talk` is conversation practice, not an interview
+`talk` is everyday chat for a non-native speaker: the partner speaks natural English
+(contractions, phrasal verbs) in 2-3 sentences so there is something to listen to, and
+asks open questions so the user does most of the speaking. It calls
+`system_prompt(..., interview=False)`, which passes only `profile.PERSONAL` (name, first
+language): stack, role and focus pulled every chat back to engineering. It may echo a
+garbled sentence back naturally ("Oh, so you ended up...") but never points it out, so
+the no-correction rule still holds.
+
 ### Schema changes need a migration
 `CREATE TABLE IF NOT EXISTS` will not add a column to a database that already exists, and
 users have real practice history in theirs. Add the column to `SCHEMA` *and* to
