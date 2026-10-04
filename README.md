@@ -183,3 +183,7 @@ form builds itself. See [CONTRIBUTING.md](CONTRIBUTING.md) and [DESIGN.md](DESIG
 ```bash
 ./scripts/check.sh      # ruff, formatter, 300-line budget, tests
 ```
+
+## License
+
+[Apache-2.0](LICENSE).
