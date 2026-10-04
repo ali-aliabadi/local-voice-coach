@@ -10,6 +10,7 @@ import * as clock from "../clock.js";
 import { get } from "../form.js";
 import { go } from "../router.js";
 import * as screen from "../screen.js";
+import { keepLast } from "./today.js";
 
 const { $ } = screen;
 const ACTIVE = "coach.active";
@@ -66,6 +67,7 @@ export async function render(node, _params, query) {
     socket?.send(JSON.stringify({ type: "slower" }));
   });
   const fresh = query.get("mode");
+  if (fresh) keepLast(mode, backend);
   connect(mode, backend, fresh ? null : saved?.session, Number(query.get("goal")) || 0);
   get("/api/progress").then(({ totals }) => { lifetime = totals.answers ? totals : null; });
 }

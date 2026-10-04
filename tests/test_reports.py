@@ -14,6 +14,7 @@ config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "reports.db")
 os.environ.update(RELAY_URL="https://relay.test", RELAY_API_KEY="rk_test", RELAY_APP="coach")
 
 from coach import picture, relay, reports, settings, store  # noqa: E402
+from coach import today as today_  # noqa: E402
 
 # ---- Relay itself is faked by reassigning the one function that talks to it ----
 sent: list[dict] = []
@@ -75,7 +76,10 @@ summary = {"work_on": ["past tense"], "phrases": [{"phrase": "a breath of fresh 
            "meaning": "something new and pleasant"}], "instead_of_um": ["Let me think"]}  # fmt: skip
 store.db().execute("UPDATE sessions SET summary = ? WHERE id = ?", (json.dumps(summary), one))
 store.db().commit()
-assert reports.streak(today) == 1
+assert today_.streak(today) == 1
+now = today_.summary(today)
+assert now["sessions"] == 1 and now["last"]["id"] == one and now["streak"] == 1
+assert now["work_on"] == ["past tense"] and now["phrases"][0]["phrase"] == "a breath of fresh air"
 
 before = len(sent)
 run(reports.after_session(one))

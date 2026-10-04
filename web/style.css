@@ -177,6 +177,11 @@ button { font: inherit; cursor: pointer; }
 .spark { display: block; width: 100%; max-width: 8rem; height: 26px; margin-top: 0.5rem; }
 .notice.good { color: var(--good); }
 
+/* ---- today ---- */
+.today-bar { margin: -1.25rem 0 1.25rem; }
+.start { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; margin: 2rem 0; }
+.advice { padding-left: 1.2rem; line-height: 1.7; }
+
 /* ---- goal picker ---- */
 .goals { border: 0; padding: 0; margin: 0 0 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .goals legend { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem; padding: 0; }

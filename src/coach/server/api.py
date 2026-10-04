@@ -6,7 +6,7 @@ import pathlib
 from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Route
 
-from .. import backends, coach, history, profile, settings, store
+from .. import backends, coach, history, profile, settings, store, today
 from ..modes import discover
 from . import models
 
@@ -139,6 +139,10 @@ async def get_progress(_request):
     )
 
 
+async def get_today(_request):
+    return JSONResponse(today.summary(dt.date.today()))
+
+
 async def get_audio(request):
     path = store.audio_path(int(request.path_params["turn"]))
     if not path or not pathlib.Path(path).exists():
@@ -162,6 +166,7 @@ ROUTES = [
     Route("/api/sessions/{session:int}", get_session),
     Route("/api/sessions/{session:int}/coach", coach_session, methods=["POST"]),
     Route("/api/progress", get_progress),
+    Route("/api/today", get_today),
     Route("/api/audio/{turn:int}", get_audio),
     Route("/api/forget", forget, methods=["POST"]),
 ]

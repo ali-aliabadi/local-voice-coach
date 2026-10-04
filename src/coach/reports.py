@@ -11,7 +11,7 @@ Each one remembers what it already sent, so a restart never sends it twice.
 import asyncio
 import datetime as dt
 
-from . import coach, history, picture, relay, settings, store
+from . import coach, history, picture, relay, settings, store, today
 
 NOW, LATER, SKIP = "Starting now", "In 30 min", "Skip today"
 WEEKLY_DAY, WEEKLY_HOUR = 6, 20  # Sunday, from 20:00
@@ -90,52 +90,33 @@ def after_session_later(session_id: int) -> None:
     asyncio.create_task(safely())
 
 
-def _days_practised() -> list[str]:
-    rows = store.db().execute(
-        "SELECT DISTINCT substr(at, 1, 10) AS day FROM turns WHERE role = 'you' ORDER BY day DESC"
-    )
-    return [r["day"] for r in rows]
-
-
-def streak(today: dt.date) -> int:
-    """Days in a row with practice, counting back from today, or from yesterday if today
-    has not happened yet."""
-    days = set(_days_practised())
-    day = today if today.isoformat() in days else today - dt.timedelta(days=1)
-    count = 0
-    while day.isoformat() in days:
-        count += 1
-        day -= dt.timedelta(days=1)
-    return count
-
-
 async def remind(now: dt.datetime | None = None) -> None:
     """If you have not practised by your reminder time, ask - once, unless you snooze it."""
     at = str(settings.get("remind_at")).strip()
     if not relay.enabled() or not at:
         return
     now = now or dt.datetime.now()
-    today = now.date().isoformat()
-    if _days_practised()[:1] == [today] or relay.recall("remind:done") == today:
+    day = now.date().isoformat()
+    if today.days_practised()[:1] == [day] or relay.recall("remind:done") == day:
         return
     asked = relay.recall("remind:asked")
-    if asked.startswith(today):  # waiting on an answer: read it, never nag
+    if asked.startswith(day):  # waiting on an answer: read it, never nag
         choice = await relay.answer(asked.split("|", 1)[1])
         if not choice:
             return
         relay.remember("remind:asked", "")
         if choice != LATER:
-            relay.remember("remind:done", today)
+            relay.remember("remind:done", day)
             return
         relay.remember("remind:next", (now + dt.timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M"))
         return
-    due = f"{today}T{at}"
+    due = f"{day}T{at}"
     snoozed = relay.recall("remind:next")
-    if snoozed.startswith(today):
+    if snoozed.startswith(day):
         due = max(due, snoozed)
     if now.strftime("%Y-%m-%dT%H:%M") < due:
         return
-    days = streak(now.date())
+    days = today.streak(now.date())
     line = (
         f"{days} day{'s' if days != 1 else ''} in a row so far. Today keeps it going."
         if days
@@ -143,9 +124,9 @@ async def remind(now: dt.datetime | None = None) -> None:
     )
     question = {"type": "question", "text": "Practise now?", "options": [NOW, LATER, SKIP]}
     message = await relay.send(
-        "No practice yet today", [relay.text(line), question], key=f"remind-{today}-{now:%H%M}"
+        "No practice yet today", [relay.text(line), question], key=f"remind-{day}-{now:%H%M}"
     )
-    relay.remember("remind:asked", f"{today}|{message}")
+    relay.remember("remind:asked", f"{day}|{message}")
     relay.remember("remind:next", "")
 
 
