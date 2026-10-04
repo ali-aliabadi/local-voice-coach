@@ -11,7 +11,10 @@ import tempfile
 from coach import config  # noqa: I001
 
 config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "reports.db")
+# config read the developer's .env on import; nothing of theirs may reach this test
 os.environ.update(RELAY_URL="https://relay.test", RELAY_API_KEY="rk_test", RELAY_APP="coach")
+for name in ("RELAY_USER", "RELAY_ADMIN"):
+    os.environ.pop(name, None)
 
 from coach import picture, relay, reports, settings, store  # noqa: E402
 from coach import today as today_  # noqa: E402

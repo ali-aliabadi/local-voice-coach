@@ -37,6 +37,11 @@ def enabled() -> bool:
     return bool(_env("RELAY_URL") and _env("RELAY_API_KEY") and _env("RELAY_APP"))
 
 
+# Cloudflare in front of a Relay answered Python's default "Python-urllib" agent with
+# 403 "error code: 1010" - even on /healthz. Any honest agent of our own passes.
+AGENT = "local-voice-coach (+relay-notify)"
+
+
 def _call(method: str, path: str, body: dict | None = None) -> dict:
     request = Request(
         _env("RELAY_URL").rstrip("/") + path,
@@ -45,13 +50,18 @@ def _call(method: str, path: str, body: dict | None = None) -> dict:
         headers={
             "Authorization": f"Bearer {_env('RELAY_API_KEY')}",
             "Content-Type": "application/json",
+            "User-Agent": AGENT,
         },
     )
     try:
         with urlopen(request, timeout=15) as response:
             return json.load(response)
     except HTTPError as exc:  # Relay's own error code and problems, never our content
-        error = json.loads(exc.read() or b"{}").get("error", {})
+        raw = exc.read()
+        try:
+            error = json.loads(raw or b"{}").get("error", {})
+        except ValueError:  # not Relay answering: a proxy in front of it, e.g. Cloudflare
+            error = {"code": raw[:80].decode(errors="replace").strip()}
         problems = "; ".join(error.get("problems") or [])
         raise RuntimeError(f"relay {exc.code} {error.get('code', '')} {problems}".strip()) from None
 
