@@ -40,6 +40,9 @@ BEAM_SIZE = 1  # greedy; raise to 5 if accuracy suffers
 # Whisper is trained to tidy speech up and silently drops "um"/"uh". This biases it to
 # keep them. ponytail: crude; CrisperWhisper does verbatim properly if exact counts matter.
 DISFLUENCY_HINT = "Um, uh, hmm, er, mmm, so, well, you know, I mean."
+# Below this confidence a word is marked "the transcriber was unsure". A proxy for an
+# unclear word - or a mishearing - never a pronunciation score. Calibration knob.
+UNCLEAR_BELOW = 0.5
 
 # ---- Audio ----
 SAMPLE_RATE = 16000  # Whisper expects 16kHz

@@ -32,6 +32,7 @@ class W:
     start: float
     end: float
     word: str
+    probability: float = 0.95
 
 
 def say(*triples):
@@ -121,7 +122,7 @@ try:
 
     numpy_words = [
         W(np.float32(0.0), np.float32(0.5), "I"),
-        W(np.float32(1.4), np.float32(2.0), "um"),
+        W(np.float32(1.4), np.float32(2.0), "um", np.float32(0.4)),
     ]
     metrics = fluency(numpy_words)
     json.dumps(metrics)  # would raise on int64/float32
@@ -137,6 +138,8 @@ assert rows[1]["filler"] and not rows[2]["filler"]
 assert rows[1]["pause"] == 1.7  # the gap before this word, since it beats the threshold
 assert rows[2]["pause"] == 0.0  # 0.1s gap is below the threshold, so not flagged
 assert rows[0]["pause"] == 0.0  # nothing precedes the first word
+unsure = word_rows([W(0.0, 0.4, "middling", probability=0.31), W(0.5, 0.9, "mind")])
+assert unsure[0]["unclear"] and not unsure[1]["unclear"]  # a proxy, never a pronunciation score
 
 # ---- message ordering ----
 # Local models served by LM Studio render a jinja chat template that rejects anything but

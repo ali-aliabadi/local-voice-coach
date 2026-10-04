@@ -66,6 +66,9 @@
 .chip.fill { background: var(--warn); }
 .legend .dur { margin-left: auto; font-variant-numeric: tabular-nums; }
 
+.unclear { text-decoration: underline dotted var(--muted); text-underline-offset: 0.25em; }
+.unclear-key { display: block; color: var(--muted); font-size: 0.75rem; line-height: 1.4; }
+
 /* ---- the coach's notes ---- */
 .coach h3 { font-size: 0.85rem; font-weight: 550; margin: 1.25rem 0 0.4rem; }
 .coach ol, .coach ul { margin: 0; padding-left: 1.2rem; line-height: 1.6; }

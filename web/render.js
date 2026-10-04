@@ -65,10 +65,18 @@ export function transcript(target, words, fallback) {
     target.textContent = fallback;
     return;
   }
-  target.innerHTML = words.map((w) =>
-    w.filler
-      ? `<span class="filler" title="filler word">${escape(w.word)}</span>`
-      : escape(w.word)).join(" ");
+  target.innerHTML = words.map((w) => {
+    if (w.filler) return `<span class="filler" title="filler word">${escape(w.word)}</span>`;
+    if (w.unclear) {
+      return `<span class="unclear" title="the transcriber was unsure of this word: maybe
+        unclear, maybe misheard">${escape(w.word)}</span>`;
+    }
+    return escape(w.word);
+  }).join(" ");
+  if (words.some((w) => w.unclear && !w.filler)) {
+    target.insertAdjacentHTML("beforeend", `<small class="unclear-key">dotted: the
+      transcriber was unsure — a word that may not have come out clearly</small>`);
+  }
 }
 
 /**
