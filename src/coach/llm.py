@@ -1,9 +1,11 @@
 """The cloud interviewer. Gemini, spoken to through the OpenAI-compatible endpoint."""
 
+import asyncio
 import re
 import time
 from typing import NamedTuple
 
+import openai
 from openai import AsyncOpenAI
 
 from . import config, settings
@@ -138,13 +140,12 @@ def split_speaker(text: str, cast) -> tuple[str | None, str]:
     return (name if name in cast else None), text[match.end() :].strip()
 
 
-async def stream_sentences(ep: Endpoint, messages, max_tokens=None):
-    """Yield complete sentences as they arrive, so speech starts before generation ends.
+# Worth asking again: nothing came back, or the server broke. A rejected key is not.
+RETRYABLE = (TimeoutError, openai.APIConnectionError, openai.InternalServerError)
 
-    Yields ("sentence", str) for each chunk, then ("done", Reply) once.
-    """
-    started = time.perf_counter()
-    first_ms = None
+
+async def _first_words(ep: Endpoint, messages, max_tokens):
+    """Open a stream and wait for its first real token. Returns (stream, token)."""
     stream = await ep.client.chat.completions.create(
         model=ep.model,
         messages=conversation(messages),
@@ -153,15 +154,44 @@ async def stream_sentences(ep: Endpoint, messages, max_tokens=None):
         stream=True,
         **ep.extra,
     )
-    buffer, full = "", ""
+    try:
+        while True:
+            chunk = await anext(stream)
+            token = chunk.choices[0].delta.content if chunk.choices else ""
+            if token:
+                return stream, token
+    except StopAsyncIteration:
+        return stream, ""
+    except BaseException:
+        await stream.close()  # abandoned by the deadline: free the connection
+        raise
+
+
+async def stream_sentences(ep: Endpoint, messages, max_tokens=None, deadline=None):
+    """Yield complete sentences as they arrive, so speech starts before generation ends.
+
+    Yields ("sentence", str) for each chunk, then ("done", Reply) once.
+
+    `deadline` is how long to wait for the first word before asking again, once. Nothing
+    has been spoken at that point, so a retry cannot repeat anything. None waits as long
+    as the client timeout allows - right for a reasoning model that thinks first.
+    """
+    started = time.perf_counter()
+    for attempt in range(2):
+        try:
+            async with asyncio.timeout(deadline):
+                stream, buffer = await _first_words(ep, messages, max_tokens)
+            break
+        except RETRYABLE:
+            if attempt:
+                raise
+    # Measured from the first attempt: the wait the user actually sat through.
+    first_ms = (time.perf_counter() - started) * 1000
+    full = buffer
     async for chunk in stream:
-        if not chunk.choices:
-            continue
-        token = chunk.choices[0].delta.content or ""
+        token = chunk.choices[0].delta.content if chunk.choices else ""
         if not token:
             continue
-        if first_ms is None:
-            first_ms = (time.perf_counter() - started) * 1000
         buffer += token
         full += token
         speak, buffer = split_for_speech(buffer)
@@ -194,6 +224,11 @@ async def complete(ep: Endpoint, messages, max_tokens=None) -> Reply:
 
 async def explain(ep: Endpoint, exc: Exception) -> str:
     """Turn an exception into something the user can act on."""
+    if isinstance(exc, TimeoutError | openai.APITimeoutError):
+        return (
+            f"{ep.model} did not start answering, even on a second try - it is probably "
+            "overloaded. Nothing you said is lost: try again, or just carry on talking."
+        )
     message = str(exc)
     if "404" in message or "not found" in message.lower():
         try:

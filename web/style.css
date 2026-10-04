@@ -175,7 +175,12 @@ button { font: inherit; cursor: pointer; }
 .hint, .foot { color: var(--muted); font-size: 0.85rem; }
 audio { height: 34px; }
 .critique { white-space: pre-wrap; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
-.notice { color: var(--warn); }
+.notice { color: var(--warn); max-width: 34rem; text-align: center; margin: 1rem auto 0; }
+.notice button {
+  display: block; margin: 0.75rem auto 0; background: none; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 9px; padding: 0.45rem 1.2rem;
+}
+.notice button:hover { border-color: var(--accent); }
 .end { display: block; margin: 4rem auto 0; }
 
 /* ---- settings ---- */

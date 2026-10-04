@@ -3,7 +3,7 @@
 // none.
 
 import { Mic, Playback, meter } from "../audio.js";
-import { get } from "../form.js";
+import { escape, get } from "../form.js";
 import * as draw from "../render.js";
 import { go } from "../router.js";
 
@@ -20,6 +20,7 @@ let detail = "";
 let parts = [];
 let root = null;
 let lifetime = null;   // your running average, so each answer can be measured against it
+let ticking = null;    // the seconds counter while you wait on something
 
 const $ = (sel) => root.querySelector(sel);
 
@@ -49,6 +50,7 @@ export async function render(node, _params, query) {
       <p class="mic-label" id="mic-label">connecting</p>
       <canvas id="level" width="240" height="28" aria-hidden="true"></canvas>
       <p class="hint">space bar works too · answer out loud, as if it were real</p>
+      <p class="notice" id="notice" role="alert" hidden></p>
     </div>
     <section id="result" aria-live="polite" hidden>
       <div class="metrics" id="metrics"></div>
@@ -60,15 +62,11 @@ export async function render(node, _params, query) {
       </div>
       <article id="critique" class="critique" hidden></article>
     </section>
-    <p class="notice" id="notice" hidden></p>
     <button class="link end" id="end">end session and review it</button>`;
 
-  playback.onBlocked = () => {
-    $("#notice").hidden = false;
-    $("#notice").textContent =
-      "Your browser blocked audio until you interact with the page. Click anywhere, "
-      + "then the interviewer will be audible from the next question.";
-  };
+  playback.onBlocked = () => notice(
+    "Your browser blocked audio until you interact with the page. Click anywhere, "
+    + "then the interviewer will be audible from the next question.");
   $("#mic").addEventListener("click", toggle);
   $("#end").addEventListener("click", finish);
   connect(mode, backend, query.get("mode") ? null : saved?.session);
@@ -105,7 +103,7 @@ function handle(event, mode, backend) {
       remember({ mode, backend, session });
       break;
     case "sentence":
-      if (parts.length === 0) reset();
+      if (parts.length === 0) { reset(); setMic(false, "listen"); }
       parts.push(event.speaker ? `${event.speaker}: ${event.text}` : event.text);
       $("#question").textContent = parts.join(" ");
       break;
@@ -114,7 +112,7 @@ function handle(event, mode, backend) {
       showAnswer(event);
       break;
     case "thinking":
-      setMic(false, `${event.text}…`);
+      wait(event.text);
       break;
     case "critique":
       $("#critique").hidden = false;
@@ -125,8 +123,7 @@ function handle(event, mode, backend) {
       break;
     case "notice":
     case "error":
-      $("#notice").hidden = false;
-      $("#notice").textContent = event.text;
+      notice(event.text, event.retry);
       setMic(true, "tap to answer");
       break;
   }
@@ -150,12 +147,36 @@ function showAnswer(event) {
   draw.timeline($("#timeline"), event.words);
   draw.transcript($("#transcript"), event.words, event.text);
   $("#replay").src = event.turn ? `/api/audio/${event.turn}` : "";
-  setMic(false, "thinking…");
+  wait("waiting for a reply");
 }
 
 function setMic(enabled, label) {
+  clearInterval(ticking);
   $("#mic").disabled = !enabled;
   $("#mic-label").textContent = label;
+}
+
+/** Disabled, with a seconds counter: a silent wait should never look like nothing. */
+function wait(label) {
+  setMic(false, `${label}…`);
+  const since = Date.now();
+  ticking = setInterval(() => {
+    const seconds = Math.round((Date.now() - since) / 1000);
+    if (seconds >= 3) $("#mic-label").textContent = `${label}… ${seconds}s`;
+  }, 1000);
+}
+
+/** A message beside the mic. With `retry`, a button that re-asks without re-recording. */
+function notice(text, retry = false) {
+  const box = $("#notice");
+  box.hidden = false;
+  box.innerHTML = escape(text)
+    + (retry ? '<button id="retry">Try again</button>' : "");
+  box.querySelector("#retry")?.addEventListener("click", () => {
+    box.hidden = true;
+    socket?.send(JSON.stringify({ type: "retry" }));
+    wait("trying again");
+  });
 }
 
 async function toggle() {
@@ -164,8 +185,7 @@ async function toggle() {
     try {
       await mic.start((chunk) => socket?.readyState === 1 && socket.send(chunk));
     } catch {
-      $("#notice").hidden = false;
-      $("#notice").textContent = "No microphone access. Allow it, then tap again.";
+      notice("No microphone access. Allow it, then tap again.");
       return;
     }
     recording = true;
@@ -183,7 +203,7 @@ async function toggle() {
     $("#mic").classList.remove("recording");
     $("#level").classList.remove("on");
     socket?.send(JSON.stringify({ type: "end_answer" }));
-    setMic(false, "transcribing…");
+    wait("transcribing");
   }
 }
 

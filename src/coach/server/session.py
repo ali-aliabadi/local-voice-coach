@@ -102,18 +102,20 @@ class BrowserIO:
         role: str = "interviewer",
         cast: dict[str, str] | None = None,
         thinking: str | None = None,
+        deadline: float | None = None,
     ) -> llm.Reply | None:
         """Speak the model's reply sentence by sentence, while it is still being written.
 
         `cast` maps speaker names to voices, for replies that open with "NAME:"; the turn
-        is then saved as "role:NAME". Returns None if the model failed - the user has
-        already been told, and offered a retry.
+        is then saved as "role:NAME". `deadline` is how long to wait for the first word
+        before asking again (see llm.stream_sentences). Returns None if the model failed -
+        the user has already been told, and offered a retry.
         """
         if thinking:
             await self.send(type="thinking", text=thinking)
         name, voice, done = None, None, llm.Reply("", None)
         try:
-            async for kind, chunk in llm.stream_sentences(endpoint, messages):
+            async for kind, chunk in llm.stream_sentences(endpoint, messages, deadline=deadline):
                 if kind == "done":
                     done = chunk
                     continue

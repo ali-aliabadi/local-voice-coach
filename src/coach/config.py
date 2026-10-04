@@ -36,6 +36,10 @@ REVIEW_MAX_TOKENS = 2500  # written critique; local reasoners spend a lot on thi
 HISTORY_TURNS = 8  # user+assistant pairs kept in context; drives token cost
 REQUEST_TIMEOUT = 45.0  # a cold call measured 16s and one hung at 51s, so this catches hangs
 # without aborting slow-but-working requests; the SDK retries twice on its own
+# In conversation, silence is the failure. A reply that has not started after this long is
+# abandoned and asked again once - a cold call measured 16s, and one stream sat silent for
+# the full 45s and then gave up, leaving the user to repeat themselves.
+FIRST_WORD_SECONDS = 20.0
 
 # ---- STT (local) ----
 WHISPER_MODEL = "small.en"  # drop to "base.en" if transcription feels slow

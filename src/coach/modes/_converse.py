@@ -6,7 +6,7 @@ conversation supplies its system prompt and its opener and calls `converse`.
 
 from collections.abc import Callable
 
-from .. import settings
+from .. import config, settings
 
 
 async def converse(
@@ -40,7 +40,11 @@ async def converse(
             messages = [{"role": "system", "content": system()}]
             messages += turns or [{"role": "user", "content": opener}]
             spoken = await io.reply(
-                endpoint, messages, thinking=getting_ready if opening else None, **reply
+                endpoint,
+                messages,
+                thinking=getting_ready if opening else None,
+                deadline=config.FIRST_WORD_SECONDS,
+                **reply,
             )
             if spoken and spoken.text:
                 history.append({"role": "assistant", "content": spoken.text})

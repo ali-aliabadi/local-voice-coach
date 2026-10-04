@@ -23,6 +23,7 @@ from coach import config  # noqa: I001
 data = pathlib.Path(tempfile.mkdtemp())
 config.DB_PATH = str(data / "wire.db")
 config.RECORDINGS = data / "recordings"
+config.FIRST_WORD_SECONDS = 1.0  # so a hung model is abandoned in a second, not twenty
 if not pathlib.Path(config.TTS_MODEL_PATH).exists():
     print("skipped: no Kokoro weights - run `make models`")
     sys.exit(0)
@@ -113,6 +114,7 @@ async def speak(ws, text: str) -> dict:
 
 async def main() -> None:
     script.extend(["Hi there. What did you do this weekend?", "Oh nice. Which film was it?"])
+    script.extend(["HANG", "HANG", "Sorry, I lost you. Was it scary?"])
     async with connect(f"ws://127.0.0.1:{app_port}/ws") as ws:
         await ws.send(json.dumps({"mode": "talk", "backend": "lfm2.5"}))
         session = (await until(ws, "ready"))["session"]
@@ -124,15 +126,26 @@ async def main() -> None:
         assert heard["metrics"]["wpm"] > 0 and heard["turn"]
         await until(ws, "turn_done")
 
+        # the model hangs twice: one silent retry, then a visible error offering another
+        await speak(ws, "It was Seven, the old one with Brad Pitt.")
+        failed = await until(ws, "error")
+        assert failed["retry"] and "try again" in failed["text"], failed
+        await ws.send(json.dumps({"type": "retry"}))  # re-ask without speaking again
+        assert (await until(ws, "sentence"))["text"] == "Sorry, I lost you."
+        await until(ws, "turn_done")
+
     # the model was sent the whole conversation, not just the last answer
-    last = received[-1]
-    assert [m["role"] for m in last] == ["system", "user", "assistant", "user"], last
-    assert "film" in last[-1]["content"].lower()
+    second = received[1]
+    assert [m["role"] for m in second] == ["system", "user", "assistant", "user"], second
+    assert "film" in second[-1]["content"].lower()
+    # and the answer that got no reply was kept for the retry, not dropped
+    retried = received[-1]
+    assert len(retried) == 6 and "brad pitt" in retried[-1]["content"].lower(), retried
     saved = sqlite3.connect(config.DB_PATH).execute(
         "SELECT role FROM turns WHERE session_id = ? ORDER BY id", (session,)
     )
     roles = [row[0] for row in saved]
-    assert roles == ["interviewer", "you", "interviewer"], roles
+    assert roles == ["interviewer", "you", "interviewer", "you", "interviewer"], roles
 
 
 asyncio.run(main())
