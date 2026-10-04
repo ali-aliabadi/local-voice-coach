@@ -1,5 +1,6 @@
 """Starlette app: static files, the JSON API, and one WebSocket per session."""
 
+import asyncio
 import contextlib
 import pathlib
 
@@ -8,7 +9,7 @@ from starlette.responses import FileResponse
 from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 
-from .. import backends, llm, settings, store
+from .. import backends, clock, llm, store
 from . import models
 from .api import MODES, ROUTES
 from .guard import MIDDLEWARE
@@ -57,13 +58,12 @@ async def websocket_session(websocket):
 
 @contextlib.asynccontextmanager
 async def lifespan(_app):
-    """Load the models once, before the first request."""
-    purged = store.purge_audio(settings.get("audio_retention_days"))
-    if purged:
-        print(f"  purged {purged} expired recording(s)")
+    """Load the models once, before the first request, and start the clock."""
     models.load()
+    ticking = asyncio.create_task(clock.run())  # expiring recordings now runs from here
     print("  ready\n")
     yield
+    ticking.cancel()
 
 
 app = Starlette(
