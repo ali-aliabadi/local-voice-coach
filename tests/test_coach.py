@@ -212,6 +212,45 @@ assert len(trend) == 2 and trend[0]["mode"] == "talk" and trend[1]["mode"] == "r
 store.forget_everything()
 assert store.trend() == [] and store.measured_latency() == {}
 
+# ---- the guard: only this machine's own pages may change anything ----
+import warnings  # noqa: E402
+
+from starlette.applications import Starlette  # noqa: E402
+from starlette.responses import PlainTextResponse  # noqa: E402
+from starlette.routing import Route, WebSocketRoute  # noqa: E402
+
+warnings.filterwarnings("ignore", message="Using `httpx`")  # starlette's own transition
+from starlette.testclient import TestClient  # noqa: E402
+from starlette.websockets import WebSocketDisconnect  # noqa: E402
+
+from coach.server.guard import MIDDLEWARE  # noqa: E402
+
+
+async def accept(ws):
+    await ws.accept()
+    await ws.close()
+
+
+guarded = Starlette(
+    middleware=MIDDLEWARE,
+    routes=[
+        Route("/x", lambda _r: PlainTextResponse("ok"), methods=["GET", "POST"]),
+        WebSocketRoute("/ws", accept),
+    ],
+)
+local = TestClient(guarded, base_url="http://127.0.0.1:8000")
+assert local.post("/x", headers={"origin": "http://127.0.0.1:8000"}).status_code == 200
+assert local.post("/x").status_code == 200  # curl and the tests send no Origin
+assert local.post("/x", headers={"origin": "https://evil.example"}).status_code == 403
+assert local.get("/x").headers["cache-control"] == "no-cache"  # no stale app after updates
+rebound = TestClient(guarded, base_url="http://evil.example:8000")  # DNS rebinding
+assert rebound.get("/x").status_code == 400
+try:
+    with local.websocket_connect("/ws", headers={"origin": "https://evil.example"}):
+        raise AssertionError("a foreign page opened the practice socket")
+except WebSocketDisconnect:
+    pass
+
 # ---- backends: role filtering and availability ----
 fast_keys = {b.key for b, _ in backends.survey("fast")[0]}
 deep_keys = {b.key for b, _ in backends.survey("deep")[0]}

@@ -11,6 +11,7 @@ from starlette.staticfiles import StaticFiles
 from .. import backends, llm, settings, store
 from . import models
 from .api import MODES, ROUTES
+from .guard import MIDDLEWARE
 from .session import BrowserIO, SessionClosed
 
 WEB = pathlib.Path(__file__).resolve().parents[3] / "web"
@@ -67,6 +68,7 @@ async def lifespan(_app):
 
 app = Starlette(
     lifespan=lifespan,
+    middleware=MIDDLEWARE,
     routes=[
         *ROUTES,
         WebSocketRoute("/ws", websocket_session),
