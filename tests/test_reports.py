@@ -187,6 +187,14 @@ plain = layout.Doc()
 assert plain.plain and plain.clean("café → “ok” — fine") == 'cafe -> "ok" - fine'
 assert plain.pdf()[:4] == b"%PDF"
 
+# ---- who it goes to: RELAY_USER, else its old name RELAY_ADMIN, else "admin" ----
+os.environ["RELAY_ADMIN"] = "old"
+assert relay.recipient() == "old"
+os.environ["RELAY_USER"] = "ali"
+assert relay.recipient() == "ali"
+del os.environ["RELAY_USER"], os.environ["RELAY_ADMIN"]
+assert relay.recipient() == "admin"
+
 # ---- switched off without the RELAY_* variables ----
 del os.environ["RELAY_API_KEY"]
 assert not relay.enabled()

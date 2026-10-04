@@ -7,7 +7,8 @@ secret and is read from the environment only):
     RELAY_URL      Relay's base URL, e.g. https://relay.example.com
     RELAY_API_KEY  this app's key (rk_...), created by the Relay admin
     RELAY_APP      this app's name as Relay records it, e.g. voice-coach
-    RELAY_ADMIN    who to notify; optional, default "admin"
+    RELAY_USER     who this app sends to; optional, default "admin" (RELAY_ADMIN, its
+                   old name, still works when RELAY_USER is unset)
 
 What leaves: numbers, a chart, and - if you allow it - the coach's lessons. Never audio,
 never whole transcripts. Message ids are logged; contents and the key never are.
@@ -25,6 +26,11 @@ from . import store
 
 def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
+
+
+def recipient() -> str:
+    """Who this app sends to, as Relay's skill resolves it."""
+    return _env("RELAY_USER") or _env("RELAY_ADMIN") or "admin"
 
 
 def enabled() -> bool:
@@ -53,7 +59,7 @@ def _call(method: str, path: str, body: dict | None = None) -> dict:
 async def send(title: str, blocks: list[dict], key: str, urgency: str = "low") -> str | None:
     """Post a message. `key` makes a retry, or a second run of the same job, a no-op."""
     body = {
-        "to": [_env("RELAY_ADMIN", "admin")],
+        "to": [recipient()],
         "source": _env("RELAY_APP"),
         "urgency": urgency,
         "title": title[:256],
