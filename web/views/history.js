@@ -61,6 +61,16 @@ function spoke(session) {
   return ` · you spoke for ${mine < 1 ? "under a minute" : `${Math.round(mine)} min`} (${share}%)`;
 }
 
+/** Where the wait went after you stopped talking, averaged over the session's replies. */
+function waits(turns) {
+  const timed = turns.map((t) => t.timing).filter((t) => t?.total);
+  if (!timed.length) return "";
+  const mean = (key) => timed.reduce((sum, t) => sum + (t[key] || 0), 0) / timed.length / 1000;
+  return `<p class="foot">Replies started ${mean("total").toFixed(1)}s after you stopped, on
+    average: ${mean("hearing").toFixed(1)}s hearing you, ${mean("thinking").toFixed(1)}s thinking,
+    ${mean("voicing").toFixed(1)}s voicing.</p>`;
+}
+
 /** How often you needed help to follow the partner: the listening half of the practice. */
 function heard(l) {
   if (!l?.replies) return "";
@@ -129,6 +139,7 @@ export const detail = {
       <p class="foot">${session.answers} answers · ${length(session)}${spoke(session)}
         · ${escape(session.model)}</p>
       ${heard(session.listening)}
+      ${waits(session.turns)}
       ${changed(session.averages, session.previous)}
       ${session.answers ? '<div class="metrics" id="session-average"></div>' : ""}
       ${coaching(session)}

@@ -40,8 +40,10 @@ CREATE TABLE IF NOT EXISTS turns (
     word_rows     TEXT,                   -- per-word timings, so a past answer can still
                                           -- show its highlighted transcript and timeline
     notes         TEXT,                   -- the coach's notes on an answer, JSON
-    helped        TEXT                    -- on a reply: what the user needed to follow it,
+    helped        TEXT,                   -- on a reply: what the user needed to follow it,
                                           -- "again,text"; "" by ear; NULL never tracked
+    timing        TEXT                    -- on a reply: ms from the end of the answer to
+                                          -- its first sound, and where that went, JSON
 );
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
@@ -56,7 +58,13 @@ _db: sqlite3.Connection | None = None
 # Columns added after the first release. CREATE TABLE IF NOT EXISTS will not add them to
 # a database that already exists, so they are applied here instead.
 ADDED_COLUMNS = {
-    "turns": {"words": "INTEGER", "word_rows": "TEXT", "notes": "TEXT", "helped": "TEXT"},
+    "turns": {
+        "words": "INTEGER",
+        "word_rows": "TEXT",
+        "notes": "TEXT",
+        "helped": "TEXT",
+        "timing": "TEXT",
+    },
     "sessions": {"goal_minutes": "INTEGER", "summary": "TEXT"},
 }
 
@@ -149,13 +157,14 @@ def record(
     reply_ms: float | None = None,
     audio_path: str | None = None,
     word_rows: list[dict] | None = None,
+    timing: dict | None = None,
 ) -> int | None:
     """Persist one turn. Returns its id, which the browser uses to fetch the recording."""
     m = metrics or {}
     cursor = db().execute(
         "INSERT INTO turns (session_id, at, role, text, words, wpm, fillers, pauses,"
-        " longest_pause, lead_in, stt_ms, reply_ms, audio_path, word_rows)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " longest_pause, lead_in, stt_ms, reply_ms, audio_path, word_rows, timing)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             session_id,
             time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -171,6 +180,7 @@ def record(
             reply_ms,
             audio_path,
             json.dumps(word_rows) if word_rows else None,
+            json.dumps(timing) if timing else None,
         ),
     )
     db().commit()

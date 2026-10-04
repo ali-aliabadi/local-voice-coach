@@ -175,6 +175,11 @@ async def main() -> None:
         "SELECT helped FROM turns WHERE session_id = ? AND role = 'interviewer' ORDER BY id",
         (session,),
     )
+    # every reply after an answer knows where the wait went; the opener has no answer before it
+    timings = [json.loads(t[0]) if t[0] else None for t in sqlite3.connect(config.DB_PATH).execute(
+        "SELECT timing FROM turns WHERE session_id = ? AND role = 'interviewer' ORDER BY id",
+        (session,))]  # fmt: skip
+    assert "total" not in timings[0] and timings[1]["total"] >= timings[1]["hearing"] > 0, timings
     # the reply it was sent for; the next one was followed by ear; the last is unanswered
     assert [m[0] for m in marks] == ["slower,text", "", None], marks
 

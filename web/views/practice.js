@@ -22,6 +22,7 @@ let stopMeter = null;
 let session = null;
 let answered = 0;
 let detail = "";
+let waited = null;     // ms from the end of your last answer to the first sound back
 let parts = [];        // the partner's sentences so far this turn
 let lifetime = null;   // your running average, so each answer can be measured against it
 let series = [];       // this session's answers, one point each on the session panel
@@ -130,6 +131,7 @@ function handle(event, mode, backend) {
       screen.critique(event.text);
       break;
     case "turn_done":
+      if (event.wait_ms) waited = event.wait_ms;
       playback.idle().then(() => { parts = []; screen.mic(true, "tap to answer"); });
       break;
     case "notice":
@@ -138,7 +140,7 @@ function handle(event, mode, backend) {
       screen.mic(true, "tap to answer");
       break;
   }
-  screen.status(answered, detail);
+  screen.status(answered, waited ? `replied in ${(waited / 1000).toFixed(1)}s · ${detail}` : detail);
 }
 
 /** Ask for the last reply again, with the same answer: nobody should have to repeat it. */

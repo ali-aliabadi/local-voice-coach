@@ -85,7 +85,7 @@ def detail(session_id: int) -> dict | None:
         store.db()
         .execute(
             "SELECT id, at, role, text, words, wpm, fillers, pauses, longest_pause, lead_in,"
-            "  stt_ms, reply_ms, word_rows, notes, audio_path IS NOT NULL AS has_audio "
+            "  stt_ms, reply_ms, word_rows, notes, timing, audio_path IS NOT NULL AS has_audio "
             "FROM turns WHERE session_id = ? ORDER BY id",
             (session_id,),
         )
@@ -227,4 +227,5 @@ def _turn(row) -> dict:
     turn = dict(row)
     turn["word_rows"] = json.loads(turn["word_rows"]) if turn["word_rows"] else []
     turn["notes"] = json.loads(turn["notes"]) if turn["notes"] else None
+    turn["timing"] = json.loads(turn["timing"]) if turn["timing"] else None
     return rates(turn) if turn["role"] == "you" and turn["wpm"] is not None else turn

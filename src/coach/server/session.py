@@ -5,6 +5,7 @@ and owns the two steps every mode repeats: hearing an answer and speaking a repl
 """
 
 import json
+import time
 from typing import NamedTuple
 
 import numpy as np
@@ -52,6 +53,7 @@ class BrowserIO:
         self.accent = ACCENTS[session % len(ACCENTS)] if on else None
         self.last_reply: tuple[str, str | None] = ("", None)  # for "say it slower"
         self.last_turn: int | None = None  # the reply the user is answering
+        self.heard_at: float | None = None  # when the user finished their last answer
 
     def prior_turns(self) -> list[dict]:
         """What was already said this session. Seed your history with it so that a browser
@@ -82,6 +84,7 @@ class BrowserIO:
                 if event.get("type") == "helped" and self.last_turn:
                     store.helped(self.last_turn, [str(k) for k in event.get("kinds", [])][:3])
                 if event.get("type") == "end_answer":
+                    self.heard_at = time.perf_counter()
                     break
         if not chunks:
             return None
@@ -138,6 +141,7 @@ class BrowserIO:
         if thinking:
             await self.send(type="thinking", text=thinking)
         name, voice, done = None, self.accent, llm.Reply("", None)
+        began, first, heard = time.perf_counter(), None, None
         try:
             async for kind, chunk in llm.stream_sentences(endpoint, messages, deadline=deadline):
                 if kind == "done":
@@ -148,19 +152,40 @@ class BrowserIO:
                     voice = cast.get(name)
                     if not chunk:
                         continue
+                first = first or time.perf_counter()
                 await self.send(type="sentence", text=chunk, speaker=name)
                 await self.say(chunk, voice)
+                heard = heard or time.perf_counter()
         except Exception as exc:
+            self.heard_at = None  # a wait that ended in an error is not a reply time
             await self.send(type="error", text=await llm.explain(endpoint, exc), retry=True)
             return None
+        timing = self._timing(began, first, heard)
         if done.text:
-            self.last_turn = self.save_turn(
-                f"{role}:{name or '?'}" if cast else role, done.text, done.ms
+            self.last_turn = store.record(
+                self.session,
+                f"{role}:{name or '?'}" if cast else role,
+                done.text,
+                reply_ms=done.ms,
+                timing=timing,
             )
             spoken = chunks.split_speaker(done.text, cast)[1] if cast else done.text
             self.last_reply = (spoken, voice)
-        await self.send(type="turn_done", latency_ms=done.ms)
+        await self.send(type="turn_done", latency_ms=done.ms, wait_ms=(timing or {}).get("total"))
         return done
+
+    def _timing(self, began: float, first: float | None, heard: float | None) -> dict | None:
+        """Where the wait went, from the end of your answer to the first sound back:
+        hearing you (transcription), thinking (the model's first chunk), voicing (Kokoro).
+        Measured on every reply, because a published latency is not your latency."""
+        if first is None or heard is None:
+            return None
+        ms = lambda a, b: round((b - a) * 1000)  # noqa: E731
+        timing = {"thinking": ms(began, first), "voicing": ms(first, heard)}
+        if self.heard_at is not None:
+            timing |= {"hearing": ms(self.heard_at, began), "total": ms(self.heard_at, heard)}
+        self.heard_at = None
+        return timing
 
     async def _slower(self) -> None:
         """The last reply again, slower. Marked as a replay, so "again" keeps the original."""
