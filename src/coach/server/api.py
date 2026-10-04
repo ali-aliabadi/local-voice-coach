@@ -6,7 +6,7 @@ import pathlib
 from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route
 
-from .. import backends, coach, history, profile, relay, reports, settings, sheet, store, today
+from .. import backends, coach, history, profile, settings, sheet, store, today
 from ..modes import discover
 from . import models
 
@@ -124,7 +124,6 @@ async def get_session(request):
             "coach_error": coach.failed.get(found["id"]),
             "sheet": sheet.stored(found["id"]) is not None,
             "can_sheet": sheet.endpoint() is not None and found["answers"] >= sheet.MIN_ANSWERS,
-            "telegram": relay.enabled(),
         }
     )
 
@@ -132,12 +131,6 @@ async def get_session(request):
 async def write_sheet(request):
     """(Re)write a session's study sheet in the background."""
     sheet.later(int(request.path_params["session"]))
-    return JSONResponse({"ok": True})
-
-
-async def send_telegram(request):
-    """Send this session's report, and its study sheet, to Telegram now."""
-    reports.after_session_later(int(request.path_params["session"]), again=True)
     return JSONResponse({"ok": True})
 
 
@@ -204,7 +197,6 @@ ROUTES = [
     Route("/api/sessions/{session:int}/coach", coach_session, methods=["POST"]),
     Route("/api/sessions/{session:int}/sheet", write_sheet, methods=["POST"]),
     Route("/api/sessions/{session:int}/sheet.pdf", get_sheet),
-    Route("/api/sessions/{session:int}/telegram", send_telegram, methods=["POST"]),
     Route("/api/progress", get_progress),
     Route("/api/today", get_today),
     Route("/api/audio/{turn:int}", get_audio),

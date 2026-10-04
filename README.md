@@ -135,8 +135,7 @@ With [Relay](https://github.com/ali-aliabadi/relay) set up, the app sends to Tel
 
 - **after each session**: how long it ran against your goal, the four numbers against
   last time, a chart of every answer, and your study sheet as a PDF to download (as page
-  images, on a Relay from before file blocks). Any session can be sent again from its
-  page with **send it to Telegram**.
+  images, on a Relay from before file blocks). Sent by itself when the session ends.
 - **a daily reminder** if you have not practised by your chosen time, with *Starting
   now* / *In 30 min* / *Skip today* buttons
 - **a weekly report** on Sunday evening: each day, against the week before

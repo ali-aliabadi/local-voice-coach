@@ -17,6 +17,12 @@ services:
       # "localhost" inside a container is the container. This reaches LM Studio on the
       # machine running Docker.
       LM_STUDIO_URL: ${LM_STUDIO_URL:-http://host.docker.internal:1234/v1}
+      # Telegram through Relay; empty leaves it off. The image never contains .env, so
+      # these have to be passed through here.
+      RELAY_URL: ${RELAY_URL:-}
+      RELAY_API_KEY: ${RELAY_API_KEY:-}
+      RELAY_APP: ${RELAY_APP:-}
+      RELAY_ADMIN: ${RELAY_ADMIN:-admin}
 
     # Docker Desktop provides this name already; the mapping is what makes it work on
     # plain Linux too.

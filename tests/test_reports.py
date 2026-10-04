@@ -170,9 +170,7 @@ assert "breath of fresh air" not in json.dumps(sent[before]), "the sheet carries
 
 before = len(sent)
 run(reports.after_session(one))
-assert len(sent) == before, "reported once by itself"
-run(reports.after_session(one, again=True))  # the session page's "send it to Telegram"
-assert len(sent) == before + 2 and sent[-2]["idempotency_key"] != f"session-{one}-4"
+assert len(sent) == before, "a session is reported once, by itself, when it ends"
 
 takes_files = False
 relay.remember(f"session:{one}", "")

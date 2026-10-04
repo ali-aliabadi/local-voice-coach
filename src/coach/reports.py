@@ -10,7 +10,6 @@ Each one remembers what it already sent, so a restart never sends it twice.
 
 import asyncio
 import datetime as dt
-import time
 
 from . import coach, history, picture, relay, settings, sheet, store, today
 
@@ -54,15 +53,13 @@ def _lessons(summary: dict | None) -> list[dict]:
     return [relay.text("\n\n".join(parts))] if parts else []
 
 
-async def after_session(session_id: int, again: bool = False) -> None:
-    """Report a session once the coach has finished with it. `again` is the session
-    page's "Send to Telegram": sent even if it went before, and whatever the setting."""
-    if not (relay.enabled() if again else _on("relay_session_report")):
+async def after_session(session_id: int) -> None:
+    """Report a session once the coach has finished with it."""
+    if not _on("relay_session_report"):
         return
     await coach.settled(session_id)
     d = history.detail(session_id)
-    reported = relay.recall(f"session:{session_id}") == str(d["answers"]) if d else False
-    if not d or not d["answers"] or (reported and not again):
+    if not d or not d["answers"] or relay.recall(f"session:{session_id}") == str(d["answers"]):
         return
     minutes = round(d["minutes"] or 0)
     goal = f" of a {d['goal_minutes']} min goal" if d["goal_minutes"] else ""
@@ -79,9 +76,7 @@ async def after_session(session_id: int, again: bool = False) -> None:
     doc = sheet.render(session_id) if settings.get("relay_sheet") == "on" else None
     if doc is None:
         blocks += _lessons(d["summary"])  # the sheet carries them when there is one
-    # The same key makes Relay hand back the first message instead of sending twice, so a
-    # deliberate resend needs a key of its own.
-    key = f"session-{session_id}-{d['answers']}" + (f"-{int(time.time())}" if again else "")
+    key = f"session-{session_id}-{d['answers']}"
     await relay.send(f"Session done: {minutes} min{goal}", blocks, key=key)
     if doc:
         await _send_sheet(doc, d["started_at"][:10], key)
@@ -114,10 +109,10 @@ async def _send_sheet(doc, day: str, key: str) -> None:
         await relay.send(title, [relay.image(page, title)], key=f"{key}-sheet-{n}")
 
 
-def after_session_later(session_id: int, again: bool = False) -> None:
+def after_session_later(session_id: int) -> None:
     async def safely():
         try:
-            await after_session(session_id, again)
+            await after_session(session_id)
         except Exception as exc:  # a report must never break anything
             print(f"  relay: {exc}")
 
