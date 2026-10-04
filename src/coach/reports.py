@@ -11,7 +11,7 @@ Each one remembers what it already sent, so a restart never sends it twice.
 import asyncio
 import datetime as dt
 
-from . import coach, history, picture, relay, settings, store, today
+from . import coach, history, picture, relay, settings, sheet, store, today
 
 NOW, LATER, SKIP = "Starting now", "In 30 min", "Skip today"
 WEEKLY_DAY, WEEKLY_HOUR = 6, 20  # Sunday, from 20:00
@@ -73,11 +73,31 @@ async def after_session(session_id: int) -> None:
         labels = ["answer 1", f"answer {len(series)}"]
         chart = picture.panels(series, labels, d["averages"])
         blocks.append(relay.image(chart, "Each answer in order; the big number is the session"))
-    blocks += _lessons(d["summary"])
-    await relay.send(
-        f"Session done: {minutes} min{goal}", blocks, key=f"session-{session_id}-{d['answers']}"
-    )
+    doc = sheet.render(session_id) if settings.get("relay_sheet") == "on" else None
+    if doc is None:
+        blocks += _lessons(d["summary"])  # the sheet carries them when there is one
+    key = f"session-{session_id}-{d['answers']}"
+    await relay.send(f"Session done: {minutes} min{goal}", blocks, key=key)
+    if doc:
+        await _send_sheet(doc, d["started_at"][:10], key)
     relay.remember(f"session:{session_id}", str(d["answers"]))
+
+
+async def _send_sheet(doc, day: str, key: str) -> None:
+    """The study sheet as a PDF; as its pages, one image each, if this Relay cannot take
+    files yet."""
+    caption = "Your study sheet"
+    sheet_file = relay.file(doc.pdf(), f"study-sheet-{day}.pdf", "application/pdf", caption)
+    try:
+        await relay.send(caption, [sheet_file], key=f"{key}-sheet")
+        return
+    except RuntimeError as exc:
+        if not str(exc).startswith(("relay 400", "relay 422")):
+            raise
+    pages = doc.pngs()
+    for n, page in enumerate(pages, 1):
+        title = f"Study sheet, page {n} of {len(pages)}"
+        await relay.send(title, [relay.image(page, title)], key=f"{key}-sheet-{n}")
 
 
 def after_session_later(session_id: int) -> None:

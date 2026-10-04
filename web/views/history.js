@@ -112,13 +112,24 @@ function coaching(session) {
     return `<p class="callout">The coach is still writing: ${done} of ${session.answers}
       answers have notes so far. This page fills in by itself.</p>`;
   }
-  if (session.summary) return `<h2>Coach</h2>${notes.summary(session.summary)}`;
+  const failed = session.coach_error
+    ? `<p class="notice">The coach could not finish: ${escape(session.coach_error)}</p>` : "";
+  if (session.summary) {
+    const take = session.sheet
+      ? `<p class="callout"><a href="/api/sessions/${session.id}/sheet.pdf" target="_blank">
+          Open your study sheet (PDF)</a> — the fixes worth the most, phrases for your
+          conversations, and what to practise tomorrow.</p>`
+      : session.can_sheet
+        ? `<p class="foot"><button class="link" id="sheet-now">Write your study sheet</button>
+            — a page or two to keep, as a PDF.</p>` : "";
+    return `<h2>Coach</h2>${failed}${take}${notes.summary(session.summary)}`;
+  }
   if (!session.answers) return "";
-  return session.coaching === "off"
+  return failed + (session.coaching === "off"
     ? `<p class="foot">The coach is off. Choose a coach model in <a href="/settings">settings</a>
        to get notes on grammar, word choice and phrases for every answer.</p>`
     : `<p class="foot"><button class="link" id="coach-now">Write coach notes for this
-       session</button> — grammar, word choice and phrases for each answer.</p>`;
+       session</button> — grammar, word choice and phrases for each answer.</p>`);
 }
 
 export const detail = {
@@ -174,6 +185,11 @@ export const detail = {
     }, 4000);
     root.querySelector("#coach-now")?.addEventListener("click", async () => {
       await post(`/api/sessions/${params.id}/coach`, {});
+      again();
+    });
+    root.querySelector("#sheet-now")?.addEventListener("click", async (event) => {
+      event.target.textContent = "Writing your study sheet…";
+      await post(`/api/sessions/${params.id}/sheet`, {});
       again();
     });
     if (session.coaching === "pending") again();

@@ -198,6 +198,18 @@ requests go one at a time and wait out 429s — the free tier for Gemini 3.8 Fla
 requests a minute, and catching up a 23-answer session at once had 20 refused. The
 default is Flash-Lite: notes as useful as Flash's, in 2s instead of 20s.
 
+### The study sheet is drawn, not typeset
+`sheet.py` has a model write the sheet's content as JSON after the summary; `layout.py`
+draws it with Pillow, which already draws the charts and can save pages as a PDF - so the
+PDF and the Telegram images come from one renderer and no PDF library is added. Pillow's
+own font has no dashes, arrows or accents, so `make models` fetches Inter into `models/`;
+without it the sheet still renders, in plain ASCII. The sheet's prompt insists a fix
+keeps the speaker's meaning - Flash-Lite once "fixed" a misheard phrase into one meaning
+the opposite. The coach's background tasks wait only for those queued before them
+(notes, then summary, then sheet): waiting on all the others deadlocked summary and sheet.
+Gemini 3.8 Flash's free tier is 20 requests a day; `llm.patiently` waits out per-minute
+limits but reports a used-up daily quota at once instead of waiting hours.
+
 ### Telegram through Relay is optional and environment-only
 `relay.py` is off unless `RELAY_URL`, `RELAY_API_KEY` and `RELAY_APP` are set. The key
 is read from the environment only — never a setting, never logged; logs carry message

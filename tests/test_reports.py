@@ -19,9 +19,12 @@ from coach import today as today_  # noqa: E402
 # ---- Relay itself is faked by reassigning the one function that talks to it ----
 sent: list[dict] = []
 answers: dict[str, str] = {}
+takes_files = True  # an older Relay refuses the file block
 
 
 def fake_call(method, path, body=None):
+    if method == "POST" and not takes_files and body["blocks"][0]["type"] == "file":
+        raise RuntimeError("relay 422 invalid_request blocks[0].type: unknown")
     if method == "POST":
         sent.append(body)
         return {"id": f"msg_{len(sent)}", "status": "queued"}
@@ -113,6 +116,53 @@ table = weekly["blocks"][0]
 assert table["type"] == "table" and len(table["rows"]) == 7 and table["rows"][-1][1] != "-"
 run(reports.weekly(at(22, 0)))
 assert len(sent) == before + 1, "once a week"
+
+# ---- the study sheet: written by a model, drawn as pages, sent as a PDF ----
+from coach import config, layout, llm, sheet  # noqa: E402
+
+for key in ("say", "more"):
+    store.record(one, "you", f"One more answer, {key}.", METRICS)
+written = {
+    "title": "A good session", "went_well": "You told a clear story — well done.",
+    "fixes": [{"said": "with me and my wife", "better": "with my wife and me", "why": "polite"}],
+    "phrases": [{"phrase": "not really my thing", "meaning": "I don't like it",
+                 "instead_of": "I don't like cinema", "example": "Cinemas are not my thing."}],
+    "instead_of_um": ["Let me think…"], "practice": ["Retell the film in 60 seconds."] * 3,
+}  # fmt: skip
+
+
+async def model(_ep, messages, max_tokens=None):  # noqa: ARG001 - the real signature
+    assert "study sheet" in messages[0]["content"] and "LEARNER:" in messages[1]["content"]
+    return llm.Reply(json.dumps(written), 1.0)
+
+
+llm.patiently = model  # the model is faked by reassigning the one call that reaches it
+run(sheet.write(one))
+assert sheet.stored(one)["title"] == "A good session"
+pdf = sheet.render(one).pdf()
+assert pdf[:4] == b"%PDF" and len(sheet.render(one).pngs()) == 1
+
+relay.remember(f"session:{one}", "")  # report the session again, now with its sheet
+before = len(sent)
+run(reports.after_session(one))
+assert [b["type"] for b in sent[-1]["blocks"]] == ["file"], "the sheet goes as a PDF"
+assert sent[-1]["blocks"][0]["filename"].endswith(".pdf")
+assert "breath of fresh air" not in json.dumps(sent[before]), "the sheet carries the lessons"
+
+takes_files = False
+relay.remember(f"session:{one}", "")
+run(reports.after_session(one))
+assert sent[-1]["blocks"][0]["type"] == "image", "an older Relay gets the pages as images"
+
+# long text runs onto a second page; without the font it still renders, in plain ASCII
+doc = layout.Doc()
+for _ in range(80):
+    doc.text("A long line about cinemas, small talk and leftovers — again and again. " * 2)
+assert len(doc.pages) >= 2 and doc.pdf()[:4] == b"%PDF"
+config.REPORT_FONT = "/nowhere/Inter.ttf"
+plain = layout.Doc()
+assert plain.plain and plain.clean("café → “ok” — fine") == 'cafe -> "ok" - fine'
+assert plain.pdf()[:4] == b"%PDF"
 
 # ---- switched off without the RELAY_* variables ----
 del os.environ["RELAY_API_KEY"]

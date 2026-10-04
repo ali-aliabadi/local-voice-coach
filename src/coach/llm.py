@@ -2,6 +2,7 @@
 to through the OpenAI-compatible endpoint."""
 
 import asyncio
+import re
 import time
 from typing import NamedTuple
 
@@ -159,6 +160,43 @@ async def complete(ep: Endpoint, messages, max_tokens=None) -> Reply:
             "   Raise 'Review max tokens' in Settings, or turn thinking off."
         )
     return Reply(text, (time.perf_counter() - started) * 1000)
+
+
+# One background request at a time. Nobody is waiting on the coach or the study sheet, and
+# free tiers count requests per minute: catching up a 23-answer session all at once got
+# 20 of them refused.
+_one_at_a_time = asyncio.Semaphore(1)
+WAIT = re.compile(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?")
+# Past this it is a daily quota, not a per-minute one: waiting would hold up every other
+# background request for hours. Gemini 3.8 Flash's free tier is 5 a minute and 20 a day.
+LONGEST_WAIT = 120
+
+
+def retry_after(message: str) -> float | None:
+    """Seconds from "Please retry in 3h35m42.5s" or "retry in 33.8s"; None if not said."""
+    found = WAIT.search(message)
+    if not found or not any(found.groups()):
+        return None
+    hours, minutes, seconds = found.groups()
+    return int(hours or 0) * 3600 + int(minutes or 0) * 60 + float(seconds or 0)
+
+
+async def patiently(ep: Endpoint, messages, max_tokens=None) -> Reply:
+    """`complete`, one at a time, waiting out per-minute rate limits; a daily quota that is
+    used up fails at once, saying so."""
+    async with _one_at_a_time:
+        for _ in range(6):
+            try:
+                return await complete(ep, messages, max_tokens)
+            except openai.RateLimitError as exc:
+                wait = retry_after(str(exc)) or 30
+                if wait > LONGEST_WAIT:
+                    raise RuntimeError(
+                        f"{ep.model} has used up its free requests for today; they come back "
+                        f"in {wait / 3600:.1f} hours. Choose another model in Settings."
+                    ) from None
+                await asyncio.sleep(wait + 1)
+        return await complete(ep, messages, max_tokens)
 
 
 async def explain(ep: Endpoint, exc: Exception) -> str:

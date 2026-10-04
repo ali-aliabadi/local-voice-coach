@@ -9,6 +9,7 @@ from coach import config  # noqa: I001
 config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "modes.db")
 
 from coach.chunks import split_for_speech, split_speaker  # noqa: E402
+from coach.llm import retry_after  # noqa: E402
 from coach.modes import repeat, shadow  # noqa: E402
 from coach.modes.panel import PANEL  # noqa: E402
 
@@ -91,5 +92,10 @@ assert split_speaker("  DEREK:   Why Redis?", PANEL) == ("DEREK", "Why Redis?")
 assert split_speaker("BOB: hello", PANEL) == (None, "hello")  # unknown name, prefix still stripped
 assert split_speaker("Tell me about yourself.", PANEL) == (None, "Tell me about yourself.")
 assert split_speaker("So the trade-off is: latency versus cost.", PANEL)[0] is None
+
+# ---- rate limits: a per-minute wait is waited out, a daily one is reported ----
+assert retry_after("Please retry in 33.876060542s.") == 33.876060542
+assert retry_after("Please retry in 3h35m42.5s.") == 3 * 3600 + 35 * 60 + 42.5
+assert retry_after("Please retry in 2m.") == 120 and retry_after("no hint") is None
 
 print("ok")

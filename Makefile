@@ -5,6 +5,7 @@
 PY      ?= ./.venv/bin/python
 COMPOSE ?= docker compose
 KOKORO  := https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0
+INTER   := https://github.com/google/fonts/raw/main/ofl/inter/Inter%5Bopsz,wght%5D.ttf
 
 help:  ## Show this help
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -15,7 +16,7 @@ help:  ## Show this help
 install:  ## Install exactly what uv.lock pins into .venv
 	uv sync
 
-models:  ## Download the Kokoro voice weights (~340MB, once)
+models:  ## Download the Kokoro voice weights (~340MB) and the report font, once
 	@mkdir -p models
 	@if [ -f kokoro-v1.0.onnx ] && [ ! -f models/kokoro-v1.0.onnx ]; then \
 		echo "  moving existing weights into models/"; \
@@ -24,6 +25,8 @@ models:  ## Download the Kokoro voice weights (~340MB, once)
 		(echo "  kokoro-v1.0.onnx (310MB)..." && curl -fL# -o models/kokoro-v1.0.onnx $(KOKORO)/kokoro-v1.0.onnx)
 	@test -f models/voices-v1.0.bin || \
 		(echo "  voices-v1.0.bin (27MB)..." && curl -fL# -o models/voices-v1.0.bin $(KOKORO)/voices-v1.0.bin)
+	@test -f models/Inter.ttf || \
+		(echo "  Inter.ttf (0.9MB, the study sheet's font)..." && curl -fL# -o models/Inter.ttf "$(INTER)")
 	@echo "  ready"
 
 run: models  ## Run the app natively (fastest on a Mac)

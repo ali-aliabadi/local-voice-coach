@@ -9,7 +9,8 @@ ENV PYTHONUNBUFFERED=1 \
     DATA_DIR=/data \
     HF_HOME=/cache/huggingface \
     KOKORO_MODEL=/models/kokoro-v1.0.onnx \
-    KOKORO_VOICES=/models/voices-v1.0.bin
+    KOKORO_VOICES=/models/voices-v1.0.bin \
+    REPORT_FONT=/models/Inter.ttf
 
 WORKDIR /app
 

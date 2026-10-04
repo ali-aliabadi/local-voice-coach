@@ -7,9 +7,13 @@ import { escape } from "./form.js";
 const list = (items, tag = "ul") => (items?.length
   ? `<${tag}>${items.map((i) => `<li>${escape(i)}</li>`).join("")}</${tag}>` : "");
 
+/** A phrase, what it means, and - when the coach anchored it - where it would have fit. */
 const phrases = (items) => (items?.length
   ? `<dl class="phrases">${items.map((p) => `<dt>${escape(p.phrase)}</dt>
-      <dd>${escape(p.meaning)}</dd>`).join("")}</dl>` : "");
+      <dd>${escape(p.meaning)}
+        ${p.instead_of ? `<span class="instead">instead of “${escape(p.instead_of)}”</span>` : ""}
+        ${p.example ? `<span class="example">“${escape(p.example)}”</span>` : ""}
+      </dd>`).join("")}</dl>` : "");
 
 export function summary(s) {
   if (!s) return "";

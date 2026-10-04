@@ -12,8 +12,6 @@ import asyncio
 import json
 import re
 
-import openai
-
 from . import backends, llm, profile, settings, store
 
 # What a fix is about, so the ones you repeat can be counted across sessions.
@@ -34,13 +32,17 @@ NOTES_PROMPT = (
     "mangled name or foreign word, was probably misheard: ignore it, never blame the speaker.\n"
     "- Spelling, capitals, digits and punctuation were written by the transcriber, not said "
     "by the speaker: never correct them.\n"
+    "- A fix must keep what they meant. If you cannot tell what they meant, leave it out.\n"
     "- Nothing worth fixing is a good result: return no fixes.\n"
-    "- Suggest 1-3 natural phrases, idioms or short sayings that fit what they talked about.\n\n"
+    "- Suggest 1-3 natural phrases, idioms or short sayings for this moment. Where one could "
+    "replace something they actually said, quote their words in instead_of and rewrite "
+    "their sentence with the phrase in example, so they see exactly where it fits.\n\n"
     "Reply with JSON only:\n"
     '{"fixes": [{"said": "their words", "better": "the natural version", '
     f'"why": "a few words", "kind": one of {list(KINDS)}}}], '
     '"natural": "how a native speaker might say the whole thing, 1-3 sentences", '
-    '"phrases": [{"phrase": "...", "meaning": "..."}], '
+    '"phrases": [{"phrase": "...", "meaning": "...", "instead_of": "their words, or empty", '
+    '"example": "their sentence, said with the phrase"}], '
     '"praise": "one specific thing they did well"}'
 )
 
@@ -55,17 +57,16 @@ SUMMARY_PROMPT = (
     '{"recap": "1-2 sentences on what was talked about, in the third person, so the next '
     'conversation can remember it", '
     '"work_on": ["the 3 most useful things to practise, one short sentence each"], '
-    '"phrases": [{"phrase": "...", "meaning": "..."}] (up to 5 worth learning), '
+    '"phrases": [{"phrase": "...", "meaning": "...", "instead_of": "their words, or empty", '
+    '"example": "their sentence, said with it"}] (up to 5 worth learning), '
     '"instead_of_um": ["2-3 short phrases to buy thinking time instead of um, suited to '
     'how they talk"], '
     '"went_well": "1-2 sentences on what went well"}'
 )
 
-_pending: dict[int, set[asyncio.Task]] = {}
-# One request at a time. Nobody is waiting on the coach, and free tiers count requests per
-# minute: catching up a 23-answer session all at once got 20 of them refused.
-_one_at_a_time = asyncio.Semaphore(1)
-WAIT = re.compile(r"retry in ([\d.]+)s")
+# In the order they were queued: notes, then the summary, then the study sheet.
+_pending: dict[int, list[asyncio.Task]] = {}
+failed: dict[int, str] = {}  # the last thing that went wrong per session, for the page to say
 
 
 def endpoint():
@@ -88,34 +89,29 @@ def pending(session_id: int) -> bool:
 
 
 async def settled(session_id: int) -> None:
-    """Wait for everything the coach is still writing for a session."""
-    await asyncio.gather(*_pending.get(session_id, ()), return_exceptions=True)
+    """Wait for the coach's work on a session. A task that is itself part of that work
+    waits only for what was queued before it - the summary for the notes, the sheet for
+    the summary - or two of them would each wait for the other forever."""
+    tasks = list(_pending.get(session_id, ()))
+    me = asyncio.current_task()
+    earlier = tasks[: tasks.index(me)] if me in tasks else tasks
+    await asyncio.gather(*earlier, return_exceptions=True)
 
 
-def _later(session_id: int, work) -> None:
+def later(session_id: int, work) -> None:
     """Run `work` in the background. The conversation never waits for the coach."""
 
     async def safely():
         try:
             await work
         except Exception as exc:  # a failed note must never reach the session
-            print(f"  coach: {llm._said(exc)[:160]}")
+            failed[session_id] = llm._said(exc)[:300]
+            print(f"  coach: {failed[session_id][:160]}")
 
+    failed.pop(session_id, None)  # a new attempt clears the last failure
     task = asyncio.create_task(safely())
-    _pending.setdefault(session_id, set()).add(task)
-    task.add_done_callback(lambda t: _pending[session_id].discard(t))
-
-
-async def _ask(ep, messages) -> llm.Reply:
-    """llm.complete, one at a time, waiting out rate limits for as long as the server asks."""
-    async with _one_at_a_time:
-        for _ in range(6):
-            try:
-                return await llm.complete(ep, messages)
-            except openai.RateLimitError as exc:
-                found = WAIT.search(str(exc))
-                await asyncio.sleep(float(found.group(1)) + 1 if found else 30)
-        return await llm.complete(ep, messages)
+    _pending.setdefault(session_id, []).append(task)
+    task.add_done_callback(lambda t: _pending[session_id].remove(t))
 
 
 def _system(prompt: str) -> str:
@@ -124,7 +120,7 @@ def _system(prompt: str) -> str:
 
 
 async def _note(ep, turn_id: int, asked: str, said: str) -> None:
-    reply = await _ask(
+    reply = await llm.patiently(
         ep,
         [
             {"role": "system", "content": _system(NOTES_PROMPT)},
@@ -141,12 +137,11 @@ def note(session_id: int, turn_id: int, asked: str, said: str) -> None:
     """Write notes on one answer, in the background."""
     ep = endpoint()
     if ep:
-        _later(session_id, _note(ep, turn_id, asked, said))
+        later(session_id, _note(ep, turn_id, asked, said))
 
 
 async def _summarise(ep, session_id: int) -> None:
-    mine = [t for t in _pending.get(session_id, ()) if t is not asyncio.current_task()]
-    await asyncio.gather(*mine, return_exceptions=True)  # the notes go into the summary
+    await settled(session_id)  # the notes go into the summary
     rows = (
         store.db()
         .execute(
@@ -162,7 +157,7 @@ async def _summarise(ep, session_id: int) -> None:
         lines.append(f"{'LEARNER' if r['role'] == 'you' else 'PARTNER'}: {r['text']}")
         if r["notes"]:
             lines.append(f"  notes: {r['notes']}")
-    reply = await _ask(
+    reply = await llm.patiently(
         ep,
         [
             {"role": "system", "content": _system(SUMMARY_PROMPT)},
@@ -194,7 +189,7 @@ def summarise(session_id: int) -> None:
         return
     if (parse(row["summary"]) or {}).get("answers") == row["answers"]:
         return
-    _later(session_id, _summarise(ep, session_id))
+    later(session_id, _summarise(ep, session_id))
 
 
 def catch_up(session_id: int) -> None:

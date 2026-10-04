@@ -64,6 +64,9 @@ def _weights(name: str, override: str) -> str:
 
 TTS_MODEL_PATH = _weights("kokoro-v1.0.onnx", "KOKORO_MODEL")
 TTS_VOICES_PATH = _weights("voices-v1.0.bin", "KOKORO_VOICES")
+# The study sheet's typeface (Inter, OFL). Pillow's own font has no dashes, arrows or
+# accented letters; without this file the sheet still renders, in plain ASCII.
+REPORT_FONT = _weights("Inter.ttf", "REPORT_FONT")
 # Only fires when a sentence never ends. Sentence boundaries are found properly now, so
 # this is a backstop against pathological output - not a routine cut. Low values chop
 # ordinary long sentences in half, which is exactly the bug it used to cause.

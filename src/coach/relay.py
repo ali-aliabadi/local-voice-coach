@@ -81,6 +81,17 @@ def image(png: bytes, caption: str) -> dict:
     }
 
 
+def file(data: bytes, filename: str, content_type: str, caption: str) -> dict:
+    """A document. Shaped like `image`; a Relay without file support answers 400 or 422."""
+    return {
+        "type": "file",
+        "base64": base64.b64encode(data).decode(),
+        "content_type": content_type,
+        "filename": filename,
+        "caption": caption[:1024],
+    }
+
+
 def text(body: str) -> dict:
     return {"type": "text", "text": body[:4000]}
 

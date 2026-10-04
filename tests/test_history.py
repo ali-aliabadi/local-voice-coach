@@ -119,6 +119,28 @@ assert history.listening("", "", first) == {"replies": 2, "helped": 1}
 day = store.db().execute("SELECT substr(at, 1, 10) FROM turns LIMIT 1").fetchone()[0]
 assert history.listening(day, day)["helped"] == 1
 
+# ---- the coach's queue: each task waits for the ones before it, never for one after ----
+import asyncio  # noqa: E402
+
+order = []
+
+
+async def step(name, pause):
+    await coach.settled(first)
+    await asyncio.sleep(pause)
+    order.append(name)
+
+
+async def queue():
+    coach.later(first, step("notes", 0.05))
+    coach.later(first, step("summary", 0))
+    coach.later(first, step("sheet", 0))
+    await asyncio.wait_for(coach.settled(first), timeout=2)  # a deadlock would time out
+
+
+asyncio.run(queue())
+assert order == ["notes", "summary", "sheet"], order
+
 # ---- a second session, and the totals across both ----
 second = store.start("review", "bonsai27", "prism-ml/bonsai-27b")
 store.record(

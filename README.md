@@ -120,12 +120,20 @@ people freeze. Correction lives with the coach, written, after the fact.
 remember the film I told you about?" gets a real answer. Choose the coach's model, or
 turn it off, in Settings.
 
+After every session of three answers or more, a model writes your **study sheet**: a page
+or two to keep — what went well, the fixes worth the most, phrases for the conversations
+you actually have (each shown against what you said, with an example), what to say
+instead of "um", and three small things to practise tomorrow. Open it as a PDF from the
+session page; with Telegram set up it is sent to you too. Phrases in the coach's notes
+are anchored the same way: *instead of "I don't like cinema" → "not really my thing"*.
+
 ## On your phone
 
 With [Relay](https://github.com/ali-aliabadi/relay) set up, the app sends to Telegram:
 
 - **after each session**: how long it ran against your goal, the four numbers against
-  last time, a chart of every answer, and the coach's lessons
+  last time, a chart of every answer, and your study sheet as a PDF (as page images, on
+  a Relay that does not take files)
 - **a daily reminder** if you have not practised by your chosen time, with *Starting
   now* / *In 30 min* / *Skip today* buttons
 - **a weekly report** on Sunday evening: each day, against the week before

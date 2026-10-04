@@ -9,7 +9,7 @@ from starlette.responses import FileResponse
 from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 
-from .. import backends, clock, coach, history, llm, reports, settings, store
+from .. import backends, clock, coach, history, llm, reports, settings, sheet, store
 from . import models
 from .api import MODES, ROUTES, partner
 from .guard import MIDDLEWARE
@@ -63,6 +63,7 @@ async def websocket_session(websocket):
         if session is not None:
             store.finish(session)
             coach.summarise(session)  # once the notes are in; skipped if already current
+            sheet.later(session)  # after the summary: the take-away page
             reports.after_session_later(session)  # to Telegram, after the coach is done
 
 

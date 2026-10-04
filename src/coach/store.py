@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     backend    TEXT NOT NULL,
     model      TEXT NOT NULL,
     goal_minutes INTEGER,               -- what the user set out to do, or NULL
-    summary    TEXT                     -- the coach's summary, JSON
+    summary    TEXT,                    -- the coach's summary, JSON
+    sheet      TEXT                     -- the study sheet's content, JSON
 );
 CREATE TABLE IF NOT EXISTS turns (
     id            INTEGER PRIMARY KEY,
@@ -65,7 +66,7 @@ ADDED_COLUMNS = {
         "helped": "TEXT",
         "timing": "TEXT",
     },
-    "sessions": {"goal_minutes": "INTEGER", "summary": "TEXT"},
+    "sessions": {"goal_minutes": "INTEGER", "summary": "TEXT", "sheet": "TEXT"},
 }
 
 

@@ -150,6 +150,19 @@ SPEC: dict[str, Setting] = {
         help="The lessons quote your own sentences, so that text ends up in your Telegram "
         "chat. Audio never does.",
     ),
+    "sheet_backend": Setting(
+        "flash",
+        "Study sheet model",
+        "Coach",
+        kind="select",
+        help="Writes a page or two after each session of 3+ answers: fixes worth the most, "
+        "phrases for your conversations, what to practise tomorrow. A PDF on the session "
+        "page, and images on Telegram. One request per session, so a stronger model is "
+        "affordable here. 'off' turns it off.",
+    ),
+    "relay_sheet": Setting(
+        "on", "Send the study sheet", "Telegram", kind="select", choices=("on", "off")
+    ),
     "whisper_model": Setting(
         "small.en",
         "Whisper model",
