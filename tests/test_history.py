@@ -63,10 +63,10 @@ assert history.totals()["answers"] == 0
 
 # ---- one full session ----
 first = store.start("talk", "flash-lite", "gemini-3.5-flash-lite")
-store.record("interviewer", "Tell me about yourself.", reply_ms=900.0)
-answer = store.record("you", "So um Redis", METRICS, stt_ms=700, word_rows=WORDS)
-store.record("interviewer", "Why Redis?", reply_ms=1100.0)
-store.finish()
+store.record(first, "interviewer", "Tell me about yourself.", reply_ms=900.0)
+answer = store.record(first, "you", "So um Redis", METRICS, stt_ms=700, word_rows=WORDS)
+store.record(first, "interviewer", "Why Redis?", reply_ms=1100.0)
+store.finish(first)
 
 rows = history.sessions()
 assert len(rows) == 1 and rows[0]["answers"] == 1 and rows[0]["wpm"] == 110
@@ -81,12 +81,15 @@ assert detail["turns"][0]["word_rows"] == []  # the interviewer has none
 assert detail["averages"]["lead_in"] == 2.2
 
 # ---- a second session, and the totals across both ----
-store.start("review", "bonsai27", "prism-ml/bonsai-27b")
+second = store.start("review", "bonsai27", "prism-ml/bonsai-27b")
 store.record(
-    "you", "second answer", {**METRICS, "words": 30, "wpm": 130, "fillers": 1, "lead_in": 1.0}
+    second,
+    "you",
+    "second answer",
+    {**METRICS, "words": 30, "wpm": 130, "fillers": 1, "lead_in": 1.0},
 )
-store.record("review", "3/5. Too vague.", reply_ms=8000.0)
-store.finish()
+store.record(second, "review", "3/5. Too vague.", reply_ms=8000.0)
+store.finish(second)
 
 assert [s["mode"] for s in history.sessions()] == ["review", "talk"]  # newest first
 totals = history.totals()
@@ -96,9 +99,9 @@ assert history.recent()["answers"] == 2
 assert history.recent(limit=1)["fillers"] == 1  # only the newest session
 
 # a session with no answers is not a session worth listing
-store.start("talk", "flash-lite", "m")
-store.record("interviewer", "hello?", reply_ms=100.0)
-store.finish()
+empty = store.start("talk", "flash-lite", "m")
+store.record(empty, "interviewer", "hello?", reply_ms=100.0)
+store.finish(empty)
 assert len(history.sessions()) == 2
 
 # ---- the column migration, on a database that predates it ----
@@ -114,8 +117,8 @@ connection.close()
 
 config.DB_PATH = str(old)
 store._db = None
-store.start("talk", "flash-lite", "m")
-assert store.record("you", "migrated", METRICS, word_rows=WORDS) is not None
+migrated = store.start("talk", "flash-lite", "m")
+assert store.record(migrated, "you", "migrated", METRICS, word_rows=WORDS) is not None
 assert history.totals()["words"] == 20  # the added column is written and read back
 
 print("ok")

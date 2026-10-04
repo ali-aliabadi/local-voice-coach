@@ -76,12 +76,16 @@ make check                           # ruff + format + line budget + tests
 
 **Adding a mode must never require editing another file.** Modes are discovered with
 `pkgutil` in `src/coach/modes/__init__.py`. A mode declares `HELP`, `ENDPOINT` (`"fast"`
-or `"deep"`), and `async def run(endpoint, transcriber, io)`.
+or `"deep"`), and `async def run(endpoint, io)`.
 
-`io` is the browser: `await io.record()`, `await io.say(text, voice)`,
-`await io.send(**event)`, `io.save_answer(...)`, and `io.prior_turns()` to resume a
-session after a refresh. Modes loop forever and never catch `SessionClosed` — the server
+`io` is the browser, for one session: `await io.answer()` hears, scores and saves an
+answer; `await io.reply(endpoint, messages)` speaks the model's reply as it streams and
+handles failure (it returns None and offers a retry); `io.save_turn()`, `io.send()` and
+`io.prior_turns()` cover the rest. A conversational mode is one call to `converse()` in
+`modes/_converse.py`. Modes loop forever and never catch `SessionClosed` — the server
 catches it when the user stops.
+
+The session id lives on `io`, never in a module global: two tabs each own a session.
 
 Do not reintroduce a branch on mode name. A mode needing a different backend names a role
 in `ENDPOINT`; `backends.CATALOGUE` does the rest.

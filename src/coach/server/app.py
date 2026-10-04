@@ -24,32 +24,34 @@ async def page(_request):
 async def websocket_session(websocket):
     """One connection, one session, one mode loop."""
     await websocket.accept()
+    session = None
     try:
         opening = await websocket.receive_json()
         mode = MODES[opening["mode"]]
         backend = backends.BY_KEY[opening["backend"]]
         endpoint = llm.endpoint_for(backend)
         resumed = opening.get("resume")
-        session = store.resume(int(resumed)) if resumed else None
-        if session is None:
-            session = store.start(opening["mode"], backend.key, endpoint.model)
-        io = BrowserIO(websocket, models.voice())
+        session = (resumed and store.resume(int(resumed))) or store.start(
+            opening["mode"], backend.key, endpoint.model
+        )
+        io = BrowserIO(websocket, models.voice(), models.transcriber(), session)
         await io.send(
             type="ready",
             mode=opening["mode"],
             model=endpoint.model,
             local=backend.local,
             session=session,
-            answered=len(store.session_scores()),
+            answered=len(store.session_scores(session)),
         )
-        await mode.run(endpoint, models.transcriber(), io)
+        await mode.run(endpoint, io)
     except SessionClosed:
         pass
     except Exception as exc:  # a mode blew up; tell the user rather than dying silently
         with contextlib.suppress(Exception):
             await websocket.send_json({"type": "error", "text": str(exc)})
     finally:
-        store.finish()
+        if session is not None:
+            store.finish(session)
 
 
 @contextlib.asynccontextmanager

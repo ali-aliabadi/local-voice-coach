@@ -1,6 +1,6 @@
 # Spoken interview practice. `make` on its own lists what you can do.
 .DEFAULT_GOAL := help
-.PHONY: help install models run check fmt build up down restart logs shell clean reset
+.PHONY: help install models run check e2e fmt build up down restart logs shell clean reset
 
 PY      ?= ./.venv/bin/python
 COMPOSE ?= docker compose
@@ -31,6 +31,9 @@ run: models  ## Run the app natively (fastest on a Mac)
 
 check:  ## ruff, formatter, line budget and tests
 	./scripts/check.sh
+
+e2e: models  ## Real server, real socket, a spoken answer (loads Whisper, ~30s)
+	$(PY) tests/test_wire.py
 
 fmt:  ## Reformat and autofix what ruff can
 	ruff check . --fix && ruff format .

@@ -126,6 +126,18 @@ def split_for_speech(buffer: str, flush: bool = False) -> tuple[str, str]:
     return "", buffer
 
 
+SPEAKER = re.compile(r"^\s*([A-Z][A-Z]+)\s*:\s*")
+
+
+def split_speaker(text: str, cast) -> tuple[str | None, str]:
+    """Pull a leading 'NAME:' off a reply. Returns (name if it is in `cast`, rest)."""
+    match = SPEAKER.match(text)
+    if not match:
+        return None, text
+    name = match.group(1)
+    return (name if name in cast else None), text[match.end() :].strip()
+
+
 async def stream_sentences(ep: Endpoint, messages, max_tokens=None):
     """Yield complete sentences as they arrive, so speech starts before generation ends.
 

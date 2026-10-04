@@ -70,11 +70,14 @@ and no branch in `main.py` to extend.
 HELP = "walk through a system design out loud"
 ENDPOINT = "deep"        # "fast" for conversation, "deep" for analysis
 
-async def run(endpoint, transcriber, speaker) -> list[dict]:
-    ...                  # endpoint bundles .client, .model and .extra
+async def run(endpoint, io) -> None:
+    said = await io.answer()                       # hear, score and save one answer
+    await io.reply(endpoint, messages)             # speak the model's reply as it streams
 ```
 
-Copy `src/coach/modes/talk.py` and change the prompt.
+A conversation is one call to `converse()` in `src/coach/modes/_converse.py` — copy
+`src/coach/modes/talk.py` and change the prompt. The full contract is in
+`src/coach/modes/__init__.py`.
 
 ## Adding a model
 

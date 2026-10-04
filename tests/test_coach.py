@@ -12,8 +12,8 @@ from coach import config  # noqa: I001
 config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "test.db")
 
 from coach import backends, settings, store  # noqa: E402
-from coach.llm import conversation, split_for_speech  # noqa: E402
-from coach.modes.panel import split_speaker  # noqa: E402
+from coach.llm import conversation, split_for_speech, split_speaker  # noqa: E402
+from coach.modes.panel import PANEL  # noqa: E402
 from coach.stt import filler_pattern, fluency, word_rows  # noqa: E402
 
 
@@ -154,11 +154,11 @@ assert any(ASSISTANT["content"] in m["content"] for m in conversation([SYS, ASSI
 assert len([m for m in conversation([SYS, SYS, USER]) if m["role"] == "system"]) == 1
 
 # ---- panel speaker routing ----
-assert split_speaker("MAYA: Tell me about yourself.") == ("MAYA", "Tell me about yourself.")
-assert split_speaker("  DEREK:   Why Redis?") == ("DEREK", "Why Redis?")
-assert split_speaker("BOB: hello") == (None, "hello")  # unknown name, prefix still stripped
-assert split_speaker("Tell me about yourself.") == (None, "Tell me about yourself.")
-assert split_speaker("So the trade-off is: latency versus cost.")[0] is None
+assert split_speaker("MAYA: Tell me about yourself.", PANEL) == ("MAYA", "Tell me about yourself.")
+assert split_speaker("  DEREK:   Why Redis?", PANEL) == ("DEREK", "Why Redis?")
+assert split_speaker("BOB: hello", PANEL) == (None, "hello")  # unknown name, prefix still stripped
+assert split_speaker("Tell me about yourself.", PANEL) == (None, "Tell me about yourself.")
+assert split_speaker("So the trade-off is: latency versus cost.", PANEL)[0] is None
 
 # ---- settings ----
 assert settings.get("pause_seconds") == 0.6
@@ -186,23 +186,25 @@ assert form["whisper_model"]["restart"] is True
 # ---- store: persistence, latency and retention ----
 assert store.measured_latency() == {} and store.trend() == []
 
-store.start("talk", "flash-lite", "gemini-3.5-flash-lite")
-first = store.record("you", "an answer", smooth, stt_ms=800, audio_path="/tmp/gone.wav")
-store.record("interviewer", "why?", reply_ms=1000.0)
-store.record("interviewer", "and then?", reply_ms=2000.0)
-store.finish()
+one = store.start("talk", "flash-lite", "gemini-3.5-flash-lite")
+first = store.record(one, "you", "an answer", smooth, stt_ms=800, audio_path="/tmp/gone.wav")
+store.record(one, "interviewer", "why?", reply_ms=1000.0)
+store.record(one, "interviewer", "and then?", reply_ms=2000.0)
+store.finish(one)
 
 assert store.measured_latency() == {"flash-lite": (1500.0, 2)}
-assert len(store.session_scores()) == 1
+assert len(store.session_scores(one)) == 1
 assert store.audio_path(first) == "/tmp/gone.wav"
 assert store.purge_audio(7) == 1  # the file is missing, so the row is cleared
 assert store.audio_path(first) is None
 assert store.purge_audio(0) == 0  # 0 means keep forever
 
-store.start("review", "bonsai27", "prism-ml/bonsai-27b")
-store.record("you", "second", gappy)
-store.record("review", "critique", reply_ms=9000.0)
-store.finish()
+two = store.start("review", "bonsai27", "prism-ml/bonsai-27b")
+store.record(two, "you", "second", gappy)
+store.record(two, "review", "critique", reply_ms=9000.0)
+store.finish(two)
+# each session is its own: two tabs no longer file answers under one another
+assert len(store.session_scores(one)) == 1 and len(store.session_scores(two)) == 1
 assert store.measured_latency()["bonsai27"] == (9000.0, 1)
 trend = store.trend()
 assert len(trend) == 2 and trend[0]["mode"] == "talk" and trend[1]["mode"] == "review"
