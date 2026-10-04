@@ -1,10 +1,11 @@
 # local-voice-coach
 
-Spoken interview practice that **measures your hesitation**.
+Spoken English practice for non-native speakers that **measures your hesitation**.
 
-You answer out loud in the browser, an interviewer digs into what you said, and every
-answer is scored: words per minute, filler words, pauses, and how long you took to start
-talking. Then you listen back to yourself.
+You talk out loud in the browser — everyday conversation, real-life roleplays, stories to
+retell, fluency drills, or a job interview — and every answer is scored: words per
+minute, filler words, pauses, and how long you took to start talking. A coach writes up
+your grammar and word choice after the session, and you listen back to yourself.
 
 **Your voice never leaves your machine.** Whisper and Kokoro run locally. Only transcript
 text reaches a model, and only if you choose a cloud backend — pick a local one and
@@ -12,8 +13,8 @@ nothing leaves at all.
 
 <!-- TODO: 20-second screencast goes here. It converts better than anything written below. -->
 
-Built for one problem: *"I can't speak confidently in interviews. There are a lot of mmmm
-and my sentences take a long time to form."* Most tools can't even measure that, because
+Built for one problem: *"I can't speak English confidently. There are a lot of mmmm and
+my sentences take a long time to form."* Most tools can't even measure that, because
 speech-to-text is trained to tidy disfluencies away before anything sees them.
 
 ## Setup
@@ -46,10 +47,11 @@ configured, since `localhost` inside a container means the container.
 
 ## It knows who you are
 
-Fill in [your profile](http://127.0.0.1:8000/profile) — target role, level, the stack you
-actually use, and what you want to get better at — and the interviewer reads it before
-every session. It pitches difficulty at your level, digs into the projects you named, and
-pushes on the thing you said you freeze on. It never reads any of it back at you.
+Fill in [your profile](http://127.0.0.1:8000/profile). Every mode gets your name and
+first language. The interview modes also get your target role, level, the stack you
+actually use, and what you want to get better at: they pitch difficulty at your level,
+dig into the projects you named, and push on the thing you said you freeze on. Nothing is
+ever read back at you.
 
 It also sees how you have been speaking lately, and asks shorter, more concrete questions
 when you have been hesitating. It is told, in the prompt, never to mention your speech:

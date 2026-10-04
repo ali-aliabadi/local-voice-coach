@@ -1,7 +1,7 @@
 [project]
 name = "local-voice-coach"
 version = "0.1.0"
-description = "Spoken interview practice that measures your hesitation. Local, private, free."
+description = "Spoken English practice that measures your hesitation. Local, private, free."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

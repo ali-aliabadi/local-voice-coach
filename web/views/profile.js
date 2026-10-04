@@ -1,5 +1,5 @@
-// Who the interviewer thinks it is talking to. This is what makes it a trainer rather
-// than a stranger asking generic questions.
+// Who the partner thinks it is talking to. This is what makes it a trainer rather than a
+// stranger asking generic questions.
 
 import { field, get, post, values } from "../form.js";
 
@@ -7,9 +7,10 @@ export async function render(root) {
   const { fields } = await get("/api/profile");
   root.innerHTML = `
     <h1>Your profile</h1>
-    <p class="foot lead">The interviewer reads this before every session: it pitches
-    questions at your level, digs into the stack you actually named, and pushes on what
-    you said you want to improve. It never repeats any of it back to you.</p>
+    <p class="foot lead">Every mode knows your name and first language. The interview modes
+    also read the rest: they pitch questions at your level, dig into the stack you actually
+    named, and push on what you said you want to improve. Nothing is ever repeated back
+    to you.</p>
     <form id="profile-form">${fields.map(field).join("")}</form>
     <div class="row">
       <button class="primary" id="save">Save</button>

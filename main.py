@@ -1,4 +1,4 @@
-"""Spoken interview practice that measures your hesitation.
+"""Spoken English practice that measures your hesitation.
 
 Local, private, free. Whisper and Kokoro run on this machine; only transcript text ever
 reaches a model, and only if you pick a cloud backend.
@@ -15,7 +15,7 @@ import webbrowser
 import uvicorn
 
 BANNER = """
-  interview practice · local, private
+  speaking practice · local, private
   ─────────────────────────────────────
 """
 

@@ -5,13 +5,14 @@ contributor can tell a deliberate choice from an accident.
 
 ## What the project is
 
-Spoken interview practice that **measures hesitation**. Not a chatbot with a microphone —
-the point is the numbers: words per minute, filler count, pause count, and time-to-first-word,
+Spoken English practice that **measures hesitation**. Not a chatbot with a microphone —
+the point is the numbers: words per minute, filler rate, pause rate, and time-to-first-word,
 tracked until they move.
 
-Primary user: a non-native-English engineer who can code but freezes in interviews.
-They are recording themselves sounding bad, which makes privacy the first requirement,
-not a feature.
+Primary user: a non-native English speaker who freezes when speaking — in conversation,
+and under the pressure of an interview. They practise about an hour a day, speaking and
+listening, and are recording themselves sounding bad, which makes privacy the first
+requirement, not a feature.
 
 ## Three rules that decide most arguments
 

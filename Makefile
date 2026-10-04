@@ -1,4 +1,4 @@
-# Spoken interview practice. `make` on its own lists what you can do.
+# Spoken English practice. `make` on its own lists what you can do.
 .DEFAULT_GOAL := help
 .PHONY: help install models run check e2e fmt build up down restart logs shell clean reset
 

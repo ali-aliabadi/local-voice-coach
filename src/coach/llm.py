@@ -1,4 +1,5 @@
-"""The cloud interviewer. Gemini, spoken to through the OpenAI-compatible endpoint."""
+"""The model on the other side: Gemini, or a local model through LM Studio, both spoken
+to through the OpenAI-compatible endpoint."""
 
 import asyncio
 import time

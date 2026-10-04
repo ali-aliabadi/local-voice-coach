@@ -4,13 +4,15 @@ Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 ## Project Overview
 
-Spoken software-engineering interview practice. The user answers out loud, a model plays
-the interviewer, and every answer is scored for fluency so hesitation can be tracked over
-time. Intended to be published for others to use and contribute to.
+Spoken English practice for non-native speakers. The user talks out loud — everyday
+conversation, roleplays, retelling, drills, or a software-engineering interview — a model
+plays the other side, every answer is scored for fluency so hesitation can be tracked over
+time, and a coach writes up the language afterwards. Intended to be published for others
+to use and contribute to.
 
-The goal behind every design choice: the user wants to cut filler words ("mmmm") and
-shorten the time it takes to form a sentence under interview pressure. They practise about
-an hour a day.
+The goal behind every design choice: the user wants to cut filler words ("mmmm"), shorten
+the time it takes to form a sentence, and understand spoken English by ear. They practise
+about an hour a day.
 
 ## Architecture
 

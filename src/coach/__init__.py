@@ -1,1 +1,1 @@
-"""Spoken interview practice: local ears and voice, cloud interviewer."""
+"""Spoken English practice: local ears and voice, a model to talk to, a coach afterwards."""
