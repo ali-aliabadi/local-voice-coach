@@ -7,6 +7,8 @@ A mode module declares these:
                     "deep" for analysis (quality matters, latency does not)
     PARTNER   str   optional: who the user is talking to, as the pages name them.
                     "interviewer" when left out.
+    UNLOCK    int   optional: sessions done before it opens; 1 when left out. A first
+                    session sees only the UNLOCK 0 mode; after one, all are shown.
     async def run(endpoint, io)
                     endpoint bundles .client, .model and .extra for your ENDPOINT.
                     io is the browser, for one session:
@@ -38,3 +40,14 @@ def discover() -> dict:
         for info in pkgutil.iter_modules(__path__)
         if not info.name.startswith("_")
     }
+
+
+def unlock(module) -> int:
+    return getattr(module, "UNLOCK", 1)
+
+
+def state(module, done: int) -> str:
+    """ "open", "locked" (shown, not yet usable) or "hidden", after `done` sessions."""
+    if done >= unlock(module):
+        return "open"
+    return "locked" if done else "hidden"

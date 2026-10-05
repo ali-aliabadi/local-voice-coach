@@ -14,6 +14,7 @@ from ._topics import TOPICS
 
 HELP = "everyday conversation to build speaking and listening, every answer scored"
 ENDPOINT = "fast"
+UNLOCK = 0  # the one mode a first session sees, and the biggest button
 PARTNER = "partner"
 
 PROMPT = (

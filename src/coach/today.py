@@ -1,4 +1,4 @@
-"""Where you stand today: the home page asks, and so does the Telegram reminder.
+"""Where you stand today, for the home page.
 
 How long you have practised today, how many days in a row, and what the coach said to
 work on last time - the three things worth knowing before you start.
@@ -11,9 +11,10 @@ from . import history, store
 
 
 def days_practised() -> list[str]:
-    """Every day with at least one answer, newest first."""
+    """Every day with a session that counts, newest first."""
     rows = store.db().execute(
-        "SELECT DISTINCT substr(at, 1, 10) AS day FROM turns WHERE role = 'you' ORDER BY day DESC"
+        "SELECT DISTINCT substr(at, 1, 10) AS day FROM turns WHERE role = 'you'"
+        f" AND session_id IN {history.counted()} ORDER BY day DESC"
     )
     return [r["day"] for r in rows]
 

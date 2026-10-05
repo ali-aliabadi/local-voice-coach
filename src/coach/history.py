@@ -48,6 +48,27 @@ def rates(m: dict | None) -> dict | None:
 
 
 PAGE = 50
+# Fewer answers, or less time from start to last turn, and it was a try, not a session:
+# not listed, not reported, not counted towards a streak or what a mode needs to open.
+MIN_ANSWERS, MIN_MINUTES = 2, 2
+
+
+def counted() -> str:
+    """The ids of sessions that count, as a subquery for `IN`."""
+    return (
+        "(SELECT s.id FROM sessions s JOIN turns t ON t.session_id = s.id GROUP BY s.id"
+        f" HAVING SUM(t.role = 'you') >= {MIN_ANSWERS}"
+        f" AND (julianday(MAX(t.at)) - julianday(s.started_at)) * 1440 >= {MIN_MINUTES})"
+    )
+
+
+def is_counted(session_id: int) -> bool:
+    return store.db().execute(f"SELECT ? IN {counted()}", (session_id,)).fetchone()[0] == 1
+
+
+def count() -> int:
+    """How many sessions you have done that count."""
+    return store.db().execute(f"SELECT COUNT(*) FROM {counted()}").fetchone()[0]
 
 
 def sessions(before: int | None = None, limit: int = PAGE) -> list[dict]:
@@ -60,7 +81,7 @@ def sessions(before: int | None = None, limit: int = PAGE) -> list[dict]:
             f"  s.goal_minutes, {LENGTH},"
             f"  COUNT(t.id) AS answers, {RATES}, SUM(t.wpm IS NOT NULL) AS scored "
             "FROM sessions s LEFT JOIN turns t ON t.session_id = s.id AND t.role = 'you' "
-            "WHERE s.id < ? GROUP BY s.id HAVING answers > 0 ORDER BY s.id DESC LIMIT ?",
+            f"WHERE s.id < ? AND s.id IN {counted()} GROUP BY s.id ORDER BY s.id DESC LIMIT ?",
             (before or 2**62, limit),
         )
         .fetchall()
@@ -113,7 +134,8 @@ def previous(before: int) -> dict:
     """Averages of the session before this one, so a review can say what changed."""
     return _rated(
         f"SELECT {RATES} FROM turns t WHERE t.session_id = (SELECT MAX(s.id) FROM sessions s"
-        "  JOIN turns x ON x.session_id = s.id AND x.role = 'you' AND x.wpm > 0 WHERE s.id < ?)",
+        "  JOIN turns x ON x.session_id = s.id AND x.role = 'you' AND x.wpm > 0"
+        f"  WHERE s.id < ? AND s.id IN {counted()})",
         (before,),
     )
 
@@ -147,7 +169,7 @@ def totals() -> dict:
             "SELECT COUNT(DISTINCT s.id) AS sessions, COUNT(t.id) AS answers,"
             f"  {RATES}, SUM(t.words) AS words "
             "FROM turns t JOIN sessions s ON s.id = t.session_id "
-            "WHERE t.role = 'you' AND t.wpm IS NOT NULL"
+            f"WHERE t.role = 'you' AND t.wpm IS NOT NULL AND s.id IN {counted()}"
         )
         .fetchone()
     )
@@ -162,7 +184,7 @@ def recent(limit: int = 5) -> dict:
         .execute(
             f"SELECT COUNT(*) AS answers, {RATES} FROM turns t "
             f"WHERE {RATED} AND t.session_id IN "
-            "  (SELECT id FROM sessions ORDER BY id DESC LIMIT ?)",
+            f"  (SELECT id FROM sessions WHERE id IN {counted()} ORDER BY id DESC LIMIT ?)",
             (limit,),
         )
         .fetchone()
@@ -195,7 +217,7 @@ def mistakes(days: int = 7) -> list[tuple[str, int]]:
     patterns worth practising, as opposed to one-off slips."""
     rows = store.db().execute(
         "SELECT notes FROM turns WHERE role = 'you' AND notes IS NOT NULL"
-        " AND at >= datetime('now', 'localtime', ?)",
+        f" AND at >= datetime('now', 'localtime', ?) AND session_id IN {counted()}",
         (f"-{days} days",),
     )
     counts: dict[str, int] = {}
@@ -215,7 +237,7 @@ def trend(days: int = 366) -> list[dict]:
             "SELECT substr(s.started_at, 1, 10) AS day, COUNT(DISTINCT s.id) AS sessions,"
             f"  COUNT(t.id) AS answers, {RATES} "
             "FROM sessions s JOIN turns t ON t.session_id = s.id "
-            f"WHERE {RATED} GROUP BY day ORDER BY day DESC LIMIT ?",
+            f"WHERE {RATED} AND s.id IN {counted()} GROUP BY day ORDER BY day DESC LIMIT ?",
             (days,),
         )
         .fetchall()

@@ -88,7 +88,8 @@ make e2e                             # real server, real socket, a spoken answer
 
 **Adding a mode must never require editing another file.** Modes are discovered with
 `pkgutil` in `src/coach/modes/__init__.py`. A mode declares `HELP`, `ENDPOINT` (`"fast"`
-or `"deep"`), and `async def run(endpoint, io)`.
+or `"deep"`), and `async def run(endpoint, io)`; optionally `UNLOCK`, the sessions done
+before it opens. A first session sees only `talk` (0); interviews open at 2.
 
 `io` is the browser, for one session: `await io.answer()` hears, scores and saves an
 answer; `await io.reply(endpoint, messages)` speaks the model's reply as it streams and
@@ -218,6 +219,18 @@ what it sent under `relay:` keys in the settings table, so a restart never repea
 The charts are drawn server-side by `picture.py` (Pillow) so a report never depends on
 a browser tab still being open; `picture.SERIES` mirrors `SERIES` in `chart.js`, and
 a test fails if they drift.
+
+### A session counts at 2 answers and 2 minutes
+Anything shorter is a try: `history.counted()` leaves it out of the history list, streaks,
+totals, trends, mode unlocks, the coach's summary, the study sheet and Telegram. The rule
+is one subquery; use it rather than re-deriving "has answers".
+
+### The app runs only while you practise
+It is started for a session and stopped after, so nothing may depend on it being up at a
+given time. Everything sent to Telegram goes when a session ends, last week's report
+included; a daily reminder was removed because it could only ever fire at someone already
+in the app. Quitting waits for the coach's queue (`app.finish_up`), and a second Ctrl-C
+skips it.
 
 ### Schema changes need a migration
 `CREATE TABLE IF NOT EXISTS` will not add a column to a database that already exists, and

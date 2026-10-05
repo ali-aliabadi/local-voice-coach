@@ -5,6 +5,8 @@ in the app. SERIES mirrors SERIES in web/chart.js; a test keeps the two in step.
 """
 
 import io
+import math
+import statistics
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -15,10 +17,37 @@ SERIES = {
     "pauses": ("pauses per minute", (0, 20), (0, 5)),
     "lead_in": ("seconds before you start", (0, 6), (0, 1.5)),
 }
+# The size of change worth saying out loud, and how to say it - MOVED and PHRASE in
+# web/chart.js, so a change reads the same on a phone as in the app.
+MOVED = {"wpm": 4, "fillers": 0.4, "pauses": 0.8, "lead_in": 0.3}
+PHRASE = {
+    "wpm": lambda d, better: f"{abs(d):.0f} wpm {'faster' if better else 'slower'}",
+    "fillers": lambda d, better: (
+        f"{abs(d):.1f} {'fewer' if better else 'more'} fillers per 100 words"
+    ),
+    "pauses": lambda d, better: f"{abs(d):.1f} {'fewer' if better else 'more'} pauses a minute",
+    "lead_in": lambda d, better: f"{abs(d):.1f}s {'quicker' if better else 'slower'} to start",
+}
+
+
+def shifts(before: dict, now: dict) -> list[str]:
+    """What moved more than noise from `before` to `now`, in words."""
+    said = []
+    for key, threshold in MOVED.items():
+        a, b = before.get(key), now.get(key)
+        if a is not None and b is not None and abs(b - a) >= threshold:
+            said.append(PHRASE[key](b - a, b > a if key == "wpm" else b < a))
+    return said
+
+
 # The light theme's tokens from web/style.css: Telegram shows images on either theme, and
 # light reads on both.
 PAGE, SURFACE, INK, MUTED = "#f4f9fd", "#ffffff", "#16232f", "#5c7285"
 LINE, ACCENT, GOAL = "#dde8f1", "#1c6fbe", "#dbeaf8"
+# The trend, in the warn colour: blue and orange stay apart under every colour blindness,
+# and it is dashed so it does not rest on colour alone.
+TREND_COLOUR = "#b5501f"
+TREND = "The dashed orange line is the trend."
 
 W, H = 1200, 760  # drawn at twice the size it is read at, so it stays sharp on a phone
 PANEL_W, PANEL_H, GAP = 570, 345, 20
@@ -30,6 +59,15 @@ def _font(size: int):
 
 def _shown(key: str, value: float) -> str:
     return f"{value:.0f}" if key == "wpm" else f"{value:.1f}"
+
+
+def _dashed(draw, start: tuple, end: tuple, dash: int = 16, gap: int = 10) -> None:
+    (x0, y0), (x1, y1) = start, end
+    length = math.hypot(x1 - x0, y1 - y0) or 1
+    for at in range(0, int(length), dash + gap):
+        a, b = at / length, min(at + dash, length) / length
+        segment = (x0 + (x1 - x0) * a, y0 + (y1 - y0) * a, x0 + (x1 - x0) * b, y0 + (y1 - y0) * b)
+        draw.line(segment, fill=TREND_COLOUR, width=4)
 
 
 def _panel(draw, x0: int, y0: int, key: str, values: list[float], labels, headline):
@@ -57,6 +95,10 @@ def _panel(draw, x0: int, y0: int, key: str, values: list[float], labels, headli
                   for i, v in enumerate(values)]  # fmt: skip
         if len(points) > 1:
             draw.line(points, fill=ACCENT, width=5, joint="curve")
+        if len(values) > 2:  # through two points the trend is the line itself
+            fit = statistics.linear_regression(range(len(values)), values)
+            last = fit.intercept + fit.slope * (len(values) - 1)
+            _dashed(draw, (points[0][0], y(fit.intercept)), (points[-1][0], y(last)))
         px, py = points[-1]
         draw.ellipse((px - 8, py - 8, px + 8, py + 8), fill=ACCENT, outline=SURFACE, width=3)
     if labels:

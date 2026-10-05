@@ -10,7 +10,7 @@ config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "modes.db")
 
 from coach.chunks import split_for_speech, split_speaker  # noqa: E402
 from coach.llm import retry_after  # noqa: E402
-from coach.modes import repeat, shadow  # noqa: E402
+from coach.modes import discover, repeat, shadow, state  # noqa: E402
 from coach.modes.panel import PANEL  # noqa: E402
 
 
@@ -97,5 +97,43 @@ assert split_speaker("So the trade-off is: latency versus cost.", PANEL)[0] is N
 assert retry_after("Please retry in 33.876060542s.") == 33.876060542
 assert retry_after("Please retry in 3h35m42.5s.") == 3 * 3600 + 35 * 60 + 42.5
 assert retry_after("Please retry in 2m.") == 120 and retry_after("no hint") is None
+
+# "high demand" is a 503 that passes: the background queue waits it out, and says so
+import asyncio  # noqa: E402
+import types  # noqa: E402
+
+import httpx  # noqa: E402
+import openai  # noqa: E402
+
+from coach import llm  # noqa: E402
+
+said = []
+
+
+async def overloaded_once(_ep, _messages, _max_tokens=None):
+    if not said:
+        response = httpx.Response(503, request=httpx.Request("POST", "http://model"))
+        raise openai.InternalServerError("high demand", response=response, body=None)
+    return llm.Reply("fine", 1.0)
+
+
+async def no_wait(_seconds):
+    said.append(llm.waiting)
+
+
+real_complete, real_sleep = llm.complete, asyncio.sleep
+llm.complete, asyncio.sleep = overloaded_once, no_wait
+try:
+    reply = asyncio.run(llm.patiently(types.SimpleNamespace(model="flash"), []))
+finally:
+    llm.complete, asyncio.sleep = real_complete, real_sleep
+assert reply.text == "fine" and said == ["flash is busy, trying again in 30s"], said
+assert llm.waiting == "", "cleared once it is past"
+
+# ---- which modes a beginner sees: talk alone, then all, the interviews last ----
+found = discover()
+assert [n for n, m in found.items() if state(m, 0) != "hidden"] == ["talk"]
+assert {n for n, m in found.items() if state(m, 1) == "locked"} == {"panel", "review"}
+assert all(state(m, 2) == "open" for m in found.values())
 
 print("ok")

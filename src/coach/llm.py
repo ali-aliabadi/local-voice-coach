@@ -181,21 +181,31 @@ def retry_after(message: str) -> float | None:
     return int(hours or 0) * 3600 + int(minutes or 0) * 60 + float(seconds or 0)
 
 
+waiting = ""  # what the background queue is sitting out right now, for the page to say
+
+
 async def patiently(ep: Endpoint, messages, max_tokens=None) -> Reply:
-    """`complete`, one at a time, waiting out per-minute rate limits; a daily quota that is
-    used up fails at once, saying so."""
+    """`complete`, one at a time, waiting out per-minute rate limits and an overloaded
+    model ("high demand" is a 503, and passes); a daily quota that is used up fails at
+    once, saying so."""
+    global waiting
     async with _one_at_a_time:
         for _ in range(6):
             try:
                 return await complete(ep, messages, max_tokens)
-            except openai.RateLimitError as exc:
+            except (openai.RateLimitError, openai.InternalServerError) as exc:
                 wait = retry_after(str(exc)) or 30
                 if wait > LONGEST_WAIT:
                     raise RuntimeError(
                         f"{ep.model} has used up its free requests for today; they come back "
                         f"in {wait / 3600:.1f} hours. Choose another model in Settings."
                     ) from None
-                await asyncio.sleep(wait + 1)
+                busy = "busy" if isinstance(exc, openai.InternalServerError) else "rate-limited"
+                waiting = f"{ep.model} is {busy}, trying again in {wait:.0f}s"
+                try:
+                    await asyncio.sleep(wait + 1)
+                finally:
+                    waiting = ""
         return await complete(ep, messages, max_tokens)
 
 

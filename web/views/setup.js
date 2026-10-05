@@ -5,6 +5,14 @@ import { GOALS, keepGoal, lastGoal } from "../clock.js";
 import { get } from "../form.js";
 import { go } from "../router.js";
 
+/** Open modes are links, the starter mode the biggest; a locked one says when it opens. */
+const card = (m) => (m.state === "open"
+  ? `<a class="card${m.unlock === 0 ? " hero" : ""}" href="/models?mode=${m.name}">
+      <b>${m.name}</b><span>${m.help}</span></a>`
+  : `<div class="card locked" aria-disabled="true">
+      <b>${m.name}<span class="tag">after ${m.left} more session${m.left === 1 ? "" : "s"}</span></b>
+      <span>${m.help}</span></div>`);
+
 export const modes = {
   async render(root) {
     const [list, { isSet }] = await Promise.all([get("/api/modes"), get("/api/profile")]);
@@ -13,10 +21,9 @@ export const modes = {
       ${isSet ? "" : `<p class="callout">Fill in <a href="/profile">your profile</a> first
         so it knows what to call you, your first language, and — for the interview modes —
         your level and what you work on.</p>`}
-      <div class="cards">
-        ${list.map((m) => `<a class="card" href="/models?mode=${m.name}">
-          <b>${m.name}</b><span>${m.help}</span></a>`).join("")}
-      </div>`;
+      <div class="cards">${list.filter((m) => m.state !== "hidden").map(card).join("")}</div>
+      ${list.some((m) => m.state === "hidden") ? `<p class="foot">Start with a conversation.
+        More modes open as you practise.</p>` : ""}`;
   },
 };
 

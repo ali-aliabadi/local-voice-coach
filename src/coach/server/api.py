@@ -6,8 +6,8 @@ import pathlib
 from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route
 
-from .. import backends, coach, history, profile, settings, sheet, store, today
-from ..modes import discover
+from .. import backends, coach, history, llm, profile, reports, settings, sheet, store, today
+from ..modes import discover, state, unlock
 from . import models
 
 MODES = discover()
@@ -41,6 +41,7 @@ def partner(mode: str) -> str:
 
 
 async def get_modes(_request):
+    done = history.count()
     return JSONResponse(
         [
             {
@@ -48,8 +49,11 @@ async def get_modes(_request):
                 "help": module.HELP,
                 "endpoint": module.ENDPOINT,
                 "partner": partner(name),
+                "unlock": unlock(module),
+                "state": state(module, done),
+                "left": max(0, unlock(module) - done),
             }
-            for name, module in sorted(MODES.items())
+            for name, module in sorted(MODES.items(), key=lambda kv: (unlock(kv[1]), kv[0]))
         ]
     )
 
@@ -124,6 +128,10 @@ async def get_session(request):
             "coach_error": coach.failed.get(found["id"]),
             "sheet": sheet.stored(found["id"]) is not None,
             "can_sheet": sheet.endpoint() is not None and found["answers"] >= sheet.MIN_ANSWERS,
+            "counted": history.is_counted(found["id"]),
+            "minimum": {"answers": history.MIN_ANSWERS, "minutes": history.MIN_MINUTES},
+            "telegram": reports.sent(found["id"], found["answers"]),
+            "waiting": llm.waiting,
         }
     )
 

@@ -147,6 +147,10 @@ assert form["tts_voice"]["choices"] == ["am_puck", "af_heart"]  # filled at requ
 assert form["whisper_model"]["restart"] is True
 
 # ---- store: persistence, latency and retention ----
+history.MIN_ANSWERS, history.MIN_MINUTES = (
+    1,
+    0,
+)  # one-answer sessions here; the rule itself is in test_reports
 assert store.measured_latency() == {} and history.trend() == []
 
 one = store.start("talk", "flash-lite", "gemini-3.5-flash-lite")

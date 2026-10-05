@@ -9,6 +9,7 @@ from .. import llm, profile, settings
 
 HELP = "one hard question, then a written critique"
 ENDPOINT = "deep"
+UNLOCK = 2  # an interview: once everyday talk has had two sessions
 
 PROMPT = (
     "You are a staff engineer interviewing a candidate for a software engineering role. "

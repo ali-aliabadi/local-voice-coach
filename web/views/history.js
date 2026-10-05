@@ -105,15 +105,48 @@ function answerBlock(turn, index) {
     </article>`;
 }
 
-/** Where the coach's summary goes: the summary, a "still writing" line, or a way to ask. */
+// What happens after a session, in order, with something to read while each one runs.
+const STEPS = [
+  ["notes", "Reading every answer", ["Squinting at your prepositions…",
+    "Counting your articles. All of them.", "Making tea for the grammar…"]],
+  ["summary", "Writing your summary", ["Boiling the whole chat down to three things…",
+    "Looking for patterns, not slips…", "Deciding what actually matters…"]],
+  ["sheet", "Drawing your study sheet", ["Picking phrases worth stealing…",
+    "Choosing fonts like it is a wedding invitation…", "Ironing the PDF flat…"]],
+  ["telegram", "Sending it to Telegram", ["Folding it into a paper plane…",
+    "Licking the stamp…"]],
+];
+
+/** Each step ticked off, the one running now, and what it is waiting on if anything. */
+function progress(s) {
+  const noted = s.turns.filter((t) => t.role === "you" && t.notes).length;
+  const done = { notes: noted >= s.answers, summary: !!s.summary, sheet: s.sheet,
+    telegram: s.telegram };
+  const applies = { notes: s.coaching !== "off", summary: s.coaching !== "off",
+    sheet: s.can_sheet, telegram: s.telegram != null };
+  let now = null;
+  const items = STEPS.filter(([key]) => applies[key]).map(([key, label, lines]) => {
+    const count = key === "notes" ? ` · ${noted} of ${s.answers}` : "";
+    if (done[key]) return `<li class="done">${label}${count}</li>`;
+    if (now) return `<li>${label}</li>`;
+    now = key;
+    const line = s.waiting || lines[Math.floor(Date.now() / 4000) % lines.length];
+    return `<li class="now">${label}${count}<span>${escape(line)}</span></li>`;
+  });
+  return `<ol class="steps" aria-live="polite">${items.join("")}</ol>`;
+}
+
+/** Where the coach's summary goes: the summary, its progress, or a way to ask for it. */
 function coaching(session) {
-  if (session.coaching === "pending") {
-    const done = session.turns.filter((t) => t.role === "you" && t.notes).length;
-    return `<p class="callout">The coach is still writing: ${done} of ${session.answers}
-      answers have notes so far. This page fills in by itself.</p>`;
+  if (!session.counted) {
+    const { answers, minutes } = session.minimum;
+    return `<p class="callout">Too short to count as a session: that takes at least
+      ${answers} answers and ${minutes} minutes. It is not in your history, and nothing was
+      sent.</p>`;
   }
+  if (session.coaching === "pending") return progress(session);
   const failed = session.coach_error
-    ? `<p class="notice">The coach could not finish: ${escape(session.coach_error)}</p>` : "";
+    ? `<p class="notice">Not everything finished: ${escape(session.coach_error)}</p>` : "";
   if (session.summary) {
     const take = session.sheet
       ? `<p class="callout"><a href="/api/sessions/${session.id}/sheet.pdf" target="_blank">
@@ -134,7 +167,8 @@ function coaching(session) {
 
 export const detail = {
   async render(root, params) {
-    root.innerHTML = `<p class="foot loading">Loading…</p>`;
+    // Only when arriving: filling in later swaps the page whole, with no flash in between.
+    if (!root.firstChild) root.innerHTML = `<p class="foot loading">Loading…</p>`;
     const session = await get(`/api/sessions/${params.id}`);
     if (session.error) {
       root.innerHTML = `<h1>Not found</h1><p class="foot">
@@ -153,7 +187,7 @@ export const detail = {
       ${waits(session.turns)}
       ${changed(session.averages, session.previous)}
       ${session.answers ? '<div class="metrics" id="session-average"></div>' : ""}
-      ${coaching(session)}
+      <div id="coaching">${coaching(session)}</div>
       <h2>The conversation</h2>
       ${expired ? `<p class="foot">Recordings from this session have expired — they are
         deleted after the retention window in <a href="/settings">settings</a>.</p>` : ""}
@@ -179,10 +213,16 @@ export const detail = {
         root.querySelector(`[data-transcript="${turn.id}"]`), turn.word_rows, turn.text);
     }
 
-    const again = () => setTimeout(() => {
+    // While the coach works only its progress is redrawn, so a recording you are playing
+    // keeps playing; the whole page is redrawn once, when it is done.
+    const again = () => setTimeout(async () => {
       // Only while this page is still the one showing: navigating away ends the polling.
-      if (location.pathname === `/history/${params.id}`) detail.render(root, params);
-    }, 4000);
+      if (location.pathname !== `/history/${params.id}`) return;
+      const next = await get(`/api/sessions/${params.id}`);
+      if (next.coaching !== "pending") return detail.render(root, params);
+      root.querySelector("#coaching").innerHTML = coaching(next);
+      again();
+    }, 2000);
     root.querySelector("#coach-now")?.addEventListener("click", async () => {
       await post(`/api/sessions/${params.id}/coach`, {});
       again();

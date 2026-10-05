@@ -133,17 +133,18 @@ are anchored the same way: *instead of "I don't like cinema" → "not really my 
 
 With [Relay](https://github.com/ali-aliabadi/relay) set up, the app sends to Telegram:
 
-- **after each session**: how long it ran against your goal, the four numbers against
-  last time, a chart of every answer, and your study sheet as a PDF to download (as page
-  images, on a Relay from before file blocks). Sent by itself when the session ends.
-- **a daily reminder** if you have not practised by your chosen time, with *Starting
-  now* / *In 30 min* / *Skip today* buttons
-- **a weekly report** on Sunday evening: each day, against the week before
+- **after each session**: how long it ran against your goal, what changed since last
+  time, how many replies you followed by ear, a chart of every answer with its trend, and
+  your study sheet as a PDF to download (as page images, on a Relay from before file
+  blocks). Sent by itself once the coach has finished.
+- **last week's report**, after the first session of a new week: each day, against the
+  week before
 
-Put `RELAY_URL`, `RELAY_API_KEY` and `RELAY_APP` in `.env`; each message has an on/off in
-Settings. Only numbers, a chart and — if you allow it — the coach's lessons are sent.
-Audio never is. It needs the server running at reminder time, which Docker's restart
-policy takes care of.
+The app is meant to run only while you practise, so everything is sent when a session
+ends; quitting with Ctrl-C waits for the study sheet and report (Ctrl-C again skips
+them). Put `RELAY_URL`, `RELAY_API_KEY` and `RELAY_APP` in `.env`; each message has an
+on/off in Settings. Only numbers, a chart and — if you allow it — the coach's lessons are
+sent. Audio never is.
 
 ## Cost
 

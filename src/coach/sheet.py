@@ -76,7 +76,7 @@ async def write(session_id: int) -> None:
 
 def later(session_id: int) -> None:
     """Write it in the background, counted with the coach's work for this session."""
-    if endpoint():
+    if endpoint() and history.is_counted(session_id):
         coach.later(session_id, write(session_id))
 
 
@@ -115,7 +115,7 @@ def _time_tiles(d: dict) -> list[tuple[str, str, str, bool | None]]:
         tiles.append(
             (shown, "you speaking", f"{round(spoken / minutes * 100)}% of the session", None)
         )
-    wait = _waits(d)
+    wait = waits(d)
     if wait:
         tiles.append((f"{wait['total']:.1f}s", "until a reply began", "after you stopped", None))
     heard = d.get("listening") or {}
@@ -127,7 +127,7 @@ def _time_tiles(d: dict) -> list[tuple[str, str, str, bool | None]]:
     return tiles
 
 
-def _waits(d: dict) -> dict | None:
+def waits(d: dict) -> dict | None:
     """The average reply wait and where it went, over the replies that were timed."""
     timed = [t["timing"] for t in d["turns"] if (t.get("timing") or {}).get("total")]
     if not timed:
@@ -145,11 +145,11 @@ def _charts(doc: layout.Doc, session_id: int, d: dict) -> None:
     if len(series) > 1:
         chart = picture.panels(series, ["answer 1", f"answer {len(series)}"], d["averages"])
         doc.image(chart, "This session, one point per answer. The shaded band is the target; the "
-                  "big number is the whole session.")  # fmt: skip
+                  f"big number is the whole session. {picture.TREND}")  # fmt: skip
     if len(days) > 1:
         chart = picture.panels(days, [days[0]["day"][5:], days[-1]["day"][5:]], days[-1])
         doc.image(chart, f"Your last {len(days)} days of practice, up to today, one point per "
-                  "day. The big number is the latest day.")  # fmt: skip
+                  f"day. The big number is the latest day. {picture.TREND}")  # fmt: skip
 
 
 def render(session_id: int) -> layout.Doc | None:
@@ -167,7 +167,7 @@ def render(session_id: int) -> layout.Doc | None:
     time = _time_tiles(d)
     if time:
         doc.tiles(time)
-    wait = _waits(d)
+    wait = waits(d)
     if wait and {"hearing", "thinking", "voicing"} <= wait.keys():
         doc.text(
             f"Each reply began {wait['total']:.1f}s after you stopped: {wait['hearing']:.1f}s "

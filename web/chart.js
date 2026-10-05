@@ -57,7 +57,9 @@ export const MOVED = { wpm: 4, fillers: 0.4, pauses: 0.8, lead_in: 0.3 };
 
 export function moved(key, now, before) {
   const diff = (now ?? 0) - (before ?? 0);
-  if (before == null || Math.abs(diff) < MOVED[key]) return null;
+  // Only the four metrics have a direction: "spoken" rides along in the same averages,
+  // and comparing it crashed the review page into a permanent "Loading".
+  if (!(key in MOVED) || before == null || Math.abs(diff) < MOVED[key]) return null;
   const better = SERIES[key].better === "up" ? diff > 0 : diff < 0;
   return { better, text: PHRASE[key](diff, better) };
 }

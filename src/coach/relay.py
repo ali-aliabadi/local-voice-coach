@@ -81,13 +81,6 @@ async def send(title: str, blocks: list[dict], key: str, urgency: str = "low") -
     return result.get("id")
 
 
-async def answer(message_id: str) -> str | None:
-    """The button pressed on a question, or None if nobody has answered yet."""
-    result = await asyncio.to_thread(_call, "GET", f"/v1/messages/{message_id}/answers")
-    answers = result.get("answers") or []
-    return answers[0].get("answer") if answers else None
-
-
 def image(png: bytes, caption: str) -> dict:
     return {
         "type": "image",

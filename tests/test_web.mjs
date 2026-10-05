@@ -52,6 +52,7 @@ assert.equal(moved("lead_in", 1.0, 2.5).better, true);
 assert.equal(moved("wpm", 118, 116), null, "2 wpm is noise");
 assert.equal(moved("fillers", 3.0, 3.1), null, "0.1 fillers is noise");
 assert.equal(moved("fillers", 3.0, null), null, "nothing to compare against");
+assert.equal(moved("spoken", 14, 9), null, "minutes spoken have no better direction");
 for (const [key, threshold] of Object.entries(MOVED)) {
   assert.equal(moved(key, threshold * 0.9, 0), null, `${key} below threshold is noise`);
   assert.ok(moved(key, threshold * 1.1, 0), `${key} above threshold is real`);

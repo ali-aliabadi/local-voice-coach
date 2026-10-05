@@ -12,7 +12,7 @@ import asyncio
 import json
 import re
 
-from . import backends, llm, profile, settings, store
+from . import backends, history, llm, profile, settings, store
 
 # What a fix is about, so the ones you repeat can be counted across sessions.
 KINDS = (
@@ -86,6 +86,11 @@ def parse(text: str) -> dict | None:
 
 def pending(session_id: int) -> bool:
     return bool(_pending.get(session_id))
+
+
+def queued() -> list[asyncio.Task]:
+    """Everything still being written, for every session."""
+    return [task for tasks in _pending.values() for task in tasks]
 
 
 async def settled(session_id: int) -> None:
@@ -185,7 +190,7 @@ def summarise(session_id: int) -> None:
         )
         .fetchone()
     )
-    if not ep or not row or not row["answers"]:
+    if not ep or not row or not history.is_counted(session_id):
         return
     if (parse(row["summary"]) or {}).get("answers") == row["answers"]:
         return

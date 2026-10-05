@@ -128,18 +128,22 @@ SPEC: dict[str, Setting] = {
         "Flash's free tier allows 5 requests a minute. bonsai27 keeps it offline.",
     ),
     # ---- Telegram, through Relay (see relay.py; switched on by RELAY_* in .env) ----
-    "remind_at": Setting(
-        "19:00",
-        "Daily reminder",
-        "Telegram",
-        help="If you have not practised by this time (HH:MM), Telegram asks whether to start. "
-        "Empty turns it off. Telegram needs RELAY_URL, RELAY_API_KEY and RELAY_APP in .env.",
-    ),
     "relay_session_report": Setting(
-        "on", "Report after each session", "Telegram", kind="select", choices=("on", "off")
+        "on",
+        "Report after each session",
+        "Telegram",
+        kind="select",
+        choices=("on", "off"),
+        help="Telegram needs RELAY_URL, RELAY_API_KEY and RELAY_APP in .env.",
     ),
     "relay_weekly": Setting(
-        "on", "Weekly report, Sunday evening", "Telegram", kind="select", choices=("on", "off")
+        "on",
+        "Last week's report",
+        "Telegram",
+        kind="select",
+        choices=("on", "off"),
+        help="Each day of last week, against the week before. Sent after the first session "
+        "of a new week: the app only runs while you practise.",
     ),
     "relay_lessons": Setting(
         "on",

@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import pathlib
+import signal
 
 from starlette.applications import Starlette
 from starlette.responses import FileResponse
@@ -62,9 +63,31 @@ async def websocket_session(websocket):
     finally:
         if session is not None:
             store.finish(session)
+            # Each skips a session too short to count, and waits for the ones before it.
             coach.summarise(session)  # once the notes are in; skipped if already current
             sheet.later(session)  # after the summary: the take-away page
-            reports.after_session_later(session)  # to Telegram, after the coach is done
+            coach.later(session, reports.after_session(session))  # to Telegram, last
+
+
+async def finish_up() -> None:
+    """The app is stopped as soon as you are done, so quitting must not lose the study
+    sheet and the report still being written: wait for them, unless Ctrl-C comes again."""
+    tasks = coach.queued()
+    if not tasks:
+        return
+    waiting = asyncio.gather(*tasks, return_exceptions=True)
+    loop = asyncio.get_running_loop()
+    try:
+        loop.add_signal_handler(signal.SIGINT, waiting.cancel)
+    except NotImplementedError:  # Windows: no way to offer a second Ctrl-C, so do not hold
+        return
+    print("  finishing the study sheet and report - Ctrl-C again to quit now")
+    try:
+        await waiting
+    except asyncio.CancelledError:
+        print("  left unfinished")
+    finally:
+        loop.remove_signal_handler(signal.SIGINT)
 
 
 @contextlib.asynccontextmanager
@@ -75,6 +98,7 @@ async def lifespan(_app):
     print("  ready\n")
     yield
     ticking.cancel()
+    await finish_up()
 
 
 app = Starlette(

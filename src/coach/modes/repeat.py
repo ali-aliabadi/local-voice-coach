@@ -7,7 +7,7 @@ Scripted: the topics are a list and the comparison is arithmetic, so no model is
 
 import random
 
-from .. import history
+from .. import history, picture
 from ._topics import TOPICS
 
 HELP = "one topic three times, faster each time (the 4/3/2 drill)"
@@ -15,17 +15,6 @@ ENDPOINT = "fast"  # the contract asks for one; this mode never calls it
 PARTNER = "coach"
 
 ROUNDS = (90, 60, 45)  # seconds per telling
-# The size of change worth saying out loud, and how to say it - as MOVED and PHRASE in
-# web/chart.js, so a change reads the same here as everywhere else.
-MOVED = {"wpm": 4, "fillers": 0.4, "pauses": 0.8, "lead_in": 0.3}
-PHRASE = {
-    "wpm": lambda d, better: f"{abs(d):.0f} wpm {'faster' if better else 'slower'}",
-    "fillers": lambda d, better: (
-        f"{abs(d):.1f} {'fewer' if better else 'more'} fillers per 100 words"
-    ),
-    "pauses": lambda d, better: f"{abs(d):.1f} {'fewer' if better else 'more'} pauses a minute",
-    "lead_in": lambda d, better: f"{abs(d):.1f}s {'quicker' if better else 'slower'} to start",
-}
 LABELS = {
     "wpm": "words per minute",
     "fillers": "fillers per 100 words",
@@ -42,11 +31,7 @@ def table(tries: list[dict]) -> list[list[str]]:
 
 def change(first: dict, last: dict) -> str:
     """First telling against the last, in words. Only what moved more than noise."""
-    said = []
-    for key, threshold in MOVED.items():
-        a, b = first.get(key), last.get(key)
-        if a is not None and b is not None and abs(b - a) >= threshold:
-            said.append(PHRASE[key](b - a, b > a if key == "wpm" else b < a))
+    said = picture.shifts(first, last)
     if not said:
         return "About the same each time. Next round, aim for smoother, not just faster."
     return "From the first telling to the last: " + ", ".join(said) + "."

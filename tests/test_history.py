@@ -57,6 +57,10 @@ assert profile.coaching_note({}) == "" and profile.coaching_note(None) == ""
 assert "For pacing only" not in profile.system_prompt("talk", "X", pacing=False)
 
 # ---- empty history ----
+history.MIN_ANSWERS, history.MIN_MINUTES = (
+    1,
+    0,
+)  # one-answer sessions here; the rule itself is in test_reports
 assert history.sessions() == []
 assert history.detail(1) is None
 assert history.recent() == {}

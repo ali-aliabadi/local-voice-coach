@@ -16,31 +16,26 @@ os.environ.update(RELAY_URL="https://relay.test", RELAY_API_KEY="rk_test", RELAY
 for name in ("RELAY_USER", "RELAY_ADMIN"):
     os.environ.pop(name, None)
 
-from coach import picture, relay, reports, settings, store  # noqa: E402
+from coach import history, picture, relay, reports, settings, store  # noqa: E402
 from coach import today as today_  # noqa: E402
 
 # ---- Relay itself is faked by reassigning the one function that talks to it ----
 sent: list[dict] = []
-answers: dict[str, str] = {}
 takes_files = True  # an older Relay refuses the file block
 
 
-def fake_call(method, path, body=None):
+def fake_call(method, _path, body=None):
     files = [b for b in (body or {}).get("blocks", []) if b["type"] == "file"]
     if method == "POST" and not takes_files and files:
         raise RuntimeError("relay 422 invalid_request blocks[0].type: unknown")
-    if method == "POST":
-        sent.append(body)
-        return {"id": f"msg_{len(sent)}", "status": "queued"}
-    found = re.match(r"/v1/messages/(.+)/answers", path)
-    pressed = answers.get(found.group(1))
-    return {"answers": [{"recipient": "ali", "answer": pressed}] if pressed else []}
+    assert method == "POST", "nothing is ever read back from Relay"
+    sent.append(body)
+    return {"id": f"msg_{len(sent)}", "status": "queued"}
 
 
 relay._call = fake_call
 run = asyncio.run
 today = dt.date.today()
-at = lambda hh, mm: dt.datetime.combine(today, dt.time(hh, mm))  # noqa: E731
 
 # ---- the charts on a phone use the same scales as the charts in the app ----
 chart_js = (pathlib.Path(__file__).parents[1] / "web" / "chart.js").read_text()
@@ -50,32 +45,26 @@ for key, (_, domain, goal) in picture.SERIES.items():
     assert found, f"{key} missing from chart.js"
     parse = lambda text: tuple(float(v) for v in text.split(","))  # noqa: E731
     assert parse(found.group(1)) == domain and parse(found.group(2)) == goal, key
+moved = ", ".join(f"{key}: {size:g}" for key, size in picture.MOVED.items())
+assert f"MOVED = {{ {moved} }}" in chart_js, "a change is worth mentioning at the same size"
 point = {"wpm": 120, "fillers": 2.1, "pauses": 6, "lead_in": 1}
 assert picture.panels([point], ["a", "b"], point)[:4] == b"\x89PNG"
 
-# ---- the daily reminder: on time, once, and it listens to the buttons ----
-run(reports.remind(at(18, 0)))
-assert sent == [], "not before the reminder time"
-run(reports.remind(at(19, 5)))
-assert len(sent) == 1 and sent[0]["blocks"][-1]["options"] == [reports.NOW, reports.LATER,
-                                                               reports.SKIP]  # fmt: skip
-assert sent[0]["source"] == "coach" and sent[0]["to"] == ["admin"]
-run(reports.remind(at(19, 15)))
-assert len(sent) == 1, "no answer yet: wait, never nag"
-answers["msg_1"] = reports.LATER
-run(reports.remind(at(19, 25)))  # reads the answer
-run(reports.remind(at(19, 45)))
-assert len(sent) == 1, "snoozed for 30 minutes"
-run(reports.remind(at(20, 0)))
-assert len(sent) == 2, "asked again after the snooze"
-answers["msg_2"] = reports.SKIP
-run(reports.remind(at(20, 10)))
-run(reports.remind(at(22, 0)))
-assert len(sent) == 2, "skip today means today"
-
 # ---- after a session: numbers, a chart, and the lessons only if allowed ----
 METRICS = {"words": 40, "wpm": 120, "fillers": 1, "pauses": 2, "longest_pause": 1, "lead_in": 1}
+
+
+def backdate(session: int, minutes: int = 5) -> None:
+    """As if it had started `minutes` ago: a session has to last to count."""
+    store.db().execute(
+        "UPDATE sessions SET started_at = datetime(started_at, ?) WHERE id = ?",
+        (f"-{minutes} minutes", session),
+    )
+    store.db().commit()
+
+
 one = store.start("talk", "flash-lite", "m", goal=30)
+backdate(one)
 store.record(one, "interviewer", "How was your day?")
 store.record(one, "you", "It was good, I went for a walk.", METRICS)
 store.record(one, "you", "Then I cooked dinner for us.", {**METRICS, "fillers": 0})
@@ -94,31 +83,46 @@ report = sent[-1]
 kinds = [b["type"] for b in report["blocks"]]
 assert len(sent) == before + 1 and report["title"].startswith("Session done")
 assert "of a 30 min goal" in report["title"]
-assert kinds[:3] == ["text", "fields", "image"], kinds
+assert kinds[:2] == ["text", "image"] and "fields" not in kinds, "the chart says the numbers"
+assert "trend" in report["blocks"][1]["caption"]
+assert report["blocks"][0]["text"].startswith("talk · 2 answers")
+assert "Since last time" not in report["blocks"][0]["text"], "nothing to compare with yet"
 assert "a breath of fresh air" in report["blocks"][-1]["text"]
 run(reports.after_session(one))
 assert len(sent) == before + 1, "a session is reported once"
 
+# ---- a try is not a session: two answers and two minutes, or it is not counted ----
 settings.set("relay_lessons", "off")
 two = store.start("talk", "flash-lite", "m")
 store.record(two, "you", "Short one.", METRICS)
 store.db().execute("UPDATE sessions SET summary = ? WHERE id = ?", (json.dumps(summary), two))
 store.db().commit()
+before = len(sent)
 run(reports.after_session(two))
+assert len(sent) == before, "one answer is a try: nothing is sent"
+store.record(two, "you", "And a second, quickly.", METRICS)
+assert not history.is_counted(two), "two answers, but under two minutes"
+assert history.count() == 1 and [s["id"] for s in history.sessions()] == [one]
+backdate(two)
+assert history.is_counted(two) and history.count() == 2
+run(reports.after_session(two))
+assert len(sent) == before + 1, "long enough now"
+# 2 fillers in 80 words against 1: said in words, since the chart shows only this session
+assert "Since last time: 1.2 more fillers per 100 words." in sent[-1]["blocks"][0]["text"]
 assert "breath of fresh air" not in json.dumps(sent[-1]), "lessons stay off Telegram"
 settings.set("relay_lessons", "on")
 
-# ---- the weekly report: once a week, every day of it ----
-reports.WEEKLY_DAY = today.weekday()  # make today the report day
+# ---- last week's report: after the first session once the week is over ----
 before = len(sent)
-run(reports.weekly(at(19, 0)))
-assert len(sent) == before, "not before the evening"
-run(reports.weekly(at(21, 0)))
+run(reports.weekly(today))
+assert len(sent) == before, "last week had no practice"
+run(reports.weekly(today + dt.timedelta(days=7)))  # a week on, this week is last week
 weekly = sent[-1]
-assert len(sent) == before + 1 and weekly["title"].startswith("Your week: 1 day,")
+assert len(sent) == before + 1 and weekly["title"].startswith("Last week: 1 day,")
 table = weekly["blocks"][0]
-assert table["type"] == "table" and len(table["rows"]) == 7 and table["rows"][-1][1] != "-"
-run(reports.weekly(at(22, 0)))
+assert table["type"] == "table" and len(table["rows"]) == 7
+assert table["rows"][today.weekday()][1] != "-", "today, in its own row"
+run(reports.weekly(today + dt.timedelta(days=8)))
 assert len(sent) == before + 1, "once a week"
 
 # ---- the study sheet: written by a model, drawn as pages, sent as a PDF ----

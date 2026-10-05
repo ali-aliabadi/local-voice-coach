@@ -121,6 +121,11 @@ button { font: inherit; cursor: pointer; }
 .card { display: block; text-decoration: none; color: inherit; }
 .card b { font-weight: 550; display: block; }
 .card span { color: var(--muted); font-size: 0.9rem; }
+.card.hero { padding: 1.6rem 1.5rem; border-color: var(--accent); background: var(--accent-soft); }
+.card.hero b { font-size: 1.35rem; }
+.card.locked { opacity: 0.55; cursor: not-allowed; }
+.card.locked:hover { border-color: var(--line); transform: none; }
+.card.locked .tag { font-size: 0.72rem; }
 
 .table { display: grid; gap: 0.4rem; }
 .pick {
@@ -245,6 +250,18 @@ svg { display: block; max-width: 100%; }
   background: var(--accent-soft); border-radius: var(--radius);
   padding: 0.9rem 1.1rem; font-size: 0.9rem; margin: 0 0 1.5rem;
 }
+
+/* ---- after a session: what is being written, step by step ---- */
+.steps { list-style: none; padding: 0; margin: 0 0 1.5rem; display: grid; gap: 0.6rem; }
+.steps li { color: var(--muted); padding-left: 1.6rem; position: relative; }
+.steps li::before { content: "○"; position: absolute; left: 0; }
+.steps li.done { color: var(--ink); }
+.steps li.done::before { content: "✓"; color: var(--good); }
+.steps li.now { color: var(--ink); font-weight: 550; }
+.steps li.now::before { content: "●"; color: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+.steps li span { display: block; font-weight: 400; color: var(--muted); font-size: 0.88rem; }
+@keyframes pulse { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .steps li.now::before { animation: none; } }
 
 /* ---- a conversation, read back ---- */
 .turn { margin: 0 0 1.75rem; padding: 0 0 1.75rem; border-bottom: 1px solid var(--line); }
