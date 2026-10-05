@@ -5,6 +5,12 @@
 
 import assert from "node:assert/strict";
 import { MOVED, PHRASE, SERIES, moved, verdict } from "../web/chart.js";
+import { mmss } from "../web/clock.js";
+import { untilSilence } from "../web/audio.js";
+
+// ---- the session clock reads naturally past an hour ----
+assert.equal(mmss(75), "01:15");
+assert.equal(mmss(21331), "5:55:31");
 
 // ---- every format returns a string, whatever the metric ----
 for (const [key, spec] of Object.entries(SERIES)) {
@@ -46,14 +52,16 @@ assert.equal(moved("lead_in", 1.0, 2.5).better, true);
 assert.equal(moved("wpm", 118, 116), null, "2 wpm is noise");
 assert.equal(moved("fillers", 3.0, 3.1), null, "0.1 fillers is noise");
 assert.equal(moved("fillers", 3.0, null), null, "nothing to compare against");
+assert.equal(moved("spoken", 14, 9), null, "minutes spoken have no better direction");
 for (const [key, threshold] of Object.entries(MOVED)) {
   assert.equal(moved(key, threshold * 0.9, 0), null, `${key} below threshold is noise`);
   assert.ok(moved(key, threshold * 1.1, 0), `${key} above threshold is real`);
 }
 
 // ---- the phrasing says the direction in words, never leaving it to an arrow ----
-assert.equal(PHRASE.fillers(-1.9, true), "1.9 fewer fillers");
-assert.equal(PHRASE.fillers(1.9, false), "1.9 more fillers");
+assert.equal(PHRASE.fillers(-1.9, true), "1.9 fewer fillers per 100 words");
+assert.equal(PHRASE.fillers(1.9, false), "1.9 more fillers per 100 words");
+assert.equal(PHRASE.pauses(-2, true), "2.0 fewer pauses a minute");
 assert.equal(PHRASE.wpm(12.4, true), "12 wpm faster");
 assert.equal(PHRASE.lead_in(-0.9, true), "0.9s quicker to start");
 for (const [key, phrase] of Object.entries(PHRASE)) {
@@ -63,5 +71,20 @@ for (const [key, phrase] of Object.entries(PHRASE)) {
     assert.ok(!text.includes("NaN"), `${key} produced NaN`);
   }
 }
+
+// ---- hands-free: stops after you have spoken and gone quiet, never before you start ----
+
+const fakeMic = { level: 0 };
+let stopped = false;
+untilSilence(fakeMic, { silence: 0.2, patience: 5, tick: 10, done: () => { stopped = true; } });
+await new Promise((r) => setTimeout(r, 300));
+assert.equal(stopped, false, "silence before you start is thinking time, not the end");
+fakeMic.level = 0.2;
+await new Promise((r) => setTimeout(r, 100));
+fakeMic.level = 0;
+await new Promise((r) => setTimeout(r, 120));
+assert.equal(stopped, false, "a short pause mid-answer does not end it");
+await new Promise((r) => setTimeout(r, 200));
+assert.equal(stopped, true, "quiet for longer than `silence` after speaking ends it");
 
 console.log("ok");

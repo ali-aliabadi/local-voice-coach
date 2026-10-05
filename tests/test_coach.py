@@ -1,5 +1,6 @@
 """Run: python tests/test_coach.py"""
 
+import asyncio
 import json
 import pathlib
 import tempfile
@@ -11,9 +12,14 @@ from coach import config  # noqa: I001
 
 config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "test.db")
 
-from coach import backends, settings, store  # noqa: E402
-from coach.llm import conversation, split_for_speech  # noqa: E402
-from coach.modes.panel import split_speaker  # noqa: E402
+from coach import (  # noqa: E402
+    backends,
+    history,
+    llm,  # noqa: E402
+    settings,
+    store,
+)
+from coach.llm import conversation  # noqa: E402
 from coach.stt import filler_pattern, fluency, word_rows  # noqa: E402
 
 
@@ -24,59 +30,12 @@ class W:
     start: float
     end: float
     word: str
+    probability: float = 0.95
 
 
 def say(*triples):
     return [W(start, end, word) for word, start, end in triples]
 
-
-# ---- sentence chunking ----
-# Models stream several words per token, so a sentence boundary usually arrives in the
-# middle of a token. Splitting only when the buffer *ended* on a boundary missed those,
-# and the length cap then cut sentences in half - the interviewer audibly stopped
-# mid-sentence. Feed tokens the way a model really sends them.
-def stream(tokens):
-    buffer, spoken = "", []
-    for token in tokens:
-        buffer += token
-        speak, buffer = split_for_speech(buffer)
-        if speak:
-            spoken.append(speak)
-    tail, _ = split_for_speech(buffer, flush=True)
-    if tail:
-        spoken.append(tail)
-    return spoken
-
-
-spoken = stream(
-    [
-        "That sounds",
-        " like a really",
-        " critical piece of the system to",
-        " own. Walk me",
-        " through how you handled two requests in the same millisecond?",
-    ]
-)
-assert spoken == [
-    "That sounds like a really critical piece of the system to own.",
-    "Walk me through how you handled two requests in the same millisecond?",
-], spoken
-
-# every chunk must end on a real sentence ending, never mid-sentence
-assert all(chunk[-1] in ".!?…" for chunk in spoken), spoken
-
-assert stream(["Hello. How are you? I am fine."]) == ["Hello. How are you? I am fine."]
-assert stream(["It costs 3.5 million", " and Dr. Chen signed", " it off."]) == [
-    "It costs 3.5 million and Dr. Chen signed it off."
-]
-assert stream(["Half a sen"]) == ["Half a sen"]  # flushed at the end of the stream
-assert split_for_speech("Half a sen") == ("", "Half a sen")  # but not before then
-assert split_for_speech("") == ("", "")
-
-# a run-on with no punctuation eventually breaks, but between words, never inside one
-run_on = stream([w + " " for w in ["word"] * 90])
-assert len(run_on) > 1 and all(" " in c for c in run_on[:-1])
-assert not any(c.endswith("wor") or c.startswith("rd") for c in run_on), run_on
 
 # ---- filler matching: a word counts however long it is drawn out ----
 pattern = filler_pattern("um uh er ah hmm mm")
@@ -113,7 +72,7 @@ try:
 
     numpy_words = [
         W(np.float32(0.0), np.float32(0.5), "I"),
-        W(np.float32(1.4), np.float32(2.0), "um"),
+        W(np.float32(1.4), np.float32(2.0), "um", np.float32(0.4)),
     ]
     metrics = fluency(numpy_words)
     json.dumps(metrics)  # would raise on int64/float32
@@ -129,6 +88,8 @@ assert rows[1]["filler"] and not rows[2]["filler"]
 assert rows[1]["pause"] == 1.7  # the gap before this word, since it beats the threshold
 assert rows[2]["pause"] == 0.0  # 0.1s gap is below the threshold, so not flagged
 assert rows[0]["pause"] == 0.0  # nothing precedes the first word
+unsure = word_rows([W(0.0, 0.4, "middling", probability=0.31), W(0.5, 0.9, "mind")])
+assert unsure[0]["unclear"] and not unsure[1]["unclear"]  # a proxy, never a pronunciation score
 
 # ---- message ordering ----
 # Local models served by LM Studio render a jinja chat template that rejects anything but
@@ -153,12 +114,14 @@ assert alternates(conversation([SYS, ASSISTANT, USER, ASSISTANT, USER]))  # rebu
 assert any(ASSISTANT["content"] in m["content"] for m in conversation([SYS, ASSISTANT, USER]))
 assert len([m for m in conversation([SYS, SYS, USER]) if m["role"] == "system"]) == 1
 
-# ---- panel speaker routing ----
-assert split_speaker("MAYA: Tell me about yourself.") == ("MAYA", "Tell me about yourself.")
-assert split_speaker("  DEREK:   Why Redis?") == ("DEREK", "Why Redis?")
-assert split_speaker("BOB: hello") == (None, "hello")  # unknown name, prefix still stripped
-assert split_speaker("Tell me about yourself.") == (None, "Tell me about yourself.")
-assert split_speaker("So the trade-off is: latency versus cost.")[0] is None
+
+# ---- errors read as the server's words, not the SDK's wrapper ----
+class Rejected(Exception):
+    body = [{"error": {"message": "No models loaded."}}]
+
+
+said = asyncio.run(llm.explain(llm.Endpoint(None, "m", {}), Rejected("Error code: 400 - {...}")))
+assert said == "m: No models loaded.", said
 
 # ---- settings ----
 assert settings.get("pause_seconds") == 0.6
@@ -166,6 +129,11 @@ settings.set("pause_seconds", "0.9")
 assert settings.get("pause_seconds") == 0.9  # coerced back to the default's type
 assert isinstance(settings.get("history_turns"), int)
 settings.set("pause_seconds", 0.6)
+# a default is never stored, or saving the form would freeze it and a better one never lands
+stored = "SELECT COUNT(*) FROM settings WHERE key = ?"
+assert store.db().execute(stored, ("pause_seconds",)).fetchone()[0] == 0
+settings.set_prompt("talk", "BUILT-IN", default="BUILT-IN")
+assert store.db().execute(stored, ("prompt:talk",)).fetchone()[0] == 0
 
 assert settings.prompt("talk", "BUILT-IN") == "BUILT-IN"
 settings.set_prompt("talk", "be brutal")
@@ -173,37 +141,82 @@ assert settings.prompt("talk", "BUILT-IN") == "be brutal"
 settings.set_prompt("talk", "   ")  # blank means fall back to the mode's own prompt
 assert settings.prompt("talk", "BUILT-IN") == "BUILT-IN"
 
-form = {f["key"]: f for f in settings.as_form(voices=("am_puck", "af_heart"))}
+form = {f["key"]: f for f in settings.as_form({"tts_voice": ("am_puck", "af_heart")})}
 assert form["gemini_api_key"]["value"] == ""  # secrets are never sent to the browser
 assert form["tts_voice"]["choices"] == ["am_puck", "af_heart"]  # filled at request time
 assert form["whisper_model"]["restart"] is True
 
 # ---- store: persistence, latency and retention ----
-assert store.measured_latency() == {} and store.trend() == []
+history.MIN_ANSWERS, history.MIN_MINUTES = (
+    1,
+    0,
+)  # one-answer sessions here; the rule itself is in test_reports
+assert store.measured_latency() == {} and history.trend() == []
 
-store.start("talk", "flash-lite", "gemini-3.5-flash-lite")
-first = store.record("you", "an answer", smooth, stt_ms=800, audio_path="/tmp/gone.wav")
-store.record("interviewer", "why?", reply_ms=1000.0)
-store.record("interviewer", "and then?", reply_ms=2000.0)
-store.finish()
+one = store.start("talk", "flash-lite", "gemini-3.5-flash-lite")
+first = store.record(one, "you", "an answer", smooth, stt_ms=800, audio_path="/tmp/gone.wav")
+store.record(one, "interviewer", "why?", reply_ms=1000.0)
+store.record(one, "interviewer", "and then?", reply_ms=2000.0)
+store.finish(one)
 
 assert store.measured_latency() == {"flash-lite": (1500.0, 2)}
-assert len(store.session_scores()) == 1
+assert len(store.session_scores(one)) == 1
 assert store.audio_path(first) == "/tmp/gone.wav"
 assert store.purge_audio(7) == 1  # the file is missing, so the row is cleared
 assert store.audio_path(first) is None
 assert store.purge_audio(0) == 0  # 0 means keep forever
 
-store.start("review", "bonsai27", "prism-ml/bonsai-27b")
-store.record("you", "second", gappy)
-store.record("review", "critique", reply_ms=9000.0)
-store.finish()
+two = store.start("review", "bonsai27", "prism-ml/bonsai-27b")
+store.record(two, "you", "second", gappy)
+store.record(two, "review", "critique", reply_ms=9000.0)
+store.finish(two)
+# each session is its own: two tabs no longer file answers under one another
+assert len(store.session_scores(one)) == 1 and len(store.session_scores(two)) == 1
 assert store.measured_latency()["bonsai27"] == (9000.0, 1)
-trend = store.trend()
-assert len(trend) == 2 and trend[0]["mode"] == "talk" and trend[1]["mode"] == "review"
+trend = history.trend()
+assert len(trend) == 1 and trend[0]["sessions"] == 2  # one point per day, not per session
 
 store.forget_everything()
-assert store.trend() == [] and store.measured_latency() == {}
+assert history.trend() == [] and store.measured_latency() == {}
+
+# ---- the guard: only this machine's own pages may change anything ----
+import warnings  # noqa: E402
+
+from starlette.applications import Starlette  # noqa: E402
+from starlette.responses import PlainTextResponse  # noqa: E402
+from starlette.routing import Route, WebSocketRoute  # noqa: E402
+
+warnings.filterwarnings("ignore", message="Using `httpx`")  # starlette's own transition
+from starlette.testclient import TestClient  # noqa: E402
+from starlette.websockets import WebSocketDisconnect  # noqa: E402
+
+from coach.server.guard import MIDDLEWARE  # noqa: E402
+
+
+async def accept(ws):
+    await ws.accept()
+    await ws.close()
+
+
+guarded = Starlette(
+    middleware=MIDDLEWARE,
+    routes=[
+        Route("/x", lambda _r: PlainTextResponse("ok"), methods=["GET", "POST"]),
+        WebSocketRoute("/ws", accept),
+    ],
+)
+local = TestClient(guarded, base_url="http://127.0.0.1:8000")
+assert local.post("/x", headers={"origin": "http://127.0.0.1:8000"}).status_code == 200
+assert local.post("/x").status_code == 200  # curl and the tests send no Origin
+assert local.post("/x", headers={"origin": "https://evil.example"}).status_code == 403
+assert local.get("/x").headers["cache-control"] == "no-cache"  # no stale app after updates
+rebound = TestClient(guarded, base_url="http://evil.example:8000")  # DNS rebinding
+assert rebound.get("/x").status_code == 400
+try:
+    with local.websocket_connect("/ws", headers={"origin": "https://evil.example"}):
+        raise AssertionError("a foreign page opened the practice socket")
+except WebSocketDisconnect:
+    pass
 
 # ---- backends: role filtering and availability ----
 fast_keys = {b.key for b, _ in backends.survey("fast")[0]}

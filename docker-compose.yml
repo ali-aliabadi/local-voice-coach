@@ -1,7 +1,9 @@
 services:
   coach:
     build: .
-    image: local-voice-coach
+    # Set IMAGE to the published one (ghcr.io/<owner>/<repo>) and `make pull` to skip
+    # building; left unset, `make up` builds it here.
+    image: ${IMAGE:-local-voice-coach}
     container_name: voice-coach
     restart: unless-stopped
 
@@ -15,6 +17,13 @@ services:
       # "localhost" inside a container is the container. This reaches LM Studio on the
       # machine running Docker.
       LM_STUDIO_URL: ${LM_STUDIO_URL:-http://host.docker.internal:1234/v1}
+      # Telegram through Relay; empty leaves it off. The image never contains .env, so
+      # these have to be passed through here.
+      RELAY_URL: ${RELAY_URL:-}
+      RELAY_API_KEY: ${RELAY_API_KEY:-}
+      RELAY_APP: ${RELAY_APP:-}
+      RELAY_USER: ${RELAY_USER:-}
+      RELAY_ADMIN: ${RELAY_ADMIN:-}  # the old name for RELAY_USER
 
     # Docker Desktop provides this name already; the mapping is what makes it work on
     # plain Linux too.

@@ -18,7 +18,10 @@ CREATE TABLE IF NOT EXISTS sessions (
     ended_at   TEXT,
     mode       TEXT NOT NULL,
     backend    TEXT NOT NULL,
-    model      TEXT NOT NULL
+    model      TEXT NOT NULL,
+    goal_minutes INTEGER,               -- what the user set out to do, or NULL
+    summary    TEXT,                    -- the coach's summary, JSON
+    sheet      TEXT                     -- the study sheet's content, JSON
 );
 CREATE TABLE IF NOT EXISTS turns (
     id            INTEGER PRIMARY KEY,
@@ -35,8 +38,13 @@ CREATE TABLE IF NOT EXISTS turns (
     stt_ms        REAL,
     reply_ms      REAL,                   -- first token for streams, whole call otherwise
     audio_path    TEXT,                   -- recording on disk, or NULL once purged
-    word_rows     TEXT                    -- per-word timings, so a past answer can still
+    word_rows     TEXT,                   -- per-word timings, so a past answer can still
                                           -- show its highlighted transcript and timeline
+    notes         TEXT,                   -- the coach's notes on an answer, JSON
+    helped        TEXT,                   -- on a reply: what the user needed to follow it,
+                                          -- "again,text"; "" by ear; NULL never tracked
+    timing        TEXT                    -- on a reply: ms from the end of the answer to
+                                          -- its first sound, and where that went, JSON
 );
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
@@ -46,12 +54,20 @@ CREATE INDEX IF NOT EXISTS turns_session ON turns(session_id);
 """
 
 _db: sqlite3.Connection | None = None
-_session: int | None = None  # one session per process, so it lives here not in the contract
 
 
 # Columns added after the first release. CREATE TABLE IF NOT EXISTS will not add them to
 # a database that already exists, so they are applied here instead.
-ADDED_COLUMNS = {"turns": {"words": "INTEGER", "word_rows": "TEXT"}}
+ADDED_COLUMNS = {
+    "turns": {
+        "words": "INTEGER",
+        "word_rows": "TEXT",
+        "notes": "TEXT",
+        "helped": "TEXT",
+        "timing": "TEXT",
+    },
+    "sessions": {"goal_minutes": "INTEGER", "summary": "TEXT", "sheet": "TEXT"},
+}
 
 
 def _migrate(connection: sqlite3.Connection) -> None:
@@ -74,26 +90,37 @@ def db() -> sqlite3.Connection:
     return _db
 
 
-def start(mode: str, backend: str, model: str) -> int:
-    global _session
+# Session ids are passed in, never held here: two tabs each own a session, and a global
+# "current session" filed one tab's answers under the other's.
+def start(mode: str, backend: str, model: str, goal: int | None = None) -> int:
     cur = db().execute(
-        "INSERT INTO sessions (started_at, mode, backend, model) VALUES (?, ?, ?, ?)",
-        (time.strftime("%Y-%m-%d %H:%M:%S"), mode, backend, model),
+        "INSERT INTO sessions (started_at, mode, backend, model, goal_minutes)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (time.strftime("%Y-%m-%d %H:%M:%S"), mode, backend, model, goal or None),
     )
     db().commit()
-    _session = cur.lastrowid
-    return _session
+    return cur.lastrowid
+
+
+def elapsed(session_id: int) -> float:
+    """Seconds since the session started, so a reloaded page keeps counting from there."""
+    row = db().execute("SELECT started_at FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    started = time.mktime(time.strptime(row["started_at"], "%Y-%m-%d %H:%M:%S"))
+    return time.time() - started
+
+
+def goal(session_id: int) -> int | None:
+    row = db().execute("SELECT goal_minutes FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    return row["goal_minutes"] if row else None
 
 
 def resume(session_id: int) -> int | None:
     """Re-attach to an existing session, so a browser refresh does not orphan it."""
-    global _session
     row = db().execute("SELECT id FROM sessions WHERE id = ?", (session_id,)).fetchone()
-    _session = row["id"] if row else None
-    return _session
+    return row["id"] if row else None
 
 
-def conversation(session_id: int | None = None, limit: int = 16) -> list[dict]:
+def conversation(session_id: int, limit: int = 16) -> list[dict]:
     """The turns of a session as chat messages, oldest first.
 
     Used to rebuild an interviewer's memory after a refresh: the browser reconnects and
@@ -104,7 +131,7 @@ def conversation(session_id: int | None = None, limit: int = 16) -> list[dict]:
         .execute(
             "SELECT role, text FROM turns WHERE session_id = ? AND role != 'review'"
             " ORDER BY id DESC LIMIT ?",
-            (session_id or _session, limit),
+            (session_id, limit),
         )
         .fetchall()
     )
@@ -114,17 +141,16 @@ def conversation(session_id: int | None = None, limit: int = 16) -> list[dict]:
     ]
 
 
-def finish() -> None:
-    if _session is None:
-        return
+def finish(session_id: int) -> None:
     db().execute(
         "UPDATE sessions SET ended_at = ? WHERE id = ?",
-        (time.strftime("%Y-%m-%d %H:%M:%S"), _session),
+        (time.strftime("%Y-%m-%d %H:%M:%S"), session_id),
     )
     db().commit()
 
 
 def record(
+    session_id: int,
     role: str,
     text: str,
     metrics: dict | None = None,
@@ -132,17 +158,16 @@ def record(
     reply_ms: float | None = None,
     audio_path: str | None = None,
     word_rows: list[dict] | None = None,
+    timing: dict | None = None,
 ) -> int | None:
     """Persist one turn. Returns its id, which the browser uses to fetch the recording."""
-    if _session is None:
-        return None
     m = metrics or {}
     cursor = db().execute(
         "INSERT INTO turns (session_id, at, role, text, words, wpm, fillers, pauses,"
-        " longest_pause, lead_in, stt_ms, reply_ms, audio_path, word_rows)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " longest_pause, lead_in, stt_ms, reply_ms, audio_path, word_rows, timing)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
-            _session,
+            session_id,
             time.strftime("%Y-%m-%d %H:%M:%S"),
             role,
             text,
@@ -156,14 +181,31 @@ def record(
             reply_ms,
             audio_path,
             json.dumps(word_rows) if word_rows else None,
+            json.dumps(timing) if timing else None,
         ),
     )
     db().commit()
     return cursor.lastrowid
 
 
-def current_session() -> int | None:
-    return _session
+def last_said(session_id: int) -> str:
+    """What the partner said last: the thing an answer is replying to."""
+    row = (
+        db()
+        .execute(
+            "SELECT text FROM turns WHERE session_id = ? AND role NOT IN ('you', 'review')"
+            " ORDER BY id DESC LIMIT 1",
+            (session_id,),
+        )
+        .fetchone()
+    )
+    return row["text"] if row else ""
+
+
+def helped(turn_id: int, kinds: list[str]) -> None:
+    """Mark a reply as one the user needed help to follow: heard again, slower, or read."""
+    db().execute("UPDATE turns SET helped = ? WHERE id = ?", (",".join(sorted(kinds)), turn_id))
+    db().commit()
 
 
 def audio_path(turn_id: int) -> str | None:
@@ -211,32 +253,14 @@ def measured_latency() -> dict[str, tuple[float, int]]:
     return {r["backend"]: (r["mean"], r["n"]) for r in rows}
 
 
-def session_scores(session_id: int | None = None) -> list[dict]:
+def session_scores(session_id: int) -> list[dict]:
     rows = (
         db()
         .execute(
             "SELECT wpm, fillers, pauses, longest_pause, lead_in FROM turns "
             "WHERE session_id = ? AND role = 'you' AND wpm IS NOT NULL",
-            (session_id or _session,),
+            (session_id,),
         )
         .fetchall()
     )
     return [dict(r) for r in rows]
-
-
-def trend(limit: int = 20) -> list[dict]:
-    """Per-session averages, oldest first, so progress is visible."""
-    rows = (
-        db()
-        .execute(
-            "SELECT s.id, s.started_at, s.mode, s.backend, COUNT(t.id) AS answers,"
-            " AVG(t.wpm) AS wpm, AVG(t.fillers) AS fillers, AVG(t.pauses) AS pauses,"
-            " AVG(t.lead_in) AS lead_in "
-            "FROM sessions s JOIN turns t ON t.session_id = s.id "
-            "WHERE t.role = 'you' AND t.wpm IS NOT NULL "
-            "GROUP BY s.id ORDER BY s.id DESC LIMIT ?",
-            (limit,),
-        )
-        .fetchall()
-    )
-    return [dict(r) for r in reversed(rows)]

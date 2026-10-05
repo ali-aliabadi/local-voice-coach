@@ -1,15 +1,16 @@
-"""The cloud interviewer. Gemini, spoken to through the OpenAI-compatible endpoint."""
+"""The model on the other side: Gemini, or a local model through LM Studio, both spoken
+to through the OpenAI-compatible endpoint."""
 
+import asyncio
 import re
 import time
 from typing import NamedTuple
 
+import openai
 from openai import AsyncOpenAI
 
 from . import config, settings
-
-TERMINATORS = (".", "!", "?", "…")
-ABBREVIATIONS = re.compile(r"\b(Mr|Mrs|Ms|Dr|St|vs|etc|e\.g|i\.e)\.$")
+from .chunks import split_for_speech
 
 
 class Reply(NamedTuple):
@@ -28,10 +29,14 @@ class Endpoint(NamedTuple):
 
 
 def _client(base_url: str, api_key: str) -> AsyncOpenAI:
-    return AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=config.REQUEST_TIMEOUT)
+    # The SDK refuses to build a client without a key, which turned "no key set yet" into
+    # a crash on every page that so much as asks which model the coach uses. Without one,
+    # the request fails instead, and `explain` tells the user to add a key in Settings.
+    key = api_key or "no-key-set"
+    return AsyncOpenAI(base_url=base_url, api_key=key, timeout=config.REQUEST_TIMEOUT)
 
 
-OPENING_NUDGE = "Begin the interview."
+OPENING_NUDGE = "Begin."
 
 
 def conversation(messages: list[dict]) -> list[dict]:
@@ -77,62 +82,12 @@ def endpoint_for(backend, model_override: str | None = None) -> Endpoint:
     )
 
 
-# A sentence ends at .!?… when the next thing is whitespace or the end of the buffer.
-# "3.5" never matches, because the dot there is followed by a digit.
-TERMINATOR = re.compile(r"[.!?…]+[\"')\]]*(?=\s|$)")
-ABBREVIATION = re.compile(r"\b(?:Mr|Mrs|Ms|Dr|St|vs|etc|e\.g|i\.e|No|Inc|Ltd|Jr|Sr)\.$")
+# Worth asking again: nothing came back, or the server broke. A rejected key is not.
+RETRYABLE = (TimeoutError, openai.APIConnectionError, openai.InternalServerError)
 
 
-def _boundaries(text: str):
-    """Offsets where a sentence genuinely ends. Abbreviations are not endings."""
-    settled = len(text.rstrip())
-    for match in TERMINATOR.finditer(text):
-        head = text[: match.end()]
-        if ABBREVIATION.search(head):
-            continue
-        # A trailing "3." may still become "3.5" once the next token lands.
-        if match.end() >= settled and len(head) >= 2 and head[-1] == "." and head[-2].isdigit():
-            continue
-        yield match.end()
-
-
-def split_for_speech(buffer: str, flush: bool = False) -> tuple[str, str]:
-    """Split the buffer into (speak now, keep buffering).
-
-    Splits at the LAST complete sentence inside the buffer, rather than only when the
-    buffer happens to end on one. Models stream several words per token, so a boundary
-    usually lands in the middle of a token ("own. Walk me"). A check that only looked at
-    the tail missed it, the buffer kept growing, and the length cap eventually cut a
-    sentence in half - which is why the interviewer stopped mid-sentence.
-
-    The returned buffer is never stripped: the trailing space is what keeps the next
-    token from being glued onto the last word.
-    """
-    if flush:
-        return buffer.strip(), ""
-    if not buffer.strip():
-        return "", buffer
-
-    cuts = list(_boundaries(buffer))
-    if cuts:
-        return buffer[: cuts[-1]].strip(), buffer[cuts[-1] :].lstrip()
-
-    # Nothing has ended yet. Only give up waiting once this has run on far too long, and
-    # then break between words - never inside one.
-    if len(buffer.strip()) >= config.MAX_CHARS_BEFORE_FLUSH:
-        space = buffer.rstrip().rfind(" ")
-        if space > 0:
-            return buffer[:space].strip(), buffer[space:].lstrip()
-    return "", buffer
-
-
-async def stream_sentences(ep: Endpoint, messages, max_tokens=None):
-    """Yield complete sentences as they arrive, so speech starts before generation ends.
-
-    Yields ("sentence", str) for each chunk, then ("done", Reply) once.
-    """
-    started = time.perf_counter()
-    first_ms = None
+async def _first_words(ep: Endpoint, messages, max_tokens):
+    """Open a stream and wait for its first real token. Returns (stream, token)."""
     stream = await ep.client.chat.completions.create(
         model=ep.model,
         messages=conversation(messages),
@@ -141,19 +96,50 @@ async def stream_sentences(ep: Endpoint, messages, max_tokens=None):
         stream=True,
         **ep.extra,
     )
-    buffer, full = "", ""
+    try:
+        while True:
+            chunk = await anext(stream)
+            token = chunk.choices[0].delta.content if chunk.choices else ""
+            if token:
+                return stream, token
+    except StopAsyncIteration:
+        return stream, ""
+    except BaseException:
+        await stream.close()  # abandoned by the deadline: free the connection
+        raise
+
+
+async def stream_sentences(ep: Endpoint, messages, max_tokens=None, deadline=None):
+    """Yield complete sentences as they arrive, so speech starts before generation ends.
+
+    Yields ("sentence", str) for each chunk, then ("done", Reply) once.
+
+    `deadline` is how long to wait for the first word before asking again, once. Nothing
+    has been spoken at that point, so a retry cannot repeat anything. None waits as long
+    as the client timeout allows - right for a reasoning model that thinks first.
+    """
+    started = time.perf_counter()
+    for attempt in range(2):
+        try:
+            async with asyncio.timeout(deadline):
+                stream, buffer = await _first_words(ep, messages, max_tokens)
+            break
+        except RETRYABLE:
+            if attempt:
+                raise
+    # Measured from the first attempt: the wait the user actually sat through.
+    first_ms = (time.perf_counter() - started) * 1000
+    full = buffer
+    spoke = False  # until the first chunk is out, a clause is enough
     async for chunk in stream:
-        if not chunk.choices:
-            continue
-        token = chunk.choices[0].delta.content or ""
+        token = chunk.choices[0].delta.content if chunk.choices else ""
         if not token:
             continue
-        if first_ms is None:
-            first_ms = (time.perf_counter() - started) * 1000
         buffer += token
         full += token
-        speak, buffer = split_for_speech(buffer)
+        speak, buffer = split_for_speech(buffer, eager=not spoke)
         if speak:
+            spoke = True
             yield "sentence", speak
     speak, _ = split_for_speech(buffer, flush=True)
     if speak:
@@ -175,13 +161,65 @@ async def complete(ep: Endpoint, messages, max_tokens=None) -> Reply:
     if not text:
         print(
             "⚠️  Empty reply — a thinking model likely spent the whole budget reasoning.\n"
-            "   Raise REVIEW_MAX_TOKENS in coach/config.py, or turn thinking off."
+            "   Raise 'Review max tokens' in Settings, or turn thinking off."
         )
     return Reply(text, (time.perf_counter() - started) * 1000)
 
 
+# One background request at a time. Nobody is waiting on the coach or the study sheet, and
+# free tiers count requests per minute: catching up a 23-answer session all at once got
+# 20 of them refused.
+_one_at_a_time = asyncio.Semaphore(1)
+WAIT = re.compile(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?")
+# Past this it is a daily quota, not a per-minute one: waiting would hold up every other
+# background request for hours. Gemini 3.8 Flash's free tier is 5 a minute and 20 a day.
+LONGEST_WAIT = 120
+
+
+def retry_after(message: str) -> float | None:
+    """Seconds from "Please retry in 3h35m42.5s" or "retry in 33.8s"; None if not said."""
+    found = WAIT.search(message)
+    if not found or not any(found.groups()):
+        return None
+    hours, minutes, seconds = found.groups()
+    return int(hours or 0) * 3600 + int(minutes or 0) * 60 + float(seconds or 0)
+
+
+waiting = ""  # what the background queue is sitting out right now, for the page to say
+
+
+async def patiently(ep: Endpoint, messages, max_tokens=None) -> Reply:
+    """`complete`, one at a time, waiting out per-minute rate limits and an overloaded
+    model ("high demand" is a 503, and passes); a daily quota that is used up fails at
+    once, saying so."""
+    global waiting
+    async with _one_at_a_time:
+        for _ in range(6):
+            try:
+                return await complete(ep, messages, max_tokens)
+            except (openai.RateLimitError, openai.InternalServerError) as exc:
+                wait = retry_after(str(exc)) or 30
+                if wait > LONGEST_WAIT:
+                    raise RuntimeError(
+                        f"{ep.model} has used up its free requests for today; they come back "
+                        f"in {wait / 3600:.1f} hours. Choose another model in Settings."
+                    ) from None
+                busy = "busy" if isinstance(exc, openai.InternalServerError) else "rate-limited"
+                waiting = f"{ep.model} is {busy}, trying again in {wait:.0f}s"
+                try:
+                    await asyncio.sleep(wait + 1)
+                finally:
+                    waiting = ""
+        return await complete(ep, messages, max_tokens)
+
+
 async def explain(ep: Endpoint, exc: Exception) -> str:
     """Turn an exception into something the user can act on."""
+    if isinstance(exc, TimeoutError | openai.APITimeoutError):
+        return (
+            f"{ep.model} did not start answering, even on a second try - it is probably "
+            "overloaded. Nothing you said is lost: try again, or just carry on talking."
+        )
     message = str(exc)
     if "404" in message or "not found" in message.lower():
         try:
@@ -192,4 +230,15 @@ async def explain(ep: Endpoint, exc: Exception) -> str:
             pass
     if "api key" in message.lower() or "401" in message or "403" in message:
         return "That API key was rejected. Check it in Settings."
-    return message
+    return f"{ep.model}: {_said(exc)}"
+
+
+def _said(exc: Exception) -> str:
+    """The server's own words, not the SDK's "Error code: 400 - {'error': ...}" wrapper."""
+    body = getattr(exc, "body", None)
+    if isinstance(body, list) and body:  # Gemini wraps its error in a list
+        body = body[0]
+    error = body.get("error", body) if isinstance(body, dict) else None
+    if isinstance(error, dict) and error.get("message"):
+        return str(error["message"])
+    return str(exc)

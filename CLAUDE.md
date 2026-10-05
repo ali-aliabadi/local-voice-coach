@@ -4,13 +4,15 @@ Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 ## Project Overview
 
-Spoken software-engineering interview practice. The user answers out loud, a model plays
-the interviewer, and every answer is scored for fluency so hesitation can be tracked over
-time. Intended to be published for others to use and contribute to.
+Spoken English practice for non-native speakers. The user talks out loud — everyday
+conversation, roleplays, retelling, drills, or a software-engineering interview — a model
+plays the other side, every answer is scored for fluency so hesitation can be tracked over
+time, and a coach writes up the language afterwards. Intended to be published for others
+to use and contribute to.
 
-The goal behind every design choice: the user wants to cut filler words ("mmmm") and
-shorten the time it takes to form a sentence under interview pressure. They practise about
-an hour a day.
+The goal behind every design choice: the user wants to cut filler words ("mmmm"), shorten
+the time it takes to form a sentence, and understand spoken English by ear. They practise
+about an hour a day.
 
 ## Architecture
 
@@ -26,16 +28,19 @@ AudioWorklet ──raw PCM 16kHz───► Whisper ──► fluency()   arith
   transcript / timeline / charts ◄─ JSON events over one WebSocket
                                      │
                                  SQLite + recordings/
+                                     │
+                     coach.py (notes, after)   reports.py ──► Relay ──► Telegram
 ```
 
 ## Commands
 
 ```bash
-make install                         # dependencies
+make install                         # uv sync: exactly what uv.lock pins, ruff included
 make models                          # Kokoro weights into models/ (~340MB, once)
 make run                             # native, serves http://127.0.0.1:8000
 make up / down / logs                # the same thing in Docker
-make check                           # ruff + format + line budget + tests
+make check                           # ruff + format + line budget + tests (what CI runs)
+make e2e                             # real server, real socket, a spoken answer
 ```
 
 `make` with no target lists everything. `python` may not be on PATH — use
@@ -50,14 +55,21 @@ make check                           # ruff + format + line budget + tests
 | `src/coach/settings.py` | user-editable settings; SPEC drives the settings UI |
 | `src/coach/stt.py` | Whisper, `fluency()`, `word_rows()` |
 | `src/coach/tts.py` | Kokoro to WAV bytes; touches no audio device |
-| `src/coach/llm.py` | endpoints, streaming, sentence chunking |
+| `src/coach/llm.py` | endpoints, streaming, retries |
+| `src/coach/chunks.py` | where to cut a streaming reply so it can be spoken |
 | `src/coach/backends.py` | the model catalogue and reachability probing |
 | `src/coach/store.py` | SQLite: writing sessions, turns, settings, retention |
-| `src/coach/history.py` | reading it back: one session, all sessions, totals |
-| `src/coach/profile.py` | who the candidate is, and the system prompt built from it |
-| `src/coach/server/` | `app.py` assembly + websocket, `api.py` JSON routes, `models.py` loaded models |
-| `src/coach/modes/` | one file per mode, discovered automatically |
-| `web/` | plain ES modules, no build step; `views/` is one file per route |
+| `src/coach/history.py` | reading it back: one session, all sessions, totals; `RATES` |
+| `src/coach/today.py` | today's minutes, the streak, the last session's advice |
+| `src/coach/profile.py` | who the user is, past-session recaps, the system prompt |
+| `src/coach/coach.py` | the second model: notes on each answer, the session summary |
+| `src/coach/clock.py` | jobs that run on a timer while the server is up |
+| `src/coach/relay.py` | the Relay client: Telegram, off unless `RELAY_*` is set |
+| `src/coach/reports.py` | what goes to Telegram and when |
+| `src/coach/picture.py` | the charts as PNG, for Telegram (Pillow) |
+| `src/coach/server/` | `app.py` assembly + websocket, `api.py` JSON routes, `session.py` the `io` modes talk to, `guard.py` localhost-only, `models.py` loaded models |
+| `src/coach/modes/` | one file per mode, discovered automatically; `_`-prefixed files are helpers |
+| `web/` | plain ES modules, no build step; `views/` is one file per route; `screen.js` draws the practice page that `views/practice.js` drives |
 | `models/` | Kokoro weights, gitignored, fetched by `make models` |
 | `data/` | sessions, metrics, recordings — gitignored, mounted as a volume |
 
@@ -76,12 +88,17 @@ make check                           # ruff + format + line budget + tests
 
 **Adding a mode must never require editing another file.** Modes are discovered with
 `pkgutil` in `src/coach/modes/__init__.py`. A mode declares `HELP`, `ENDPOINT` (`"fast"`
-or `"deep"`), and `async def run(endpoint, transcriber, io)`.
+or `"deep"`), and `async def run(endpoint, io)`; optionally `UNLOCK`, the sessions done
+before it opens. A first session sees only `talk` (0); interviews open at 2.
 
-`io` is the browser: `await io.record()`, `await io.say(text, voice)`,
-`await io.send(**event)`, `io.save_answer(...)`, and `io.prior_turns()` to resume a
-session after a refresh. Modes loop forever and never catch `SessionClosed` — the server
+`io` is the browser, for one session: `await io.answer()` hears, scores and saves an
+answer; `await io.reply(endpoint, messages)` speaks the model's reply as it streams and
+handles failure (it returns None and offers a retry); `io.save_turn()`, `io.send()` and
+`io.prior_turns()` cover the rest. A conversational mode is one call to `converse()` in
+`modes/_converse.py`. Modes loop forever and never catch `SessionClosed` — the server
 catches it when the user stops.
+
+The session id lives on `io`, never in a module global: two tabs each own a session.
 
 Do not reintroduce a branch on mode name. A mode needing a different backend names a role
 in `ENDPOINT`; `backends.CATALOGUE` does the rest.
@@ -91,7 +108,7 @@ in `ENDPOINT`; `backends.CATALOGUE` does the rest.
 ### Fluency metrics are arithmetic, not a model
 `fluency()` counts words and measures gaps between timestamps. Deliberately not an LLM
 call: counting is exact, free, offline and instant. Do not replace it.
-`PAUSE_SECONDS` (0.6) is a calibration knob, not a magic number.
+The `pause_seconds` setting (0.6) is a calibration knob, not a magic number.
 
 ### Whisper deletes the thing being measured
 Whisper is trained to tidy speech up and silently drops "um"/"uh".
@@ -116,7 +133,7 @@ Models stream several words per token, so a sentence boundary usually arrives in
 middle of a token (`"own. Walk me"`). The old `ready_to_speak` only asked whether the
 buffer *ended* on a terminator, missed those boundaries entirely, and then
 `MAX_CHARS_BEFORE_FLUSH` cut sentences in half — the interviewer audibly stopped
-mid-sentence and it read as bad text-to-speech. `llm.split_for_speech` finds the last
+mid-sentence and it read as bad text-to-speech. `chunks.split_for_speech` finds the last
 real boundary inside the buffer instead.
 
 Two traps it has to avoid: the returned buffer must **not** be stripped, or the trailing
@@ -162,6 +179,59 @@ knowing the candidate.
 pacing only* and forbids mentioning them. Being told you say "um" mid-answer is exactly
 what makes someone freeze, and the whole app exists to stop that.
 
+### `talk` is conversation practice, not an interview
+`talk` is everyday chat for a non-native speaker: the partner speaks natural English
+(contractions, phrasal verbs) in 2-3 sentences so there is something to listen to, and
+asks open questions so the user does most of the speaking. It calls
+`system_prompt(..., interview=False)`, which passes only `profile.PERSONAL` (name, first
+language): stack, role and focus pulled every chat back to engineering. It may echo a
+garbled sentence back naturally ("Oh, so you ended up...") but never points it out, so
+the no-correction rule still holds.
+
+### Correction lives with the coach, not the partner
+The conversation partner never corrects the user — being corrected mid-answer is what
+makes people freeze. `coach.py` is a second model that reads each answer in the
+background (never awaited by the conversation) and writes notes read after the session,
+then a session summary whose `recap` becomes `talk`'s memory of past sessions. Its
+prompts forbid blaming the speaker for speech-recognition errors: a "fix" for a word
+Whisper misheard, or for the transcriber's spelling, is the worst kind of note. Coach
+requests go one at a time and wait out 429s — the free tier for Gemini 3.8 Flash is 5
+requests a minute, and catching up a 23-answer session at once had 20 refused. The
+default is Flash-Lite: notes as useful as Flash's, in 2s instead of 20s.
+
+### The study sheet is drawn, not typeset
+`sheet.py` has a model write the sheet's content as JSON after the summary; `layout.py`
+draws it with Pillow, which already draws the charts and can save pages as a PDF - so the
+PDF and the Telegram images come from one renderer and no PDF library is added. Pillow's
+own font has no dashes, arrows or accents, so `make models` fetches Inter into `models/`;
+without it the sheet still renders, in plain ASCII. The sheet's prompt insists a fix
+keeps the speaker's meaning - Flash-Lite once "fixed" a misheard phrase into one meaning
+the opposite. The coach's background tasks wait only for those queued before them
+(notes, then summary, then sheet): waiting on all the others deadlocked summary and sheet.
+Gemini 3.8 Flash's free tier is 20 requests a day; `llm.patiently` waits out per-minute
+limits but reports a used-up daily quota at once instead of waiting hours.
+
+### Telegram through Relay is optional and environment-only
+`relay.py` is off unless `RELAY_URL`, `RELAY_API_KEY` and `RELAY_APP` are set. The key
+is read from the environment only — never a setting, never logged; logs carry message
+ids, never contents. `reports.py` holds what is sent and when; each message remembers
+what it sent under `relay:` keys in the settings table, so a restart never repeats one.
+The charts are drawn server-side by `picture.py` (Pillow) so a report never depends on
+a browser tab still being open; `picture.SERIES` mirrors `SERIES` in `chart.js`, and
+a test fails if they drift.
+
+### A session counts at 2 answers and 2 minutes
+Anything shorter is a try: `history.counted()` leaves it out of the history list, streaks,
+totals, trends, mode unlocks, the coach's summary, the study sheet and Telegram. The rule
+is one subquery; use it rather than re-deriving "has answers".
+
+### The app runs only while you practise
+It is started for a session and stopped after, so nothing may depend on it being up at a
+given time. Everything sent to Telegram goes when a session ends, last week's report
+included; a daily reminder was removed because it could only ever fire at someone already
+in the app. Quitting waits for the coach's queue (`app.finish_up`), and a second Ctrl-C
+skips it.
+
 ### Schema changes need a migration
 `CREATE TABLE IF NOT EXISTS` will not add a column to a database that already exists, and
 users have real practice history in theirs. Add the column to `SCHEMA` *and* to
@@ -192,7 +262,7 @@ beat published ones; do not present an estimate as a measurement.
 
 ### Local reasoning models need a large token budget
 Bonsai-27B returned an **empty** reply at `max_tokens=500` — thinking consumed the whole
-budget, exactly like `gemini-3.8-flash` did at 120. `REVIEW_MAX_TOKENS` is 2500, and
+budget, exactly like `gemini-3.8-flash` did at 120. The `review_max_tokens` setting is 2500, and
 `llm.complete` prints an explanation on an empty reply rather than failing silently.
 
 ### Model choices

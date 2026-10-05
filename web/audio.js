@@ -51,15 +51,30 @@ export class Playback {
     this.playing = false;
     this.waiters = [];
     // Browsers block audio until the page has been interacted with. On a reload straight
-    // back into a session there has been no click, so the interviewer would speak into
+    // back into a session there has been no click, so the reply would play into
     // the void. Tell someone instead of swallowing it.
     this.onBlocked = null;
     this.blocked = false;
+    this.turn = [];     // the current reply's clips, kept so "again" needs no round trip
+    this.keep = true;   // false for a replay, so "again" replays the original speed
   }
 
   push(bytes) {
-    this.queue.push(new Blob([bytes], { type: 'audio/wav' }));
+    const blob = new Blob([bytes], { type: 'audio/wav' });
+    if (this.keep) this.turn.push(blob);
+    this.keep = true;
+    this.queue.push(blob);
     if (!this.playing) this.#next();
+  }
+
+  /** A new reply is starting: forget the last one's clips. */
+  newTurn() { this.turn = []; }
+
+  /** The current reply again, from the top. */
+  again() {
+    this.stop();
+    this.queue.push(...this.turn);
+    this.#next();
   }
 
   #next() {
@@ -96,6 +111,29 @@ export class Playback {
     this.playing = false;
     this.waiters.splice(0).forEach((resolve) => resolve());
   }
+}
+
+/**
+ * Hands-free: call `done` once you have spoken and then been quiet for `silence` seconds,
+ * or after `patience` seconds if you never start. Returns a function that stops watching.
+ * `silence` should sit well above the pause threshold: a pause mid-thought is exactly
+ * what is being practised, and cutting it off would punish it.
+ */
+export const VOICE_LEVEL = 0.015;  // calibration knob: the mic level that counts as speech
+export function untilSilence(mic, { silence, patience = 30, done, tick = 100 }) {
+  const began = Date.now();
+  let spoke = false;
+  let quietSince = null;
+  const timer = setInterval(() => {
+    const now = Date.now();
+    if (mic.level > VOICE_LEVEL) { spoke = true; quietSince = null; return; }
+    quietSince ??= now;
+    if ((spoke && now - quietSince >= silence * 1000) || (!spoke && now - began >= patience * 1000)) {
+      clearInterval(timer);
+      done();
+    }
+  }, tick);
+  return () => clearInterval(timer);
 }
 
 /** The little bar under the mic button. Rendered from Mic.level. */

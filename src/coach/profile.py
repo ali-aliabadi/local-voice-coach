@@ -5,6 +5,7 @@ Stored in the settings table under `profile:` keys, the same way prompt override
 interviewer asks generic questions.
 """
 
+import json
 from dataclasses import dataclass, field
 
 from . import history, settings, store
@@ -108,15 +109,27 @@ def is_set() -> bool:
     return any(get(f.key).strip() for f in FIELDS)
 
 
-def as_prompt() -> str:
+# All a conversation partner needs: what to call them and how to pitch the English.
+# Stack, role and focus would pull every chat back to engineering.
+PERSONAL = ("name", "native_language")
+
+
+def as_prompt(interview: bool = True) -> str:
     """The profile as a block to append to a system prompt. Empty if nothing is filled in.
 
     Only non-empty fields appear, so a half-filled profile does not feed the model a list
     of blanks to speculate about.
     """
-    lines = [f"- {f.term}: {get(f.key).strip()}" for f in FIELDS if get(f.key).strip()]
+    fields = FIELDS if interview else [BY_KEY[k] for k in PERSONAL]
+    lines = [f"- {f.term}: {get(f.key).strip()}" for f in fields if get(f.key).strip()]
     if not lines:
         return ""
+    if not interview:
+        return (
+            "\n\nYou are talking with:\n"
+            + "\n".join(lines)
+            + "\n\nNever read this back to them or mention that you have it."
+        )
     return (
         "\n\nYou are interviewing this specific person:\n"
         + "\n".join(lines)
@@ -137,14 +150,34 @@ def coaching_note(recent: dict | None) -> str:
         return ""
     return (
         f"\n\nFor pacing only, their recent delivery: {recent['wpm']:.0f} words per minute, "
-        f"{recent['fillers']:.1f} filler words and {recent['lead_in']:.1f}s of silence "
-        "before starting, per answer. If they are hesitating a lot, ask shorter and more "
-        "concrete questions. Never mention these numbers or their speech. Never correct "
-        "their English."
+        f"{recent['fillers']:.1f} filler words per 100 words, and {recent['lead_in']:.1f}s "
+        "of silence before starting each answer. If they are hesitating a lot, ask shorter "
+        "and more concrete questions. Never mention these numbers or their speech. Never "
+        "correct their English."
     )
 
 
-def system_prompt(mode: str, default: str, pacing: bool = True) -> str:
+def recaps(limit: int = 3) -> str:
+    """What earlier conversations were about, from the coach's recaps. Without it every
+    session starts from nothing, and "do you remember?" gets a bluff."""
+    rows = store.db().execute(
+        "SELECT started_at, summary FROM sessions WHERE summary IS NOT NULL"
+        " ORDER BY id DESC LIMIT ?",
+        (limit,),
+    )
+    recaps = [(r["started_at"][:10], json.loads(r["summary"]).get("recap")) for r in rows]
+    lines = [f"- {day}: {recap}" for day, recap in recaps if recap]
+    if not lines:
+        return ""
+    return (
+        "\n\nEarlier conversations with them, most recent first. Bring one up only when it "
+        "fits naturally, the way a friend would:\n" + "\n".join(lines)
+    )
+
+
+def system_prompt(
+    mode: str, default: str, pacing: bool = True, interview: bool = True, memory: bool = False
+) -> str:
     """The interviewer's full instructions: the mode's prompt, the user's override if
     there is one, who they are, and how they have been speaking lately.
 
@@ -152,8 +185,12 @@ def system_prompt(mode: str, default: str, pacing: bool = True) -> str:
     interviewer into one that knows the candidate.
 
     `pacing` is off for written critique, where delivery is not being judged.
+    `interview` is off for plain conversation, which gets their name and language instead
+    of their CV. `memory` adds what earlier sessions were about.
     """
-    prompt = settings.prompt(mode, default) + as_prompt()
+    prompt = settings.prompt(mode, default) + as_prompt(interview)
+    if memory:
+        prompt += recaps()
     if pacing:
         prompt += coaching_note(history.recent())
     return prompt

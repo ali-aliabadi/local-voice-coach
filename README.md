@@ -1,10 +1,11 @@
 # local-voice-coach
 
-Spoken interview practice that **measures your hesitation**.
+Spoken English practice for non-native speakers that **measures your hesitation**.
 
-You answer out loud in the browser, an interviewer digs into what you said, and every
-answer is scored: words per minute, filler words, pauses, and how long you took to start
-talking. Then you listen back to yourself.
+You talk out loud in the browser — everyday conversation, real-life roleplays, stories to
+retell, fluency drills, or a job interview — and every answer is scored: words per
+minute, filler words, pauses, and how long you took to start talking. A coach writes up
+your grammar and word choice after the session, and you listen back to yourself.
 
 **Your voice never leaves your machine.** Whisper and Kokoro run locally. Only transcript
 text reaches a model, and only if you choose a cloud backend — pick a local one and
@@ -12,8 +13,8 @@ nothing leaves at all.
 
 <!-- TODO: 20-second screencast goes here. It converts better than anything written below. -->
 
-Built for one problem: *"I can't speak confidently in interviews. There are a lot of mmmm
-and my sentences take a long time to form."* Most tools can't even measure that, because
+Built for one problem: *"I can't speak English confidently. There are a lot of mmmm and
+my sentences take a long time to form."* Most tools can't even measure that, because
 speech-to-text is trained to tidy disfluencies away before anything sees them.
 
 ## Setup
@@ -31,7 +32,8 @@ make logs        # watch it come up
 make down
 ```
 
-`make` on its own lists everything.
+`make` on its own lists everything. To skip building the image, use the published one:
+`IMAGE=ghcr.io/<owner>/local-voice-coach make pull up`.
 
 Add a Gemini key in Settings (free, no card, from
 [aistudio.google.com/apikey](https://aistudio.google.com/apikey)), or skip it and use a
@@ -46,10 +48,11 @@ configured, since `localhost` inside a container means the container.
 
 ## It knows who you are
 
-Fill in [your profile](http://127.0.0.1:8000/profile) — target role, level, the stack you
-actually use, and what you want to get better at — and the interviewer reads it before
-every session. It pitches difficulty at your level, digs into the projects you named, and
-pushes on the thing you said you freeze on. It never reads any of it back at you.
+Fill in [your profile](http://127.0.0.1:8000/profile). Every mode gets your name and
+first language. The interview modes also get your target role, level, the stack you
+actually use, and what you want to get better at: they pitch difficulty at your level,
+dig into the projects you named, and push on the thing you said you freeze on. Nothing is
+ever read back at you.
 
 It also sees how you have been speaking lately, and asks shorter, more concrete questions
 when you have been hesitating. It is told, in the prompt, never to mention your speech:
@@ -59,9 +62,18 @@ being corrected mid-answer is what makes people freeze.
 
 | Mode | What it is |
 |---|---|
-| **talk** | One interviewer, fast replies, every answer scored. Built for reps. |
+| **talk** | Everyday conversation, not an interview — a friendly partner chats about ordinary things and talks enough to give you something to listen to. It remembers your last few sessions. |
+| **roleplay** | A real-life scene — ordering with an allergy, booking a doctor, returning broken headphones, small talk with a new colleague — with the partner playing the other person. |
+| **retell** | It tells a short story; you tell it back in your own words, and it says what you caught and what you missed. Listening and speaking in one. |
+| **repeat** | The 4/3/2 drill: one topic three times, in 90, 60 and 45 seconds, then a table of how your numbers moved between the first telling and the last. |
+| **shadow** | It says a natural sentence; you say it straight back. Scored by the words you matched, and a sentence you mostly missed is said again. |
 | **panel** | Three interviewers with distinct voices — a hiring manager, a staff engineer, and a bar raiser who pushes back. Closer to a real onsite. |
 | **review** | One hard technical question, then a written critique: what held up, what was vague, what a real interviewer would probe next. Deliberately slow. |
+
+What the partner says is blurred until you tap **show text** — hear it first. **again**
+replays it, **slower** says it again at four fifths of the speed, and how often you needed
+either is tracked, so you can watch your ear improve. Each session gets a different
+American or British voice.
 
 Tap the circle to answer, tap again when you're done. Space works too.
 
@@ -70,8 +82,8 @@ Tap the circle to answer, tap again when you're done. Space works too.
 | Metric | Meaning | Direction |
 |---|---|---|
 | **wpm** | words per minute while actually speaking | up — native conversational is ~140–160 |
-| **fillers** | "um", "uh", "mmm", "er", "hmm" | down |
-| **pauses** | silences past your threshold (0.6s) mid-answer | down |
+| **fillers** | "um", "uh", "mmm", "er", "hmm" — per 100 words | down — 2 or fewer is barely noticeable |
+| **pauses** | silences past your threshold (0.6s) mid-answer — per minute | down |
 | **lead-in** | seconds before your first word | down — this is *"sentences take long to form"* |
 
 After each answer you get the transcript with **every filler highlighted**, a **timeline**
@@ -82,9 +94,57 @@ whole conversation, each answer scored, the highlighted transcript and timeline 
 and your recordings. `/history` lists them all; `/progress` totals everything you have
 ever done and charts the four numbers over time.
 
+Fillers and pauses are rates, not counts per answer: a long answer has more of them in it
+without being any worse, and averages are weighted by words so one short answer cannot
+swing a session.
+
 Filler counts are a floor, not a census: Whisper drops some disfluencies even with the
 prompt biasing it toward verbatim. Pauses, wpm and lead-in come from word timestamps and
 are exact.
+
+## The coach
+
+A second model reads each answer in the background while you keep talking, and leaves
+notes you read after the session: grammar fixes as *what you said → a better version*, a
+more natural way to say the whole thing, phrases and idioms that fit the topic, and one
+thing you did well. The session gets a summary at the top — the three things to work on,
+phrases worth learning, and phrases to buy thinking time instead of "um". The coach is
+told to be kind, to skip anything a native listener would let pass, and to ignore what
+speech recognition probably misheard. The fixes it keeps making are counted on the
+progress page, so a pattern stands out from a one-off slip.
+
+The partner you talk to never corrects you — being corrected mid-answer is what makes
+people freeze. Correction lives with the coach, written, after the fact.
+
+`talk` also remembers your last few sessions from the coach's recaps, so "do you
+remember the film I told you about?" gets a real answer. Choose the coach's model, or
+turn it off, in Settings.
+
+After every session of three answers or more, a model writes your **study sheet**: a page
+or two to keep — what went well, the fixes worth the most, phrases for the conversations
+you actually have (each shown against what you said, with an example), what to say
+instead of "um", three small things to practise tomorrow, how the session's time went
+(its length against your goal, how much of it was you speaking, how fast replies came,
+how many you followed by ear) and charts of every answer and of your last two weeks. Open it as a PDF from the
+session page; with Telegram set up it is sent to you too. Phrases in the coach's notes
+are anchored the same way: *instead of "I don't like cinema" → "not really my thing"*.
+
+## On your phone
+
+With [Relay](https://github.com/ali-aliabadi/relay) set up, the app sends to Telegram:
+
+- **after each session**: how long it ran against your goal, what changed since last
+  time, how many replies you followed by ear, a chart of every answer with its trend, and
+  your study sheet as a PDF to download (as page images, on a Relay from before file
+  blocks). Sent by itself once the coach has finished.
+- **last week's report**, after the first session of a new week: each day, against the
+  week before
+
+The app is meant to run only while you practise, so everything is sent when a session
+ends; quitting with Ctrl-C waits for the study sheet and report (Ctrl-C again skips
+them). Put `RELAY_URL`, `RELAY_API_KEY` and `RELAY_APP` in `.env`; each message has an
+on/off in Settings. Only numbers, a chart and — if you allow it — the coach's lessons are
+sent. Audio never is.
 
 ## Cost
 
@@ -98,6 +158,11 @@ Measured on a real turn: 995 input tokens, 20 output. At ~40 answers (about an h
 
 Free tier covers roughly 500 requests/day, well above the ~40 an hour needs. Run a local
 model and it's free and offline regardless.
+
+Those figures were measured with 8 turns of history and no coach. The partner now sees the
+whole session — so it remembers what you said twenty minutes ago — and the coach adds one
+Flash-Lite call per answer, so a turn costs several times the 995 tokens above. Still
+well inside the free tier for an hour a day; the billed price has not been re-measured.
 
 The picker shows published latency next to **Yours** — the average measured from your own
 past sessions. Trust that column, not the estimate.
@@ -133,5 +198,11 @@ Adding a mode is one file. Adding a model is one row. Adding a setting is one ro
 form builds itself. See [CONTRIBUTING.md](CONTRIBUTING.md) and [DESIGN.md](DESIGN.md).
 
 ```bash
-./scripts/check.sh      # ruff, formatter, 300-line budget, tests
+make install            # exactly what uv.lock pins, ruff included
+make check              # ruff, formatter, 300-line budget, tests - what CI runs
+make e2e                # the real server over a real socket (needs `make models`)
 ```
+
+## License
+
+[Apache-2.0](LICENSE).

@@ -1,12 +1,13 @@
 """The JSON API. One endpoint per thing the browser needs, kept out of app.py."""
 
+import datetime as dt
 import pathlib
 
-from starlette.responses import FileResponse, JSONResponse
+from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route
 
-from .. import backends, history, profile, settings, store
-from ..modes import discover
+from .. import backends, coach, history, llm, profile, reports, settings, sheet, store, today
+from ..modes import discover, state, unlock
 from . import models
 
 MODES = discover()
@@ -34,11 +35,25 @@ def prompt_fields() -> list[dict]:
     return fields
 
 
+def partner(mode: str) -> str:
+    """Who the user talks to in a mode, as the pages name them."""
+    return getattr(MODES.get(mode), "PARTNER", "interviewer")
+
+
 async def get_modes(_request):
+    done = history.count()
     return JSONResponse(
         [
-            {"name": name, "help": module.HELP, "endpoint": module.ENDPOINT}
-            for name, module in sorted(MODES.items())
+            {
+                "name": name,
+                "help": module.HELP,
+                "endpoint": module.ENDPOINT,
+                "partner": partner(name),
+                "unlock": unlock(module),
+                "state": state(module, done),
+                "left": max(0, unlock(module) - done),
+            }
+            for name, module in sorted(MODES.items(), key=lambda kv: (unlock(kv[1]), kv[0]))
         ]
     )
 
@@ -72,33 +87,98 @@ async def save_profile(request):
 
 
 async def get_settings(_request):
-    return JSONResponse(settings.as_form(models.voice_names()) + prompt_fields())
+    choices = {
+        "tts_voice": models.voice_names(),
+        "coach_backend": ("off", *backends.BY_KEY),
+        "sheet_backend": ("off", *backends.BY_KEY),
+    }
+    return JSONResponse(settings.as_form(choices) + prompt_fields())
 
 
 async def save_settings(request):
+    defaults = {f["key"]: f["default"] for f in prompt_fields()}
     for key, value in (await request.json()).items():
         if key.startswith("prompt:"):
-            settings.set_prompt(key[len("prompt:") :], value)
+            settings.set_prompt(key[len("prompt:") :], value, defaults.get(key))
         elif key in settings.SPEC:
             if settings.SPEC[key].secret and value == "":
                 continue  # blank means "leave the stored secret alone"
-            settings.set(key, value)
+            try:
+                settings.set(key, value)
+            except ValueError:
+                return JSONResponse({"error": f"{key}: not a valid number"}, status_code=400)
     return JSONResponse({"ok": True})
 
 
-async def get_sessions(_request):
-    return JSONResponse(history.sessions())
+async def get_sessions(request):
+    before = request.query_params.get("before")
+    return JSONResponse(history.sessions(before=int(before) if before else None))
 
 
 async def get_session(request):
     found = history.detail(int(request.path_params["session"]))
     if found is None:
         return JSONResponse({"error": "no such session"}, status_code=404)
-    return JSONResponse(found)
+    coaching = "pending" if coach.pending(found["id"]) else "on" if coach.endpoint() else "off"
+    return JSONResponse(
+        {
+            **found,
+            "partner": partner(found["mode"]),
+            "coaching": coaching,
+            "coach_error": coach.failed.get(found["id"]),
+            "sheet": sheet.stored(found["id"]) is not None,
+            "can_sheet": sheet.endpoint() is not None and found["answers"] >= sheet.MIN_ANSWERS,
+            "counted": history.is_counted(found["id"]),
+            "minimum": {"answers": history.MIN_ANSWERS, "minutes": history.MIN_MINUTES},
+            "telegram": reports.sent(found["id"], found["answers"]),
+            "waiting": llm.waiting,
+        }
+    )
+
+
+async def write_sheet(request):
+    """(Re)write a session's study sheet in the background."""
+    sheet.later(int(request.path_params["session"]))
+    return JSONResponse({"ok": True})
+
+
+async def get_sheet(request):
+    """The study sheet as a PDF, drawn fresh from what the model wrote."""
+    session_id = int(request.path_params["session"])
+    doc = sheet.render(session_id)
+    if doc is None:
+        return JSONResponse({"error": "no study sheet for this session yet"}, status_code=404)
+    name = f"study-sheet-{session_id}.pdf"
+    return Response(
+        doc.pdf(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{name}"'},
+    )
+
+
+async def coach_session(request):
+    """Notes for answers that have none, then the summary. Old sessions get a report too."""
+    coach.catch_up(int(request.path_params["session"]))
+    return JSONResponse({"ok": True})
 
 
 async def get_progress(_request):
-    return JSONResponse({"totals": history.totals(), "trend": store.trend(limit=60)})
+    day = lambda back: (dt.date.today() - dt.timedelta(days=back)).isoformat()  # noqa: E731
+    return JSONResponse(
+        {
+            "totals": history.totals(),
+            "trend": history.trend(),
+            "mistakes": history.mistakes(7),
+            "listening": {
+                "week": history.listening(day(6), day(0)),
+                "before": history.listening(day(13), day(7)),
+            },
+        }
+    )
+
+
+async def get_today(_request):
+    return JSONResponse(today.summary(dt.date.today()))
 
 
 async def get_audio(request):
@@ -122,7 +202,11 @@ ROUTES = [
     Route("/api/settings", save_settings, methods=["POST"]),
     Route("/api/sessions", get_sessions),
     Route("/api/sessions/{session:int}", get_session),
+    Route("/api/sessions/{session:int}/coach", coach_session, methods=["POST"]),
+    Route("/api/sessions/{session:int}/sheet", write_sheet, methods=["POST"]),
+    Route("/api/sessions/{session:int}/sheet.pdf", get_sheet),
     Route("/api/progress", get_progress),
+    Route("/api/today", get_today),
     Route("/api/audio/{turn:int}", get_audio),
     Route("/api/forget", forget, methods=["POST"]),
 ]

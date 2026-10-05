@@ -58,6 +58,7 @@ def word_rows(words) -> list[dict]:
                 "end": round(float(word.end), 2),
                 "filler": bool(filler_re.fullmatch(word.word.strip(" ,.!?-"))),
                 "pause": round(gap, 2) if gap >= pause_seconds else 0.0,
+                "unclear": float(getattr(word, "probability", 1.0)) < config.UNCLEAR_BELOW,
             }
         )
         previous_end = float(word.end)

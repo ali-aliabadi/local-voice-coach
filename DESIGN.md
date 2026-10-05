@@ -5,13 +5,14 @@ contributor can tell a deliberate choice from an accident.
 
 ## What the project is
 
-Spoken interview practice that **measures hesitation**. Not a chatbot with a microphone —
-the point is the numbers: words per minute, filler count, pause count, and time-to-first-word,
+Spoken English practice that **measures hesitation**. Not a chatbot with a microphone —
+the point is the numbers: words per minute, filler rate, pause rate, and time-to-first-word,
 tracked until they move.
 
-Primary user: a non-native-English engineer who can code but freezes in interviews.
-They are recording themselves sounding bad, which makes privacy the first requirement,
-not a feature.
+Primary user: a non-native English speaker who freezes when speaking — in conversation,
+and under the pressure of an interview. They practise about an hour a day, speaking and
+listening, and are recording themselves sounding bad, which makes privacy the first
+requirement, not a feature.
 
 ## Three rules that decide most arguments
 
@@ -81,9 +82,17 @@ trend line, and a CDN would break the offline promise.
 
 ## Interface
 
-**Focus mode.** One question on screen and nothing else. Metrics appear *after* the answer,
-never during. The alternative — a dashboard visible while you speak — gives you somewhere to
-hide and something to perform for. Real interviews have neither.
+**Focus while you speak.** While you are answering there is only the mic: the session
+panel dims and nothing changes on screen. A dashboard you can read mid-answer gives you
+somewhere to hide and something to perform for.
+
+**The session between answers.** Between answers the page shows the whole session so far —
+each metric with a sparkline, one point per answer — the clock against the goal you set,
+and your last answer in detail. Per-answer numbers alone could not show whether an hour of
+practice was getting better or worse; this was asked for after the first real session.
+
+**Listen first.** What the partner says is blurred until you choose "show text". Reading it
+would turn a listening exercise into a reading one.
 
 **Calm and minimal.** Generous white space, one accent colour, soft type. The user is
 already nervous; the tool should not add to it.
@@ -114,7 +123,7 @@ where they are and how far that is from where they want to be.
 | Settings | SQLite `settings` table | survives restarts, editable from the UI |
 | Secrets | `.env`, never returned to the browser | the API key is write-only over the wire, masked on read |
 
-Recordings auto-delete after `audio_retention_days` (default 7), purged on startup by mtime.
+Recordings auto-delete after `audio_retention_days` (default 7), checked by mtime every ten minutes while the server runs (`clock.py`).
 Roughly 1MB per answer, ~40MB per hour of practice, so steady state is a few hundred MB.
 There is a visible delete-everything button, because the whole pitch is that this data is
 yours.

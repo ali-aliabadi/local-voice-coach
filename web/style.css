@@ -91,11 +91,14 @@ h2 { font-size: 1.05rem; font-weight: 550; margin: 2.5rem 0 1rem; }
 hr { border: 0; border-top: 1px solid var(--line); margin: 3rem 0 2rem; }
 
 button { font: inherit; cursor: pointer; }
+/* A class that sets display must never beat the hidden attribute. */
+[hidden] { display: none !important; }
 .link {
   background: none; border: 0; color: var(--muted); padding: 0;
   text-decoration: none; border-bottom: 1px solid transparent;
 }
 .link:hover { color: var(--ink); border-bottom-color: var(--line); }
+.more { display: block; margin: 1.25rem auto 0; }
 .primary {
   background: var(--accent); color: #fff; border: 0;
   border-radius: 9px; padding: 0.6rem 1.4rem;
@@ -118,6 +121,11 @@ button { font: inherit; cursor: pointer; }
 .card { display: block; text-decoration: none; color: inherit; }
 .card b { font-weight: 550; display: block; }
 .card span { color: var(--muted); font-size: 0.9rem; }
+.card.hero { padding: 1.6rem 1.5rem; border-color: var(--accent); background: var(--accent-soft); }
+.card.hero b { font-size: 1.35rem; }
+.card.locked { opacity: 0.55; cursor: not-allowed; }
+.card.locked:hover { border-color: var(--line); transform: none; }
+.card.locked .tag { font-size: 0.72rem; }
 
 .table { display: grid; gap: 0.4rem; }
 .pick {
@@ -158,6 +166,33 @@ button { font: inherit; cursor: pointer; }
 .mic.recording { border-color: var(--warn); background: var(--surface); }
 .mic.recording::after { border-radius: 3px; background: var(--warn); width: 17px; height: 17px; }
 .mic-label { color: var(--muted); font-size: 0.9rem; margin: 0; }
+.topline { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.topline p { margin: 0; }
+.clock { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.9rem; }
+.goalbar { height: 3px; background: var(--line); border-radius: 2px; margin-top: 0.6rem; }
+.goalbar i { display: block; height: 100%; width: 0; background: var(--accent);
+  border-radius: 2px; transition: width 1s linear; }
+.question.veiled { filter: blur(7px); user-select: none; }
+.listen-tools { text-align: center; margin: -2.5rem auto 2.5rem; font-size: 0.85rem;
+  color: var(--muted); }
+.session { margin-top: clamp(2rem, 6vh, 3rem); transition: opacity .3s; }
+.session.dim { opacity: 0.25; }
+.session h2, #result h2 { font-size: 0.8rem; font-weight: 550; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 1rem; }
+.spark { display: block; width: 100%; max-width: 8rem; height: 26px; margin-top: 0.5rem; }
+.notice.good { color: var(--good); }
+
+/* ---- today ---- */
+.today-bar { margin: -1.25rem 0 1.25rem; }
+.start { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; margin: 2rem 0; }
+.advice { padding-left: 1.2rem; line-height: 1.7; }
+
+/* ---- goal picker ---- */
+.goals { border: 0; padding: 0; margin: 0 0 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.goals legend { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem; padding: 0; }
+.chip-button { background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 99px; padding: 0.35rem 0.9rem; font-size: 0.85rem; }
+.chip-button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 #level { opacity: 0; transition: opacity .2s; }
 #level.on { opacity: 1; }
 
@@ -175,7 +210,12 @@ button { font: inherit; cursor: pointer; }
 .hint, .foot { color: var(--muted); font-size: 0.85rem; }
 audio { height: 34px; }
 .critique { white-space: pre-wrap; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
-.notice { color: var(--warn); }
+.notice { color: var(--warn); max-width: 34rem; text-align: center; margin: 1rem auto 0; }
+.notice button {
+  display: block; margin: 0.75rem auto 0; background: none; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 9px; padding: 0.45rem 1.2rem;
+}
+.notice button:hover { border-color: var(--accent); }
 .end { display: block; margin: 4rem auto 0; }
 
 /* ---- settings ---- */
@@ -210,6 +250,18 @@ svg { display: block; max-width: 100%; }
   background: var(--accent-soft); border-radius: var(--radius);
   padding: 0.9rem 1.1rem; font-size: 0.9rem; margin: 0 0 1.5rem;
 }
+
+/* ---- after a session: what is being written, step by step ---- */
+.steps { list-style: none; padding: 0; margin: 0 0 1.5rem; display: grid; gap: 0.6rem; }
+.steps li { color: var(--muted); padding-left: 1.6rem; position: relative; }
+.steps li::before { content: "○"; position: absolute; left: 0; }
+.steps li.done { color: var(--ink); }
+.steps li.done::before { content: "✓"; color: var(--good); }
+.steps li.now { color: var(--ink); font-weight: 550; }
+.steps li.now::before { content: "●"; color: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+.steps li span { display: block; font-weight: 400; color: var(--muted); font-size: 0.88rem; }
+@keyframes pulse { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .steps li.now::before { animation: none; } }
 
 /* ---- a conversation, read back ---- */
 .turn { margin: 0 0 1.75rem; padding: 0 0 1.75rem; border-bottom: 1px solid var(--line); }

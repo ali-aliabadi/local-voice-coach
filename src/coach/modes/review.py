@@ -5,10 +5,11 @@ the depth a real interviewer would probe. The question is spoken; the critique i
 because nobody wants to listen to six paragraphs.
 """
 
-from .. import llm, profile, settings, store
+from .. import llm, profile, settings
 
 HELP = "one hard question, then a written critique"
 ENDPOINT = "deep"
+UNLOCK = 2  # an interview: once everyday talk has had two sessions
 
 PROMPT = (
     "You are a staff engineer interviewing a candidate for a software engineering role. "
@@ -34,45 +35,25 @@ CRITIQUE_PROMPT = (
 )
 
 
-async def run(endpoint, transcriber, io) -> None:
+async def run(endpoint, io) -> None:
     history: list[dict] = io.prior_turns()
+    question = None
 
     while True:
-        # --- ask ---
-        messages = [{"role": "system", "content": profile.system_prompt("review", PROMPT)}]
-        messages += history[-settings.get("history_turns") * 2 :]
-        await io.send(type="thinking", text="Composing a question")
-        asked = llm.Reply("", None)
-        try:
-            async for kind, chunk in llm.stream_sentences(endpoint, messages):
-                if kind == "sentence":
-                    await io.send(type="sentence", text=chunk)
-                    await io.say(chunk)
-                else:
-                    asked = chunk
-        except Exception as exc:
-            await io.send(type="error", text=await llm.explain(endpoint, exc))
-            return
-        question = asked.text
-        store.record("interviewer", question, reply_ms=asked.ms)
-        await io.send(type="turn_done", latency_ms=asked.ms)
-        await io.drain()
+        # --- ask, unless a question is still waiting for its answer ---
+        if question is None:
+            messages = [{"role": "system", "content": profile.system_prompt("review", PROMPT)}]
+            messages += history[-settings.get("history_turns") * 2 :]
+            asked = await io.reply(endpoint, messages, thinking="Composing a question")
+            question = asked.text if asked and asked.text else None
 
-        # --- answer ---
-        audio = await io.record()
-        if audio is None:
-            await io.send(type="notice", text="Nothing recorded - hold it a little longer.")
+        # --- answer: a failed recording keeps the same question ---
+        said = await io.answer()
+        if question is None or said is None or said is io.RETRY:
             continue
-        text, metrics, words, stt_ms = await transcriber.transcribe(audio)
-        if not text:
-            await io.send(type="notice", text="Didn't catch that. Move closer to the mic.")
-            continue
-
-        turn = io.save_answer(audio, text, metrics, stt_ms, words)
-        await io.send(type="transcript", text=text, metrics=metrics, words=words, turn=turn)
 
         # --- critique ---
-        delivery = ", ".join(f"{k} {v}" for k, v in (metrics or {}).items()) or "not measured"
+        delivery = ", ".join(f"{k} {v}" for k, v in (said.metrics or {}).items())
         await io.send(type="thinking", text="Reviewing your answer")
         try:
             critique = await llm.complete(
@@ -86,13 +67,15 @@ async def run(endpoint, transcriber, io) -> None:
                     },
                     {
                         "role": "user",
-                        "content": f"Question asked:\n{question}\n\nCandidate's answer:\n{text}\n\n"
-                        f"Delivery numbers: {delivery}",
+                        "content": f"Question asked:\n{question}\n\n"
+                        f"Candidate's answer:\n{said.text}\n\n"
+                        f"Delivery numbers: {delivery or 'not measured'}",
                     },
                 ],
             )
         except Exception as exc:
             await io.send(type="error", text=await llm.explain(endpoint, exc))
+            question = None
             continue
 
         if not critique.text:
@@ -103,9 +86,9 @@ async def run(endpoint, transcriber, io) -> None:
                     "budget reasoning. Raise 'Review max tokens' in Settings."
                 ),
             )
-            continue
-
-        await io.send(type="critique", text=critique.text, latency_ms=critique.ms)
-        store.record("review", critique.text, reply_ms=critique.ms)
-        history.append({"role": "user", "content": f"Q: {question}\nA: {text}"})
-        history.append({"role": "assistant", "content": critique.text[:400]})
+        else:
+            await io.send(type="critique", text=critique.text, latency_ms=critique.ms)
+            io.save_turn("review", critique.text, critique.ms)
+            history.append({"role": "user", "content": f"Q: {question}\nA: {said.text}"})
+            history.append({"role": "assistant", "content": critique.text[:400]})
+        question = None

@@ -1,4 +1,4 @@
-"""Spoken interview practice that measures your hesitation.
+"""Spoken English practice that measures your hesitation.
 
 Local, private, free. Whisper and Kokoro run on this machine; only transcript text ever
 reaches a model, and only if you pick a cloud backend.
@@ -15,7 +15,7 @@ import webbrowser
 import uvicorn
 
 BANNER = """
-  interview practice · local, private
+  speaking practice · local, private
   ─────────────────────────────────────
 """
 
@@ -33,7 +33,8 @@ def main() -> None:
         "--host",
         default="127.0.0.1",
         help="Anything but 127.0.0.1 exposes your microphone feed to your network, and "
-        "browsers block getUserMedia on plain http from another host anyway.",
+        "browsers block getUserMedia on plain http from another host anyway. Requests are "
+        "only accepted for localhost names; add yours with ALLOWED_HOSTS=name1,name2.",
     )
     parser.add_argument("--no-open", action="store_true", help="don't open a browser")
     args = parser.parse_args()

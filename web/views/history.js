@@ -1,10 +1,29 @@
 // Every session you have done, and any one of them replayed in full.
 
 import { moved } from "../chart.js";
-import { escape, get } from "../form.js";
+import { escape, get, post } from "../form.js";
+import * as notes from "../notes.js";
 import * as draw from "../render.js";
 
 const when = (stamp) => (stamp || "").slice(0, 16).replace("T", " ");
+
+/** "34 min of a 30 min goal": how long it ran, against what you set out to do. */
+const length = (s) => {
+  if (s.minutes == null) return "";
+  const ran = `${Math.max(1, Math.round(s.minutes))} min`;
+  return s.goal_minutes ? `${ran} of a ${s.goal_minutes} min goal` : ran;
+};
+
+const PAGE = 50;   // matches history.PAGE: a full page means there may be more
+
+const row = (s) => `
+  <a class="pick" href="/history/${s.id}">
+    <b>${escape(s.mode)} <span class="tag">${when(s.started_at)}</span></b>
+    <span class="cost">${length(s)} · ${s.answers} answer${s.answers === 1 ? "" : "s"}</span>
+    <span class="meta">${s.wpm == null ? "not scored" : `${Math.round(s.wpm)} wpm ·
+      ${s.fillers.toFixed(1)} fillers per 100 words · ${s.pauses.toFixed(1)} pauses
+      a minute · ${s.lead_in.toFixed(1)}s before speaking`}</span>
+  </a>`;
 
 export const list = {
   async render(root) {
@@ -18,20 +37,46 @@ export const list = {
     }
     root.innerHTML = `
       <h1>History</h1>
-      <p class="foot lead">${sessions.length} session${sessions.length === 1 ? "" : "s"}.
-      Open one to read the whole conversation back, with your own recordings.</p>
-      <div class="table">
-        ${sessions.map((s) => `
-          <a class="pick" href="/history/${s.id}">
-            <b>${escape(s.mode)} <span class="tag">${when(s.started_at)}</span></b>
-            <span class="cost">${s.answers} answer${s.answers === 1 ? "" : "s"}</span>
-            <span class="meta">${Math.round(s.wpm)} wpm ·
-              ${s.fillers.toFixed(1)} fillers · ${s.pauses.toFixed(1)} pauses ·
-              ${s.lead_in.toFixed(1)}s before speaking</span>
-          </a>`).join("")}
-      </div>`;
+      <p class="foot lead">Newest first. Open one to read the whole conversation back, with
+      your own recordings.</p>
+      <div class="table" id="sessions">${sessions.map(row).join("")}</div>
+      <button class="link more" id="older" ${sessions.length < PAGE ? "hidden" : ""}>
+        show older sessions</button>`;
+
+    let oldest = sessions[sessions.length - 1].id;
+    root.querySelector("#older").addEventListener("click", async (event) => {
+      const more = await get(`/api/sessions?before=${oldest}`);
+      root.querySelector("#sessions").insertAdjacentHTML("beforeend", more.map(row).join(""));
+      if (more.length) oldest = more[more.length - 1].id;
+      event.target.hidden = more.length < PAGE;
+    });
   },
 };
+
+/** How much of the session was you talking: the partner should not be doing most of it. */
+function spoke(session) {
+  const mine = session.averages?.spoken;
+  if (!mine || !session.minutes) return "";
+  const share = Math.min(100, Math.round((mine / session.minutes) * 100));
+  return ` · you spoke for ${mine < 1 ? "under a minute" : `${Math.round(mine)} min`} (${share}%)`;
+}
+
+/** Where the wait went after you stopped talking, averaged over the session's replies. */
+function waits(turns) {
+  const timed = turns.map((t) => t.timing).filter((t) => t?.total);
+  if (!timed.length) return "";
+  const mean = (key) => timed.reduce((sum, t) => sum + (t[key] || 0), 0) / timed.length / 1000;
+  return `<p class="foot">Replies started ${mean("total").toFixed(1)}s after you stopped, on
+    average: ${mean("hearing").toFixed(1)}s hearing you, ${mean("thinking").toFixed(1)}s thinking,
+    ${mean("voicing").toFixed(1)}s voicing.</p>`;
+}
+
+/** How often you needed help to follow the partner: the listening half of the practice. */
+function heard(l) {
+  if (!l?.replies) return "";
+  return `<p class="foot">You followed ${l.replies - l.helped} of ${l.replies} replies by ear
+    alone${l.helped ? `; for ${l.helped} you heard it again, slower, or read the text` : ""}.</p>`;
+}
 
 /** The sentence a trainer opens with. Only mentions what actually moved. */
 function changed(now, before) {
@@ -56,12 +101,74 @@ function answerBlock(turn, index) {
       <p class="transcript" data-transcript="${turn.id}"></p>
       ${turn.has_audio
         ? `<audio controls preload="none" src="/api/audio/${turn.id}"></audio>` : ""}
+      ${notes.answer(turn.notes)}
     </article>`;
+}
+
+// What happens after a session, in order, with something to read while each one runs.
+const STEPS = [
+  ["notes", "Reading every answer", ["Squinting at your prepositions…",
+    "Counting your articles. All of them.", "Making tea for the grammar…"]],
+  ["summary", "Writing your summary", ["Boiling the whole chat down to three things…",
+    "Looking for patterns, not slips…", "Deciding what actually matters…"]],
+  ["sheet", "Drawing your study sheet", ["Picking phrases worth stealing…",
+    "Choosing fonts like it is a wedding invitation…", "Ironing the PDF flat…"]],
+  ["telegram", "Sending it to Telegram", ["Folding it into a paper plane…",
+    "Licking the stamp…"]],
+];
+
+/** Each step ticked off, the one running now, and what it is waiting on if anything. */
+function progress(s) {
+  const noted = s.turns.filter((t) => t.role === "you" && t.notes).length;
+  const done = { notes: noted >= s.answers, summary: !!s.summary, sheet: s.sheet,
+    telegram: s.telegram };
+  const applies = { notes: s.coaching !== "off", summary: s.coaching !== "off",
+    sheet: s.can_sheet, telegram: s.telegram != null };
+  let now = null;
+  const items = STEPS.filter(([key]) => applies[key]).map(([key, label, lines]) => {
+    const count = key === "notes" ? ` · ${noted} of ${s.answers}` : "";
+    if (done[key]) return `<li class="done">${label}${count}</li>`;
+    if (now) return `<li>${label}</li>`;
+    now = key;
+    const line = s.waiting || lines[Math.floor(Date.now() / 4000) % lines.length];
+    return `<li class="now">${label}${count}<span>${escape(line)}</span></li>`;
+  });
+  return `<ol class="steps" aria-live="polite">${items.join("")}</ol>`;
+}
+
+/** Where the coach's summary goes: the summary, its progress, or a way to ask for it. */
+function coaching(session) {
+  if (!session.counted) {
+    const { answers, minutes } = session.minimum;
+    return `<p class="callout">Too short to count as a session: that takes at least
+      ${answers} answers and ${minutes} minutes. It is not in your history, and nothing was
+      sent.</p>`;
+  }
+  if (session.coaching === "pending") return progress(session);
+  const failed = session.coach_error
+    ? `<p class="notice">Not everything finished: ${escape(session.coach_error)}</p>` : "";
+  if (session.summary) {
+    const take = session.sheet
+      ? `<p class="callout"><a href="/api/sessions/${session.id}/sheet.pdf" target="_blank">
+          Open your study sheet (PDF)</a> — the fixes worth the most, phrases for your
+          conversations, and what to practise tomorrow.</p>`
+      : session.can_sheet
+        ? `<p class="foot"><button class="link" id="sheet-now">Write your study sheet</button>
+            — a page or two to keep, as a PDF.</p>` : "";
+    return `<h2>Coach</h2>${failed}${take}${notes.summary(session.summary)}`;
+  }
+  if (!session.answers) return "";
+  return failed + (session.coaching === "off"
+    ? `<p class="foot">The coach is off. Choose a coach model in <a href="/settings">settings</a>
+       to get notes on grammar, word choice and phrases for every answer.</p>`
+    : `<p class="foot"><button class="link" id="coach-now">Write coach notes for this
+       session</button> — grammar, word choice and phrases for each answer.</p>`);
 }
 
 export const detail = {
   async render(root, params) {
-    root.innerHTML = `<p class="foot loading">Loading…</p>`;
+    // Only when arriving: filling in later swaps the page whole, with no flash in between.
+    if (!root.firstChild) root.innerHTML = `<p class="foot loading">Loading…</p>`;
     const session = await get(`/api/sessions/${params.id}`);
     if (session.error) {
       root.innerHTML = `<h1>Not found</h1><p class="foot">
@@ -74,9 +181,13 @@ export const detail = {
     root.innerHTML = `
       <p class="crumbs"><a href="/history">history</a> › <b>${escape(session.mode)}</b></p>
       <h1>${when(session.started_at)}</h1>
-      <p class="foot">${session.answers} answers · ${escape(session.model)}</p>
+      <p class="foot">${session.answers} answers · ${length(session)}${spoke(session)}
+        · ${escape(session.model)}</p>
+      ${heard(session.listening)}
+      ${waits(session.turns)}
       ${changed(session.averages, session.previous)}
       ${session.answers ? '<div class="metrics" id="session-average"></div>' : ""}
+      <div id="coaching">${coaching(session)}</div>
       <h2>The conversation</h2>
       ${expired ? `<p class="foot">Recordings from this session have expired — they are
         deleted after the retention window in <a href="/settings">settings</a>.</p>` : ""}
@@ -85,7 +196,7 @@ export const detail = {
         if (turn.role === "review") {
           return `<article class="turn critique">${escape(turn.text)}</article>`;
         }
-        const who = turn.role.startsWith("panel:") ? turn.role.slice(6) : "Interviewer";
+        const who = turn.role.startsWith("panel:") ? turn.role.slice(6) : session.partner;
         return `<article class="turn them"><span class="who">${escape(who)}</span>
           ${escape(turn.text)}</article>`;
       }).join(""); })()}`;
@@ -101,5 +212,26 @@ export const detail = {
       draw.transcript(
         root.querySelector(`[data-transcript="${turn.id}"]`), turn.word_rows, turn.text);
     }
+
+    // While the coach works only its progress is redrawn, so a recording you are playing
+    // keeps playing; the whole page is redrawn once, when it is done.
+    const again = () => setTimeout(async () => {
+      // Only while this page is still the one showing: navigating away ends the polling.
+      if (location.pathname !== `/history/${params.id}`) return;
+      const next = await get(`/api/sessions/${params.id}`);
+      if (next.coaching !== "pending") return detail.render(root, params);
+      root.querySelector("#coaching").innerHTML = coaching(next);
+      again();
+    }, 2000);
+    root.querySelector("#coach-now")?.addEventListener("click", async () => {
+      await post(`/api/sessions/${params.id}/coach`, {});
+      again();
+    });
+    root.querySelector("#sheet-now")?.addEventListener("click", async (event) => {
+      event.target.textContent = "Writing your study sheet…";
+      await post(`/api/sessions/${params.id}/sheet`, {});
+      again();
+    });
+    if (session.coaching === "pending") again();
   },
 };
