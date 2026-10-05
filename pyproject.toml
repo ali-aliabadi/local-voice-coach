@@ -19,7 +19,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ruff>=0.6"]  # `uv sync` installs it; the Docker image leaves it out
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.6",
+]  # `uv sync` installs it; the Docker image leaves it out
 
 [build-system]
 requires = ["setuptools>=77"]  # the SPDX license string (PEP 639)
@@ -55,3 +59,19 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E402"]    # tests import mid-file on purpose, to reset module state
+
+# ---- tests: `make check` runs pytest with coverage; `make e2e` the end-to-end test ----
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-q", "--strict-markers", "--strict-config", "-m", "not e2e"]
+markers = ["e2e: the real server and models over a real socket (`make e2e`)"]
+filterwarnings = ["error", "ignore:Using `httpx`:DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["coach"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 65  # where it stands; raise it as tests are added, never lower it

@@ -1,25 +1,16 @@
 """What the modes say and hear: chunking a reply for speech, routing a panel's voices, and
-the arithmetic behind shadow and repeat. Run: python tests/test_modes.py"""
+the arithmetic behind shadow and repeat."""
 
-import pathlib
-import tempfile
+import pytest
 
-from coach import config  # noqa: I001
-
-config.DB_PATH = str(pathlib.Path(tempfile.mkdtemp()) / "modes.db")
-
-from coach.chunks import split_for_speech, split_speaker  # noqa: E402
-from coach.llm import retry_after  # noqa: E402
-from coach.modes import discover, repeat, shadow, state  # noqa: E402
-from coach.modes.panel import PANEL  # noqa: E402
+from coach import picture
+from coach.chunks import split_for_speech, split_speaker
+from coach.modes import repeat, shadow
+from coach.modes.panel import PANEL
 
 
-# ---- sentence chunking ----
-# Models stream several words per token, so a sentence boundary usually arrives in the
-# middle of a token. Splitting only when the buffer *ended* on a boundary missed those,
-# and the length cap then cut sentences in half - the interviewer audibly stopped
-# mid-sentence. Feed tokens the way a model really sends them.
 def stream(tokens):
+    """Feed tokens the way a model really sends them: several words at a time."""
     buffer, spoken = "", []
     for token in tokens:
         buffer += token
@@ -32,111 +23,115 @@ def stream(tokens):
     return spoken
 
 
-spoken = stream(
-    [
-        "That sounds",
-        " like a really",
-        " critical piece of the system to",
-        " own. Walk me",
-        " through how you handled two requests in the same millisecond?",
+def test_a_sentence_ending_mid_token_is_still_found():
+    """Splitting only when the buffer *ended* on a boundary cut sentences in half."""
+    spoken = stream(
+        [
+            "That sounds",
+            " like a really",
+            " critical piece of the system to",
+            " own. Walk me",
+            " through how you handled two requests in the same millisecond?",
+        ]
+    )
+    assert spoken == [
+        "That sounds like a really critical piece of the system to own.",
+        "Walk me through how you handled two requests in the same millisecond?",
     ]
+    assert all(chunk[-1] in ".!?…" for chunk in spoken)
+
+
+@pytest.mark.parametrize(
+    ("tokens", "spoken"),
+    [
+        (["Hello. How are you? I am fine."], ["Hello. How are you? I am fine."]),
+        (
+            ["It costs 3.5 million", " and Dr. Chen signed", " it off."],
+            ["It costs 3.5 million and Dr. Chen signed it off."],
+        ),
+        (["Half a sen"], ["Half a sen"]),  # flushed at the end of the stream
+    ],
 )
-assert spoken == [
-    "That sounds like a really critical piece of the system to own.",
-    "Walk me through how you handled two requests in the same millisecond?",
-], spoken
+def test_decimals_and_titles_do_not_end_a_sentence(tokens, spoken):
+    assert stream(tokens) == spoken
 
-# every chunk must end on a real sentence ending, never mid-sentence
-assert all(chunk[-1] in ".!?…" for chunk in spoken), spoken
 
-assert stream(["Hello. How are you? I am fine."]) == ["Hello. How are you? I am fine."]
-assert stream(["It costs 3.5 million", " and Dr. Chen signed", " it off."]) == [
-    "It costs 3.5 million and Dr. Chen signed it off."
-]
-assert stream(["Half a sen"]) == ["Half a sen"]  # flushed at the end of the stream
-assert split_for_speech("Half a sen") == ("", "Half a sen")  # but not before then
-assert split_for_speech("") == ("", "")
+def test_nothing_is_spoken_before_a_boundary():
+    assert split_for_speech("Half a sen") == ("", "Half a sen")
+    assert split_for_speech("") == ("", "")
 
-# a run-on with no punctuation eventually breaks, but between words, never inside one
-run_on = stream([w + " " for w in ["word"] * 90])
-assert len(run_on) > 1 and all(" " in c for c in run_on[:-1])
-assert not any(c.endswith("wor") or c.startswith("rd") for c in run_on), run_on
 
-# ---- the first words of a reply may end at a clause: they are the wait you feel ----
-assert split_for_speech("Oh, nice one, getting home", eager=True) == (
-    "Oh, nice one,",
-    "getting home",
+def test_a_run_on_breaks_between_words_never_inside_one():
+    run_on = stream([w + " " for w in ["word"] * 90])
+    assert len(run_on) > 1 and all(" " in c for c in run_on[:-1])
+    assert not any(c.endswith("wor") or c.startswith("rd") for c in run_on)
+
+
+@pytest.mark.parametrize(
+    ("buffer", "eager", "split"),
+    [
+        ("Oh, nice one, getting home", True, ("Oh, nice one,", "getting home")),
+        ("Oh, ", True, ("", "Oh, ")),  # too short to sound natural
+        ("About 1,000 people came", True, ("", "About 1,000 people came")),  # not a clause
+        ("Oh, nice one, getting home", False, ("", "Oh, nice one, getting home")),
+        ("Done. And then, more", True, ("Done.", "And then, more")),
+    ],
 )
-assert split_for_speech("Oh, ", eager=True) == ("", "Oh, ")  # too short to sound natural
-assert split_for_speech("About 1,000 people came", eager=True)[0] == ""  # not a clause
-assert split_for_speech("Oh, nice one, getting home") == ("", "Oh, nice one, getting home")
-assert split_for_speech("Done. And then, more", eager=True) == ("Done.", "And then, more")
+def test_the_first_words_may_end_at_a_clause(buffer, eager, split):
+    """The first words of a reply are the wait you feel, so they need not wait for a full stop."""
+    assert split_for_speech(buffer, eager=eager) == split
 
-# ---- shadow: word matching is arithmetic, and order matters ----
-assert shadow.match("I ended up staying in", "I ended up staying in") == (1.0, [])
-score, missed = shadow.match("I ended up staying in last night", "I end up staying last night")
-assert round(score, 2) == 0.71 and missed == ["ended", "in"], (score, missed)
-assert shadow.match("", "anything") == (0.0, [])
 
-# ---- repeat: the first telling against the last, in words, noise left out ----
-first, last = {"wpm": 100, "fillers": 3.0, "pauses": 6.0}, {"wpm": 118, "fillers": 2.9, "pauses": 4}
-assert repeat.change(first, last) == (
-    "From the first telling to the last: 18 wpm faster, 2.0 fewer pauses a minute."
+@pytest.mark.parametrize(
+    ("said", "heard", "score", "missed"),
+    [
+        ("I ended up staying in", "I ended up staying in", 1.0, []),
+        ("I ended up staying in last night", "I end up staying last night", 0.71, ["ended", "in"]),
+        ("", "anything", 0.0, []),
+    ],
 )
-assert repeat.change(first, first).startswith("About the same")
-assert len(repeat.table([first, last])) == 5 and repeat.table([first])[1][1] == "100"
-
-# ---- panel speaker routing ----
-assert split_speaker("MAYA: Tell me about yourself.", PANEL) == ("MAYA", "Tell me about yourself.")
-assert split_speaker("  DEREK:   Why Redis?", PANEL) == ("DEREK", "Why Redis?")
-assert split_speaker("BOB: hello", PANEL) == (None, "hello")  # unknown name, prefix still stripped
-assert split_speaker("Tell me about yourself.", PANEL) == (None, "Tell me about yourself.")
-assert split_speaker("So the trade-off is: latency versus cost.", PANEL)[0] is None
-
-# ---- rate limits: a per-minute wait is waited out, a daily one is reported ----
-assert retry_after("Please retry in 33.876060542s.") == 33.876060542
-assert retry_after("Please retry in 3h35m42.5s.") == 3 * 3600 + 35 * 60 + 42.5
-assert retry_after("Please retry in 2m.") == 120 and retry_after("no hint") is None
-
-# "high demand" is a 503 that passes: the background queue waits it out, and says so
-import asyncio  # noqa: E402
-import types  # noqa: E402
-
-import httpx  # noqa: E402
-import openai  # noqa: E402
-
-from coach import llm  # noqa: E402
-
-said = []
+def test_shadow_matches_words_in_order(said, heard, score, missed):
+    got, gone = shadow.match(said, heard)
+    assert round(got, 2) == score and gone == missed
 
 
-async def overloaded_once(_ep, _messages, _max_tokens=None):
-    if not said:
-        response = httpx.Response(503, request=httpx.Request("POST", "http://model"))
-        raise openai.InternalServerError("high demand", response=response, body=None)
-    return llm.Reply("fine", 1.0)
+def test_repeat_says_what_moved_from_the_first_telling_to_the_last():
+    first, last = (
+        {"wpm": 100, "fillers": 3.0, "pauses": 6.0},
+        {"wpm": 118, "fillers": 2.9, "pauses": 4},
+    )
+    assert repeat.change(first, last) == (
+        "From the first telling to the last: 18 wpm faster, 2.0 fewer pauses a minute."
+    )
+    assert repeat.change(first, first).startswith("About the same")
+    assert len(repeat.table([first, last])) == 5 and repeat.table([first])[1][1] == "100"
 
 
-async def no_wait(_seconds):
-    said.append(llm.waiting)
+@pytest.mark.parametrize(
+    ("before", "now", "said"),
+    [
+        ({"wpm": 100}, {"wpm": 103}, []),  # under the threshold: noise
+        ({"lead_in": 2.0}, {"lead_in": 1.0}, ["1.0s quicker to start"]),
+        ({"fillers": 1.0}, {"fillers": 2.0}, ["1.0 more fillers per 100 words"]),
+        ({"wpm": 100}, {}, []),  # nothing to compare with
+    ],
+)
+def test_a_change_is_said_in_words_only_when_it_is_more_than_noise(before, now, said):
+    assert picture.shifts(before, now) == said
 
 
-real_complete, real_sleep = llm.complete, asyncio.sleep
-llm.complete, asyncio.sleep = overloaded_once, no_wait
-try:
-    reply = asyncio.run(llm.patiently(types.SimpleNamespace(model="flash"), []))
-finally:
-    llm.complete, asyncio.sleep = real_complete, real_sleep
-assert reply.text == "fine" and said == ["flash is busy, trying again in 30s"], said
-assert llm.waiting == "", "cleared once it is past"
+@pytest.mark.parametrize(
+    ("line", "routed"),
+    [
+        ("MAYA: Tell me about yourself.", ("MAYA", "Tell me about yourself.")),
+        ("  DEREK:   Why Redis?", ("DEREK", "Why Redis?")),
+        ("BOB: hello", (None, "hello")),  # unknown name, prefix still stripped
+        ("Tell me about yourself.", (None, "Tell me about yourself.")),
+    ],
+)
+def test_a_panel_line_goes_to_its_speakers_voice(line, routed):
+    assert split_speaker(line, PANEL) == routed
 
-# no API key yet: the pages that tell you to add one must still load
-assert llm._client("https://model.test", "").api_key
 
-# ---- which modes a beginner sees: talk alone, then all, the interviews last ----
-found = discover()
-assert [n for n, m in found.items() if state(m, 0) != "hidden"] == ["talk"]
-assert {n for n, m in found.items() if state(m, 1) == "locked"} == {"panel", "review"}
-assert all(state(m, 2) == "open" for m in found.values())
-
-print("ok")
+def test_a_colon_mid_sentence_is_not_a_speaker():
+    assert split_speaker("So the trade-off is: latency versus cost.", PANEL)[0] is None

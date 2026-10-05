@@ -199,7 +199,7 @@ form builds itself. See [CONTRIBUTING.md](CONTRIBUTING.md) and [DESIGN.md](DESIG
 
 ```bash
 make install            # exactly what uv.lock pins, ruff included
-make check              # ruff, formatter, 300-line budget, tests - what CI runs
+make check              # ruff, formatter, 300-line budget, tests with coverage - what CI runs
 make e2e                # the real server over a real socket (needs `make models`)
 ```
 

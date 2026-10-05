@@ -32,11 +32,11 @@ models:  ## Download the Kokoro voice weights (~340MB) and the report font, once
 run: models  ## Run the app natively (fastest on a Mac)
 	$(PY) main.py
 
-check:  ## ruff, formatter, line budget and tests
+check:  ## ruff, formatter, line budget, tests with coverage: what CI runs
 	./scripts/check.sh
 
 e2e: models  ## Real server, real socket, a spoken answer (loads Whisper, ~30s)
-	$(PY) tests/test_wire.py
+	$(PY) -m pytest -m e2e
 
 fmt:  ## Reformat and autofix what ruff can
 	$(PY) -m ruff check . --fix && $(PY) -m ruff format .

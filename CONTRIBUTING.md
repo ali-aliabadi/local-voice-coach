@@ -25,7 +25,7 @@ else has a home.
 main.py              the only root module - argument parsing and startup
 src/coach/           the package
 src/coach/modes/     one file per mode, discovered automatically
-tests/               plain asserts, no framework
+tests/               pytest, one file per area; conftest.py holds the fixtures
 scripts/             checks and tooling
 web/                 the browser app: plain ES modules, no build step
 ```
@@ -104,19 +104,27 @@ practice view uses it to close its socket and release the microphone.
 
 ## Tests
 
-Plain `assert`s, one file per area, each runnable on its own with `python tests/<file>`:
-`test_coach.py` (scoring, settings, store, the guard), `test_history.py` (reading it all
-back, the coach's notes), `test_modes.py` (chunking speech, the arithmetic behind the
-drills), `test_reports.py` (Telegram, with Relay faked) and `test_web.mjs` (the charts,
-under plain `node`). `make check` runs them all, as CI does. No pytest, no fixtures, no
-mocks beyond reassigning a module attribute.
+pytest, one file per area: `test_stt.py` (scoring an answer), `test_llm.py` (talking to
+models), `test_store.py` (settings, sessions, recordings), `test_server.py` (the guard,
+backends, which modes are open), `test_profile.py`, `test_history.py`, `test_modes.py`,
+`test_reports.py` (Telegram, with Relay faked) and `test_sheet.py`. `test_web.mjs` covers
+the charts under plain `node`. `make check` runs them all with coverage, as CI does, and
+fails below the floor in `pyproject.toml` - raise it as tests are added, never lower it.
+
+- Every test gets its own empty database and none of your environment (`conftest.py`): a
+  key in `.env` once hid a crash that only happened without one.
+- Fixtures over setup code: `counted` makes a session that counts, `telegram` fakes Relay,
+  `lessons` gives a session the coach's summary.
+- Never call a real model or a real Relay. Fake the one function that reaches it with
+  `monkeypatch`.
+- Tables of cases are `pytest.mark.parametrize`, and a test's name says what it proves.
+- Warnings are errors: a leaked socket or a deprecation fails the run.
+- Every bug fix comes with a test that fails before the fix.
 
 `make e2e` runs `tests/test_wire.py`: the real server over a real WebSocket, a spoken
-answer synthesised by Kokoro, and a fake model. It needs the Kokoro weights, so it is not
-part of `make check` - run it before you push anything that touches the session.
-
-Non-trivial logic gets one test — a branch, a parser, a money or timing path. Trivial
-one-liners do not; YAGNI applies to tests too.
+answer synthesised by Kokoro, and a fake model. It needs the Kokoro weights, so plain
+`pytest` skips it (`-m "not e2e"`) - run it before you push anything that touches the
+session.
 
 ## Charts
 

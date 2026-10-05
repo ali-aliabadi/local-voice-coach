@@ -39,7 +39,7 @@ make install                         # uv sync: exactly what uv.lock pins, ruff 
 make models                          # Kokoro weights into models/ (~340MB, once)
 make run                             # native, serves http://127.0.0.1:8000
 make up / down / logs                # the same thing in Docker
-make check                           # ruff + format + line budget + tests (what CI runs)
+make check                           # ruff + format + line budget + pytest with coverage (CI)
 make e2e                             # real server, real socket, a spoken answer
 ```
 
@@ -296,7 +296,9 @@ budget, exactly like `gemini-3.8-flash` did at 120. The `review_max_tokens` sett
 ## Conventions
 
 - Constants, not config objects. A frozen dataclass instantiated once was removed as ceremony.
-- Non-trivial logic gets one assert in `tests/test_coach.py`. No frameworks, no fixtures.
+- Tests are pytest, one file per area, each with its own empty database and none of
+  the environment (`tests/conftest.py`). Bug fixes come with a test that fails without
+  them. Coverage has a floor in `pyproject.toml`; raise it, never lower it.
 - `ponytail:` comments mark deliberate shortcuts and name the upgrade path.
 
 ## Rejected alternatives (don't re-propose without new information)
