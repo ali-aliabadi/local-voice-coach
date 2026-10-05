@@ -29,7 +29,11 @@ class Endpoint(NamedTuple):
 
 
 def _client(base_url: str, api_key: str) -> AsyncOpenAI:
-    return AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=config.REQUEST_TIMEOUT)
+    # The SDK refuses to build a client without a key, which turned "no key set yet" into
+    # a crash on every page that so much as asks which model the coach uses. Without one,
+    # the request fails instead, and `explain` tells the user to add a key in Settings.
+    key = api_key or "no-key-set"
+    return AsyncOpenAI(base_url=base_url, api_key=key, timeout=config.REQUEST_TIMEOUT)
 
 
 OPENING_NUDGE = "Begin."

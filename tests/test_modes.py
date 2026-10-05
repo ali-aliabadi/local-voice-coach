@@ -130,6 +130,9 @@ finally:
 assert reply.text == "fine" and said == ["flash is busy, trying again in 30s"], said
 assert llm.waiting == "", "cleared once it is past"
 
+# no API key yet: the pages that tell you to add one must still load
+assert llm._client("https://model.test", "").api_key
+
 # ---- which modes a beginner sees: talk alone, then all, the interviews last ----
 found = discover()
 assert [n for n, m in found.items() if state(m, 0) != "hidden"] == ["talk"]
