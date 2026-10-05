@@ -27,7 +27,8 @@ def test_the_phone_charts_use_the_apps_scales(key):
     found = re.search(pattern, CHART_JS)
     assert found, f"{key} missing from chart.js"
     parse = lambda text: tuple(float(v) for v in text.split(","))  # noqa: E731
-    assert parse(found.group(1)) == domain and parse(found.group(2)) == goal
+    assert parse(found.group(1)) == domain
+    assert parse(found.group(2)) == goal
 
 
 def test_a_change_is_worth_mentioning_at_the_same_size_as_in_the_app():
@@ -45,8 +46,11 @@ def test_today_counts_the_session(counted, lessons):
     lessons(session)
     summary = lessons(session)
     now = today_.summary(TODAY)
-    assert today_.streak(TODAY) == 1 and now["sessions"] == 1 and now["last"]["id"] == session
-    assert now["work_on"] == summary["work_on"] and now["phrases"] == summary["phrases"]
+    assert today_.streak(TODAY) == 1
+    assert now["sessions"] == 1
+    assert now["last"]["id"] == session
+    assert now["work_on"] == summary["work_on"]
+    assert now["phrases"] == summary["phrases"]
 
 
 def test_the_session_report(telegram, counted, lessons):
@@ -55,9 +59,12 @@ def test_the_session_report(telegram, counted, lessons):
     report(session)
     [message] = telegram.sent
     kinds = [b["type"] for b in message["blocks"]]
-    assert message["title"].startswith("Session done") and "of a 30 min goal" in message["title"]
-    assert message["source"] == "coach" and message["to"] == ["admin"]
-    assert kinds[:2] == ["text", "image"] and "fields" not in kinds, "the chart says the numbers"
+    assert message["title"].startswith("Session done")
+    assert "of a 30 min goal" in message["title"]
+    assert message["source"] == "coach"
+    assert message["to"] == ["admin"]
+    assert kinds[:2] == ["text", "image"]
+    assert "fields" not in kinds, "the chart says the numbers"
     assert "trend" in message["blocks"][1]["caption"]
     assert message["blocks"][0]["text"].startswith("talk · 2 answers")
     assert "Since last time" not in message["blocks"][0]["text"], "nothing to compare with yet"
@@ -101,7 +108,8 @@ def test_last_weeks_report_once_the_week_is_over(telegram, counted):
     [weekly] = telegram.sent
     table = weekly["blocks"][0]
     assert weekly["title"].startswith("Last week: 1 day,")
-    assert table["type"] == "table" and len(table["rows"]) == 7
+    assert table["type"] == "table"
+    assert len(table["rows"]) == 7
     assert table["rows"][TODAY.weekday()][1] != "-", "today, in its own row"
     asyncio.run(reports.weekly(TODAY + dt.timedelta(days=8)))
     assert len(telegram.sent) == 1, "once a week"

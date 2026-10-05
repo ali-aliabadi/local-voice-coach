@@ -3,6 +3,7 @@
 import datetime as dt
 import pathlib
 
+from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route
 
@@ -40,7 +41,7 @@ def partner(mode: str) -> str:
     return getattr(MODES.get(mode), "PARTNER", "interviewer")
 
 
-async def get_modes(_request):
+async def get_modes(_request: Request) -> Response:
     done = history.count()
     return JSONResponse(
         [
@@ -58,7 +59,7 @@ async def get_modes(_request):
     )
 
 
-async def get_backends(request):
+async def get_backends(request: Request) -> Response:
     rows, available = backends.survey(request.query_params.get("role", "fast"))
     measured = store.measured_latency()
     return JSONResponse(
@@ -77,16 +78,16 @@ async def get_backends(request):
     )
 
 
-async def get_profile(_request):
+async def get_profile(_request: Request) -> Response:
     return JSONResponse({"fields": profile.as_form(), "isSet": profile.is_set()})
 
 
-async def save_profile(request):
+async def save_profile(request: Request) -> Response:
     profile.save(await request.json())
     return JSONResponse({"ok": True})
 
 
-async def get_settings(_request):
+async def get_settings(_request: Request) -> Response:
     choices = {
         "tts_voice": models.voice_names(),
         "coach_backend": ("off", *backends.BY_KEY),
@@ -95,7 +96,7 @@ async def get_settings(_request):
     return JSONResponse(settings.as_form(choices) + prompt_fields())
 
 
-async def save_settings(request):
+async def save_settings(request: Request) -> Response:
     defaults = {f["key"]: f["default"] for f in prompt_fields()}
     for key, value in (await request.json()).items():
         if key.startswith("prompt:"):
@@ -110,12 +111,12 @@ async def save_settings(request):
     return JSONResponse({"ok": True})
 
 
-async def get_sessions(request):
+async def get_sessions(request: Request) -> Response:
     before = request.query_params.get("before")
     return JSONResponse(history.sessions(before=int(before) if before else None))
 
 
-async def get_session(request):
+async def get_session(request: Request) -> Response:
     found = history.detail(int(request.path_params["session"]))
     if found is None:
         return JSONResponse({"error": "no such session"}, status_code=404)
@@ -136,13 +137,13 @@ async def get_session(request):
     )
 
 
-async def write_sheet(request):
+async def write_sheet(request: Request) -> Response:
     """(Re)write a session's study sheet in the background."""
     sheet.later(int(request.path_params["session"]))
     return JSONResponse({"ok": True})
 
 
-async def get_sheet(request):
+async def get_sheet(request: Request) -> Response:
     """The study sheet as a PDF, drawn fresh from what the model wrote."""
     session_id = int(request.path_params["session"])
     doc = sheet.render(session_id)
@@ -156,13 +157,13 @@ async def get_sheet(request):
     )
 
 
-async def coach_session(request):
+async def coach_session(request: Request) -> Response:
     """Notes for answers that have none, then the summary. Old sessions get a report too."""
     coach.catch_up(int(request.path_params["session"]))
     return JSONResponse({"ok": True})
 
 
-async def get_progress(_request):
+async def get_progress(_request: Request) -> Response:
     day = lambda back: (dt.date.today() - dt.timedelta(days=back)).isoformat()  # noqa: E731
     return JSONResponse(
         {
@@ -177,18 +178,18 @@ async def get_progress(_request):
     )
 
 
-async def get_today(_request):
+async def get_today(_request: Request) -> Response:
     return JSONResponse(today.summary(dt.date.today()))
 
 
-async def get_audio(request):
+async def get_audio(request: Request) -> Response:
     path = store.audio_path(int(request.path_params["turn"]))
     if not path or not pathlib.Path(path).exists():
         return JSONResponse({"error": "recording expired or deleted"}, status_code=404)
     return FileResponse(path, media_type="audio/wav")
 
 
-async def forget(_request):
+async def forget(_request: Request) -> Response:
     store.forget_everything()
     return JSONResponse({"ok": True})
 

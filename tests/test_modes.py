@@ -63,7 +63,8 @@ def test_nothing_is_spoken_before_a_boundary():
 
 def test_a_run_on_breaks_between_words_never_inside_one():
     run_on = stream([w + " " for w in ["word"] * 90])
-    assert len(run_on) > 1 and all(" " in c for c in run_on[:-1])
+    assert len(run_on) > 1
+    assert all(" " in c for c in run_on[:-1])
     assert not any(c.endswith("wor") or c.startswith("rd") for c in run_on)
 
 
@@ -92,7 +93,8 @@ def test_the_first_words_may_end_at_a_clause(buffer, eager, split):
 )
 def test_shadow_matches_words_in_order(said, heard, score, missed):
     got, gone = shadow.match(said, heard)
-    assert round(got, 2) == score and gone == missed
+    assert round(got, 2) == score
+    assert gone == missed
 
 
 def test_repeat_says_what_moved_from_the_first_telling_to_the_last():
@@ -104,7 +106,8 @@ def test_repeat_says_what_moved_from_the_first_telling_to_the_last():
         "From the first telling to the last: 18 wpm faster, 2.0 fewer pauses a minute."
     )
     assert repeat.change(first, first).startswith("About the same")
-    assert len(repeat.table([first, last])) == 5 and repeat.table([first])[1][1] == "100"
+    assert len(repeat.table([first, last])) == 5
+    assert repeat.table([first])[1][1] == "100"
 
 
 @pytest.mark.parametrize(

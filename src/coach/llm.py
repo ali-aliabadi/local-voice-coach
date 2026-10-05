@@ -1,16 +1,24 @@
 """The model on the other side: Gemini, or a local model through LM Studio, both spoken
 to through the OpenAI-compatible endpoint."""
 
+from __future__ import annotations
+
 import asyncio
+import contextlib
 import re
 import time
-from typing import NamedTuple
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 import openai
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, AsyncStream
+from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
 
 from . import config, settings
 from .chunks import split_for_speech
+
+if TYPE_CHECKING:
+    from .backends import Backend
 
 
 class Reply(NamedTuple):
@@ -55,7 +63,7 @@ async def close() -> None:
 OPENING_NUDGE = "Begin."
 
 
-def conversation(messages: list[dict]) -> list[dict]:
+def conversation(messages: list[dict]) -> list[ChatCompletionMessageParam]:
     """Make a message list every backend will accept.
 
     Gemini tolerates any ordering. Local models served through LM Studio render a jinja
@@ -80,10 +88,10 @@ def conversation(messages: list[dict]) -> list[dict]:
             merged[-1]["content"] += "\n\n" + message["content"]
         else:
             merged.append(message)
-    return system + merged
+    return cast(list[ChatCompletionMessageParam], system + merged)
 
 
-def endpoint_for(backend, model_override: str | None = None) -> Endpoint:
+def endpoint_for(backend: Backend, model_override: str | None = None) -> Endpoint:
     """Build the endpoint for a chosen backend. The only way endpoints are made.
 
     Credentials resolve here rather than in the catalogue, so editing the API key in the
@@ -102,15 +110,21 @@ def endpoint_for(backend, model_override: str | None = None) -> Endpoint:
 RETRYABLE = (TimeoutError, openai.APIConnectionError, openai.InternalServerError)
 
 
-async def _first_words(ep: Endpoint, messages, max_tokens):
+async def _first_words(
+    ep: Endpoint, messages: list[dict], max_tokens: int | None
+) -> tuple[AsyncStream[ChatCompletionChunk], str]:
     """Open a stream and wait for its first real token. Returns (stream, token)."""
-    stream = await ep.client.chat.completions.create(
-        model=ep.model,
-        messages=conversation(messages),
-        temperature=settings.get("temperature"),
-        max_tokens=max_tokens or settings.get("reply_max_tokens"),
-        stream=True,
-        **ep.extra,
+    # **ep.extra hides the stream=True overload from the type checker; it is a stream
+    stream = cast(
+        AsyncStream[ChatCompletionChunk],
+        await ep.client.chat.completions.create(
+            model=ep.model,
+            messages=conversation(messages),
+            temperature=settings.get("temperature"),
+            max_tokens=max_tokens or settings.get("reply_max_tokens"),
+            stream=True,
+            **ep.extra,
+        ),
     )
     try:
         while True:
@@ -125,7 +139,12 @@ async def _first_words(ep: Endpoint, messages, max_tokens):
         raise
 
 
-async def stream_sentences(ep: Endpoint, messages, max_tokens=None, deadline=None):
+async def stream_sentences(
+    ep: Endpoint,
+    messages: list[dict],
+    max_tokens: int | None = None,
+    deadline: float | None = None,
+) -> AsyncIterator[tuple[str, Any]]:
     """Yield complete sentences as they arrive, so speech starts before generation ends.
 
     Yields ("sentence", str) for each chunk, then ("done", Reply) once.
@@ -163,7 +182,7 @@ async def stream_sentences(ep: Endpoint, messages, max_tokens=None, deadline=Non
     yield "done", Reply(full.strip(), first_ms)
 
 
-async def complete(ep: Endpoint, messages, max_tokens=None) -> Reply:
+async def complete(ep: Endpoint, messages: list[dict], max_tokens: int | None = None) -> Reply:
     """One-shot, no streaming. For written output nobody is waiting to hear."""
     started = time.perf_counter()
     reply = await ep.client.chat.completions.create(
@@ -204,11 +223,11 @@ def retry_after(message: str) -> float | None:
 waiting = ""  # what the background queue is sitting out right now, for the page to say
 
 
-async def patiently(ep: Endpoint, messages, max_tokens=None) -> Reply:
+async def patiently(ep: Endpoint, messages: list[dict], max_tokens: int | None = None) -> Reply:
     """`complete`, one at a time, waiting out per-minute rate limits and an overloaded
     model ("high demand" is a 503, and passes); a daily quota that is used up fails at
     once, saying so."""
-    global waiting
+    global waiting  # noqa: PLW0603 - one queue per process, and this is what it waits on
     async with _one_at_a_time:
         for _ in range(6):
             try:
@@ -238,12 +257,10 @@ async def explain(ep: Endpoint, exc: Exception) -> str:
         )
     message = str(exc)
     if "404" in message or "not found" in message.lower():
-        try:
+        with contextlib.suppress(Exception):  # no list to offer: say what the server said
             names = [m.id for m in (await ep.client.models.list()).data]
             usable = [n for n in names if "flash" in n or "pro" in n]
             return f"'{ep.model}' is not a valid model. Try: {', '.join(usable[:6])}"
-        except Exception:
-            pass
     if "api key" in message.lower() or "401" in message or "403" in message:
         return "That API key was rejected. Check it in Settings."
     return f"{ep.model}: {_said(exc)}"

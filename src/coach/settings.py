@@ -220,7 +220,7 @@ def _store(key: str, value: str | None) -> None:
     store.db().commit()
 
 
-def set(key: str, value: Any) -> None:  # noqa: A001 - reads better than set_value here
+def set(key: str, value: Any) -> None:
     """Only differences from the default are stored. The form posts every field, and
     storing them all froze each default at whatever it was on the day you hit Save, so a
     better default never reached you. Raises ValueError for a value of the wrong type."""

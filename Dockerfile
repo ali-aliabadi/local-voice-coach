@@ -2,7 +2,8 @@
 # devices. This image only ever sees numpy arrays and WAV bytes.
 FROM python:3.12-slim
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Pinned, so a rebuild next month installs the same way; bump it deliberately.
+COPY --from=ghcr.io/astral-sh/uv:0.12.23 /uv /usr/local/bin/uv
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -10,16 +11,21 @@ ENV PYTHONUNBUFFERED=1 \
     HF_HOME=/cache/huggingface \
     KOKORO_MODEL=/models/kokoro-v1.0.onnx \
     KOKORO_VOICES=/models/voices-v1.0.bin \
-    REPORT_FONT=/models/Inter.ttf
+    REPORT_FONT=/models/Inter.ttf \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    PATH=/opt/venv/bin:$PATH
 
 WORKDIR /app
 
-# Dependencies first, against a stub package, so editing source does not reinstall
-# everything. The real source lands in the next layer and replaces the stub.
-COPY pyproject.toml README.md ./
+# Exactly what uv.lock pins - the versions CI tested - and no dev tools. Dependencies
+# first, against a stub package, so editing source does not reinstall everything; the
+# real source lands in the next layer and replaces the stub.
+COPY pyproject.toml uv.lock README.md ./
 RUN mkdir -p src/coach/modes \
     && touch src/coach/__init__.py src/coach/modes/__init__.py \
-    && uv pip install --system --no-cache -e .
+    && uv sync --frozen --no-dev --no-cache
 
 COPY main.py ./
 COPY src/ ./src/

@@ -53,7 +53,7 @@ W, H = 1200, 760  # drawn at twice the size it is read at, so it stays sharp on 
 PANEL_W, PANEL_H, GAP = 570, 345, 20
 
 
-def _font(size: int):
+def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     return ImageFont.load_default(size=size)
 
 
@@ -61,7 +61,9 @@ def _shown(key: str, value: float) -> str:
     return f"{value:.0f}" if key == "wpm" else f"{value:.1f}"
 
 
-def _dashed(draw, start: tuple, end: tuple, dash: int = 16, gap: int = 10) -> None:
+def _dashed(
+    draw: ImageDraw.ImageDraw, start: tuple, end: tuple, dash: int = 16, gap: int = 10
+) -> None:
     (x0, y0), (x1, y1) = start, end
     length = math.hypot(x1 - x0, y1 - y0) or 1
     for at in range(0, int(length), dash + gap):
@@ -70,7 +72,16 @@ def _dashed(draw, start: tuple, end: tuple, dash: int = 16, gap: int = 10) -> No
         draw.line(segment, fill=TREND_COLOUR, width=4)
 
 
-def _panel(draw, x0: int, y0: int, key: str, values: list[float], labels, headline):
+def _panel(
+    draw: ImageDraw.ImageDraw,
+    x0: int,
+    y0: int,
+    key: str,
+    values: list[float],
+    *,
+    labels: list[str],
+    headline: float | None,
+) -> None:
     label, (lo, hi), (glo, ghi) = SERIES[key]
     draw.rounded_rectangle((x0, y0, x0 + PANEL_W, y0 + PANEL_H), 18, fill=SURFACE)
     # The headline is the average over the whole period, never the last point: one good
@@ -115,7 +126,7 @@ def panels(rows: list[dict], labels: list[str], headline: dict) -> bytes:
         x0 = GAP + (i % 2) * (PANEL_W + GAP)
         y0 = GAP + (i // 2) * (PANEL_H + GAP)
         values = [float(r[key]) for r in rows if r.get(key) is not None]
-        _panel(draw, x0, y0, key, values, labels, headline.get(key))
+        _panel(draw, x0, y0, key, values, labels=labels, headline=headline.get(key))
     out = io.BytesIO()
     image.save(out, "PNG", optimize=True)
     return out.getvalue()

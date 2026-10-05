@@ -30,14 +30,19 @@ def full(backdate):
 
 
 def test_nothing_yet():
-    assert history.sessions() == [] and history.detail(1) is None
-    assert history.recent() == {} and history.totals()["answers"] == 0
+    assert history.sessions() == []
+    assert history.detail(1) is None
+    assert history.recent() == {}
+    assert history.totals()["answers"] == 0
 
 
 def test_a_session_in_full(full):
     rows = history.sessions()
-    assert len(rows) == 1 and rows[0]["answers"] == 2 and rows[0]["wpm"] == 110
+    assert len(rows) == 1
+    assert rows[0]["answers"] == 2
+    assert rows[0]["wpm"] == 110
     detail = history.detail(full)
+    assert detail is not None
     assert [t["role"] for t in detail["turns"]] == ["interviewer", "you", "you", "interviewer"]
     spoken = detail["turns"][1]
     # the per-word data survives, so an old session still shows its highlighted fillers
@@ -46,14 +51,16 @@ def test_a_session_in_full(full):
     assert detail["averages"]["lead_in"] == 2.2
     assert detail["averages"]["fillers"] == 15.0  # 6 fillers in 40 words
     assert spoken["fillers"] == 15.0  # each answer is shown as a rate as well
-    assert detail["goal_minutes"] is None and round(detail["minutes"]) == 5
+    assert detail["goal_minutes"] is None
+    assert round(detail["minutes"]) == 5
     assert round(detail["averages"]["spoken"], 3) == round(40 / 110, 3)
     assert [a["fillers"] for a in history.answers(full)] == [15.0, 15.0]
 
 
 def test_the_clock_and_the_goal():
     session = store.start("talk", "flash-lite", "m", goal=30)
-    assert store.goal(session) == 30 and 0 <= store.elapsed(session) < 60
+    assert store.goal(session) == 30
+    assert 0 <= store.elapsed(session) < 60
     assert store.goal(store.start("talk", "flash-lite", "m")) is None
 
 
@@ -85,7 +92,9 @@ def test_totals_are_weighted_by_words_across_sessions(counted):
     newest = history.sessions()[0]["id"]
     assert [s["mode"] for s in history.sessions(before=newest)] == ["talk"]  # the next page
     totals = history.totals()
-    assert totals["sessions"] == 2 and totals["answers"] == 4 and totals["words"] == 100
+    assert totals["sessions"] == 2
+    assert totals["answers"] == 4
+    assert totals["words"] == 100
     # 100 words over 40/110 + 60/130 minutes, not the plain mean of 120
     assert round(totals["wpm"], 1) == 121.2
     assert totals["fillers"] == 8.0  # 8 fillers in 100 words, however they split
@@ -100,16 +109,21 @@ def test_totals_are_weighted_by_words_across_sessions(counted):
 def test_rates_not_counts(words, fillers, pauses):
     """The same fillers in a longer answer is better, not equal."""
     rated = history.rates({"words": words, "wpm": 120, "fillers": 2, "pauses": 1})
-    assert rated["fillers"] == fillers and rated["pauses"] == pauses
+    assert rated["fillers"] == fillers
+    assert rated["pauses"] == pauses
 
 
 def test_the_coachs_fixes_are_counted_by_kind(full):
     kinds = {"fixes": [{"kind": "articles"}, {"kind": "articles"}, {"kind": "tense"}]}
-    answer = history.detail(full)["turns"][1]["id"]
+    detail = history.detail(full)
+    assert detail is not None
+    answer = detail["turns"][1]["id"]
     store.db().execute("UPDATE turns SET notes = ? WHERE id = ?", (json.dumps(kinds), answer))
     store.db().commit()
     assert history.mistakes() == [("articles", 2), ("tense", 1)]
-    assert history.detail(full)["turns"][1]["notes"]["fixes"][1]["kind"] == "articles"
+    noted = history.detail(full)
+    assert noted is not None
+    assert noted["turns"][1]["notes"]["fixes"][1]["kind"] == "articles"
 
 
 @pytest.mark.parametrize(

@@ -4,18 +4,25 @@ Not a mode itself - the leading underscore keeps it out of discovery. A mode tha
 conversation supplies its system prompt and its opener and calls `converse`.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from .. import config, settings
 
+if TYPE_CHECKING:
+    from ..llm import Endpoint
+    from ..server.session import Answer, BrowserIO, Retry
+
 
 async def converse(
-    endpoint,
-    io,
+    endpoint: Endpoint,
+    io: BrowserIO,
     system: Callable[[], str],
     opener: str,
     getting_ready: str = "Getting ready",
-    **reply,
+    **reply: Any,
 ) -> None:
     """Run the conversation until the user leaves.
 
@@ -28,13 +35,13 @@ async def converse(
     # Seeded from the database, so a browser refresh resumes instead of starting over.
     history: list[dict] = io.prior_turns()
     # Owed a reply: a fresh session (the partner opens), or one that died mid-turn.
-    said = io.RETRY if not history or history[-1]["role"] == "user" else None
+    said: Answer | Retry | None = io.RETRY if not history or history[-1]["role"] == "user" else None
     if said is None:
         await io.send(type="turn_done")  # resumed on the user's turn: open the mic
 
     while True:
         if said is not None:
-            if said is not io.RETRY:
+            if said != io.RETRY:
                 history.append({"role": "user", "content": said.text})
             turns = history[-settings.get("history_turns") * 2 :]
             # A real conversation opens with a greeting, not with silence.

@@ -1,20 +1,18 @@
 """Every tunable in the project. Contributors: start here."""
 
+import contextlib
 import os
 import pathlib
 
 
 def load_env(path: str = ".env") -> None:
     """Minimal .env reader. Real env vars win, so `GEMINI_API_KEY=... python main.py` overrides."""
-    try:
-        with open(path, encoding="utf-8") as handle:
-            for line in handle:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, value = line.split("=", 1)
-                    os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
-    except FileNotFoundError:
-        pass
+    with contextlib.suppress(FileNotFoundError):
+        for raw in pathlib.Path(path).read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
 
 
 load_env()

@@ -31,9 +31,10 @@ prompt, and you have a new mode. Files starting with "_" are helpers, not modes.
 
 import importlib
 import pkgutil
+from types import ModuleType
 
 
-def discover() -> dict:
+def discover() -> dict[str, ModuleType]:
     """Import every mode module in this package, keyed by filename."""
     return {
         info.name: importlib.import_module(f"{__name__}.{info.name}")
@@ -42,11 +43,11 @@ def discover() -> dict:
     }
 
 
-def unlock(module) -> int:
+def unlock(module: ModuleType) -> int:
     return getattr(module, "UNLOCK", 1)
 
 
-def state(module, done: int) -> str:
+def state(module: ModuleType, done: int) -> str:
     """ "open", "locked" (shown, not yet usable) or "hidden", after `done` sessions."""
     if done >= unlock(module):
         return "open"

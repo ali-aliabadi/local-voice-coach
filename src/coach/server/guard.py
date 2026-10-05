@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 from starlette.middleware import Middleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 # ALLOWED_HOSTS adds names for serving beyond localhost, e.g. a Tailscale https name.
 HOSTS = ["127.0.0.1", "localhost", "::1", "[::1]"] + [
@@ -34,10 +35,10 @@ class SameOrigin:
     """Reject state-changing requests from other sites, and stop the browser serving a
     stale copy of the app after an update (no-cache revalidates; it is free on localhost)."""
 
-    def __init__(self, app) -> None:
+    def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
-    async def __call__(self, scope, receive, send) -> None:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] not in ("http", "websocket"):
             return await self.app(scope, receive, send)
         origin = dict(scope["headers"]).get(b"origin", b"").decode()
@@ -54,7 +55,7 @@ class SameOrigin:
             )
             return await send({"type": "http.response.body", "body": b"Cross-site request"})
 
-        async def no_cache(message) -> None:
+        async def no_cache(message: Message) -> None:
             if message["type"] == "http.response.start":
                 message["headers"] = [*message.get("headers", []), (b"cache-control", b"no-cache")]
             await send(message)

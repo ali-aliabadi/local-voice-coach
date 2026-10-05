@@ -4,11 +4,14 @@ import asyncio
 import contextlib
 import pathlib
 import signal
+from collections.abc import AsyncIterator
 
 from starlette.applications import Starlette
+from starlette.requests import Request
 from starlette.responses import FileResponse
 from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
+from starlette.websockets import WebSocket
 
 from .. import backends, clock, coach, history, llm, reports, settings, sheet, store
 from . import models
@@ -19,12 +22,12 @@ from .session import BrowserIO, SessionClosed
 WEB = pathlib.Path(__file__).resolve().parents[3] / "web"
 
 
-async def page(_request):
+async def page(_request: Request) -> FileResponse:
     """Every non-API path serves the app; the browser routes from there."""
     return FileResponse(WEB / "index.html")
 
 
-async def websocket_session(websocket):
+async def websocket_session(websocket: WebSocket) -> None:
     """One connection, one session, one mode loop."""
     await websocket.accept()
     session = None
@@ -91,7 +94,7 @@ async def finish_up() -> None:
 
 
 @contextlib.asynccontextmanager
-async def lifespan(_app):
+async def lifespan(_app: Starlette) -> AsyncIterator[None]:
     """Load the models once, before the first request, and start the clock."""
     models.load()
     ticking = asyncio.create_task(clock.run())  # expiring recordings now runs from here

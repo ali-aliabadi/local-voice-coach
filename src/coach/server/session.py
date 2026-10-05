@@ -6,16 +6,17 @@ and owns the two steps every mode repeats: hearing an answer and speaking a repl
 
 import json
 import time
-from typing import NamedTuple
+from typing import Any, Final, Literal, NamedTuple
 
 import numpy as np
+from starlette.websockets import WebSocket
 
 from .. import chunks, coach, config, history, llm, settings, store, stt, tts
 
 RECORDINGS = config.RECORDINGS
 
 
-class SessionClosed(Exception):
+class SessionClosed(Exception):  # noqa: N818 - control flow, not an error
     """The user finished, or the socket went away. Unwinds whatever mode is running."""
 
 
@@ -25,7 +26,8 @@ class Answer(NamedTuple):
 
 
 # What `answer()` returns when the user asked for the last reply again instead of speaking.
-RETRY = "retry"
+RETRY: Final = "retry"
+Retry = Literal["retry"]
 # Accents a session can be given, so the ear is not trained on one voice. The better-rated
 # Kokoro voices: American and British, women and men.
 ACCENTS = (
@@ -41,9 +43,11 @@ class BrowserIO:
     never catch SessionClosed - the server does that around `mode.run`.
     """
 
-    RETRY = RETRY
+    RETRY: Final = RETRY
 
-    def __init__(self, websocket, voice: tts.Voice, transcriber: stt.Transcriber, session: int):
+    def __init__(
+        self, websocket: WebSocket, voice: tts.Voice, transcriber: stt.Transcriber, session: int
+    ) -> None:
         self.websocket = websocket
         self.voice = voice
         self.transcriber = transcriber
@@ -60,7 +64,7 @@ class BrowserIO:
         refresh resumes the conversation rather than restarting it."""
         return store.conversation(self.session, limit=settings.get("history_turns") * 2)
 
-    async def record(self) -> np.ndarray | str | None:
+    async def record(self) -> np.ndarray | Retry | None:
         """Gather raw PCM frames until the client says the answer is finished.
 
         The browser sends Float32 at 16kHz - exactly what Whisper wants - so there is no
@@ -73,19 +77,12 @@ class BrowserIO:
                 raise SessionClosed
             if message.get("bytes"):
                 chunks.append(np.frombuffer(message["bytes"], dtype=np.float32))
-            elif message.get("text"):
-                event = json.loads(message["text"])
-                if event.get("type") == "quit":
-                    raise SessionClosed
-                if event.get("type") == "retry" and not chunks:
-                    return RETRY
-                if event.get("type") == "slower":
-                    await self._slower()
-                if event.get("type") == "helped" and self.last_turn:
-                    store.helped(self.last_turn, [str(k) for k in event.get("kinds", [])][:3])
-                if event.get("type") == "end_answer":
-                    self.heard_at = time.perf_counter()
-                    break
+                continue
+            kind = await self._event(json.loads(message["text"])) if message.get("text") else None
+            if kind == "retry" and not chunks:
+                return RETRY
+            if kind == "end_answer":
+                break
         if not chunks:
             return None
         audio = np.concatenate(chunks)
@@ -93,7 +90,20 @@ class BrowserIO:
             return None
         return audio
 
-    async def answer(self) -> Answer | str | None:
+    async def _event(self, event: dict) -> str | None:
+        """Act on one thing the page said while an answer is being recorded; return its type."""
+        kind = event.get("type")
+        if kind == "quit":
+            raise SessionClosed
+        if kind == "slower":
+            await self._slower()
+        if kind == "helped" and self.last_turn:
+            store.helped(self.last_turn, [str(k) for k in event.get("kinds", [])][:3])
+        if kind == "end_answer":
+            self.heard_at = time.perf_counter()
+        return kind
+
+    async def answer(self) -> Answer | Retry | None:
         """Hear one answer: record it, transcribe it, score it, save it, show it.
 
         Returns the Answer, RETRY if the user asked to hear the last reply again, or None
@@ -115,7 +125,7 @@ class BrowserIO:
         await self.send(
             type="transcript",
             text=text,
-            metrics=history.rates(metrics),
+            metrics=history.rates(metrics) if metrics else None,
             words=words,
             turn=turn,
             session=history.so_far(self.session),
@@ -124,8 +134,9 @@ class BrowserIO:
 
     async def reply(
         self,
-        endpoint,
+        endpoint: llm.Endpoint,
         messages: list[dict],
+        *,
         role: str = "interviewer",
         cast: dict[str, str] | None = None,
         thinking: str | None = None,
@@ -151,10 +162,11 @@ class BrowserIO:
                     done = chunk
                     continue
                 if cast and name is None:
-                    name, chunk = chunks.split_speaker(chunk, cast)
-                    voice = cast.get(name)
-                    if not chunk:
+                    name, rest = chunks.split_speaker(chunk, cast)
+                    voice = cast.get(name) if name else None
+                    if not rest:
                         continue
+                    chunk = rest  # noqa: PLW2901 - the same sentence, its speaker taken off
                 first = first or time.perf_counter()
                 await self.send(type="sentence", text=chunk, speaker=name)
                 await self.say(chunk, voice)
@@ -212,13 +224,15 @@ class BrowserIO:
         await self.send(type="audio", bytes=len(wav))
         await self.websocket.send_bytes(wav)
 
-    async def send(self, **payload) -> None:
+    async def send(self, **payload: Any) -> None:
         await self.websocket.send_text(json.dumps(payload))
 
-    def save_turn(self, role: str, text: str, reply_ms: float | None = None) -> int | None:
+    def save_turn(self, role: str, text: str, reply_ms: float | None = None) -> int:
         return store.record(self.session, role, text, reply_ms=reply_ms)
 
-    def _save_answer(self, audio, text, metrics, stt_ms, words) -> int | None:
+    def _save_answer(
+        self, audio: np.ndarray, text: str, metrics: dict | None, stt_ms: float, words: list[dict]
+    ) -> int:
         """Persist the answer and its recording. Returns the turn id for playback."""
         folder = RECORDINGS / str(self.session)
         folder.mkdir(parents=True, exist_ok=True)

@@ -6,7 +6,8 @@
 make check
 ```
 
-Runs ruff, the formatter, the line budget and the tests. Green before you push.
+Runs ruff, the formatter, mypy, the line budget, hadolint and actionlint (when installed)
+and the tests with coverage. Green before you push.
 `make` on its own lists every target.
 
 ## Running it
@@ -50,7 +51,23 @@ commit; the cap is a prompt to think, not a law.
 ## Style
 
 `ruff` is the standard, configured in `pyproject.toml`. `ruff format` decides layout, so
-there is nothing to argue about. Two conventions it cannot check:
+there is nothing to argue about. Beyond style, it holds every function to a size:
+
+- **Complexity at most 10, branches at most 12, statements at most 50.** A function that
+  outgrows them is split along its sections (see `sheet.render`), not excused.
+- **At most five positional arguments.** Past that, a call stops saying what it passes:
+  make the rest keyword-only, after a `*`.
+- **Security checks (bandit) are on.** The few deliberate exceptions are project-wide in
+  `pyproject.toml` with their reason, or a `# noqa` on the line saying why.
+
+`mypy` type-checks everything. The app is fully annotated; tests need no annotations, but
+their bodies are checked, so an optional value is narrowed with `assert x is not None`
+before it is used.
+
+The Dockerfile is linted by hadolint and the workflows by actionlint. CI installs both at
+pinned versions; `brew install hadolint actionlint` runs them locally too.
+
+Two conventions no tool can check:
 
 - **Comments explain why, not what.** The code says what it does.
 - **Mark deliberate shortcuts** with a `ponytail:` comment naming the ceiling and the

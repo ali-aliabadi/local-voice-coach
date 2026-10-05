@@ -4,8 +4,16 @@ Closer to a real onsite: someone warm, someone digging into technical detail, an
 pushing back. Kokoro ships 54 voices, so a panel costs nothing extra to run.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from .. import profile
 from ._converse import converse
+
+if TYPE_CHECKING:
+    from ..llm import Endpoint
+    from ..server.session import BrowserIO
 
 HELP = "several interviewers, one voice each"
 ENDPOINT = "fast"
@@ -35,7 +43,7 @@ PROMPT = (
 OPENER = "Begin the interview. One panellist greets them briefly and asks the first question."
 
 
-async def run(endpoint, io) -> None:
+async def run(endpoint: Endpoint, io: BrowserIO) -> None:
     await io.send(
         type="panel", members=[{"name": name, "role": role} for name, (_, role) in PANEL.items()]
     )

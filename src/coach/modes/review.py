@@ -5,7 +5,15 @@ the depth a real interviewer would probe. The question is spoken; the critique i
 because nobody wants to listen to six paragraphs.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from .. import llm, profile, settings
+
+if TYPE_CHECKING:
+    from ..llm import Endpoint
+    from ..server.session import BrowserIO
 
 HELP = "one hard question, then a written critique"
 ENDPOINT = "deep"
@@ -35,7 +43,7 @@ CRITIQUE_PROMPT = (
 )
 
 
-async def run(endpoint, io) -> None:
+async def run(endpoint: Endpoint, io: BrowserIO) -> None:
     history: list[dict] = io.prior_turns()
     question = None
 
@@ -49,7 +57,7 @@ async def run(endpoint, io) -> None:
 
         # --- answer: a failed recording keeps the same question ---
         said = await io.answer()
-        if question is None or said is None or said is io.RETRY:
+        if question is None or said is None or said == io.RETRY:
             continue
 
         # --- critique ---

@@ -5,8 +5,16 @@ it out loud. The partner says what you got and, gently, one thing you missed - a
 understanding only, never grammar.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from .. import profile
 from ._converse import converse
+
+if TYPE_CHECKING:
+    from ..llm import Endpoint
+    from ..server.session import BrowserIO
 
 HELP = "it tells a short story, you retell it in your own words"
 ENDPOINT = "fast"
@@ -27,7 +35,7 @@ OPENER = "Greet them in one sentence, then tell the first story."
 STORY_TOKENS = 400  # a story and a reaction do not fit the conversational default
 
 
-async def run(endpoint, io) -> None:
+async def run(endpoint: Endpoint, io: BrowserIO) -> None:
     await converse(
         endpoint,
         io,

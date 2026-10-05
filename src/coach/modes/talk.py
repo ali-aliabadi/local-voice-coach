@@ -6,11 +6,18 @@ learner does most of the speaking. Uses the fast endpoint, because a conversatio
 lags stops feeling like one.
 """
 
+from __future__ import annotations
+
 import random
+from typing import TYPE_CHECKING
 
 from .. import profile
 from ._converse import converse
 from ._topics import TOPICS
+
+if TYPE_CHECKING:
+    from ..llm import Endpoint
+    from ..server.session import BrowserIO
 
 HELP = "everyday conversation to build speaking and listening, every answer scored"
 ENDPOINT = "fast"
@@ -46,7 +53,7 @@ PROMPT = (
 OPENER = "Start the conversation. Greet them casually, then bring up this topic naturally: {}."
 
 
-async def run(endpoint, io) -> None:
+async def run(endpoint: Endpoint, io: BrowserIO) -> None:
     await converse(
         endpoint,
         io,

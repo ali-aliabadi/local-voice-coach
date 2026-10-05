@@ -1,7 +1,8 @@
 """Talking to models: message shape, errors, rate limits and overload."""
 
 import asyncio
-import types
+import itertools
+from typing import ClassVar
 
 import httpx
 import openai
@@ -10,6 +11,7 @@ import pytest
 from coach import llm
 from coach.llm import conversation, retry_after
 
+FLASH = llm.Endpoint(llm._client("https://model.test", "key"), "flash", {})  # never called
 SYS = {"role": "system", "content": "sys"}
 ASSISTANT = {"role": "assistant", "content": "Tell me about yourself."}
 USER = {"role": "user", "content": "I built a payment service."}
@@ -17,7 +19,7 @@ USER = {"role": "user", "content": "I built a payment service."}
 
 def alternates(messages):
     body = [m["role"] for m in messages if m["role"] != "system"]
-    return body[0] == "user" and all(a != b for a, b in zip(body, body[1:], strict=False))
+    return body[0] == "user" and all(a != b for a, b in itertools.pairwise(body))
 
 
 @pytest.mark.parametrize(
@@ -35,7 +37,8 @@ def test_messages_alternate_for_local_chat_templates(messages):
 
 
 def test_the_partners_opening_is_kept_not_dropped():
-    assert any(ASSISTANT["content"] in m["content"] for m in conversation([SYS, ASSISTANT, USER]))
+    sent = conversation([SYS, ASSISTANT, USER])
+    assert any(ASSISTANT["content"] in str(m.get("content")) for m in sent)
 
 
 def test_one_system_message():
@@ -43,11 +46,11 @@ def test_one_system_message():
 
 
 def test_an_error_reads_as_the_servers_words_not_the_sdks_wrapper():
-    class Rejected(Exception):
-        body = [{"error": {"message": "No models loaded."}}]
+    class RejectedError(Exception):
+        body: ClassVar = [{"error": {"message": "No models loaded."}}]
 
-    said = asyncio.run(llm.explain(llm.Endpoint(None, "m", {}), Rejected("Error code: 400")))
-    assert said == "m: No models loaded."
+    said = asyncio.run(llm.explain(FLASH, RejectedError("Error code: 400")))
+    assert said == "flash: No models loaded."
 
 
 @pytest.mark.parametrize(
@@ -65,7 +68,7 @@ def test_retry_after(message, seconds):
 
 def test_an_overloaded_model_is_waited_out_and_said_so(monkeypatch):
     """A 503, "high demand", passes: wait it out. The study sheet was once lost to one."""
-    waits = []
+    waits: list[str] = []
 
     async def overloaded_once(_ep, _messages, _max_tokens=None):
         if not waits:
@@ -78,8 +81,9 @@ def test_an_overloaded_model_is_waited_out_and_said_so(monkeypatch):
 
     monkeypatch.setattr(llm, "complete", overloaded_once)
     monkeypatch.setattr(asyncio, "sleep", no_wait)
-    reply = asyncio.run(llm.patiently(types.SimpleNamespace(model="flash"), []))
-    assert reply.text == "fine" and waits == ["flash is busy, trying again in 30s"]
+    reply = asyncio.run(llm.patiently(FLASH, []))
+    assert reply.text == "fine"
+    assert waits == ["flash is busy, trying again in 30s"]
     assert llm.waiting == "", "cleared once it is past"
 
 
@@ -90,7 +94,7 @@ def test_a_daily_quota_is_reported_not_waited_for(monkeypatch):
 
     monkeypatch.setattr(llm, "complete", used_up)
     with pytest.raises(RuntimeError, match="used up its free requests"):
-        asyncio.run(llm.patiently(types.SimpleNamespace(model="flash"), []))
+        asyncio.run(llm.patiently(FLASH, []))
 
 
 def test_a_client_is_built_without_an_api_key():
@@ -104,4 +108,5 @@ def test_a_client_is_kept_per_server_and_key_and_closed_on_shutdown():
     assert llm._client("https://model.test", "key") is first
     assert llm._client("https://model.test", "other") is not first  # an edited key
     asyncio.run(llm.close())
-    assert first.is_closed() and llm._client("https://model.test", "key") is not first
+    assert first.is_closed()
+    assert llm._client("https://model.test", "key") is not first

@@ -11,6 +11,8 @@ notice, or what changes the meaning, is worth your attention.
 import asyncio
 import json
 import re
+from collections.abc import Coroutine
+from typing import Any
 
 from . import backends, history, llm, profile, settings, store
 
@@ -69,7 +71,7 @@ _pending: dict[int, list[asyncio.Task]] = {}
 failed: dict[int, str] = {}  # the last thing that went wrong per session, for the page to say
 
 
-def endpoint():
+def endpoint() -> llm.Endpoint | None:
     """The coach's model, or None when the coach is switched off."""
     backend = backends.BY_KEY.get(settings.get("coach_backend"))
     return llm.endpoint_for(backend) if backend else None
@@ -103,10 +105,10 @@ async def settled(session_id: int) -> None:
     await asyncio.gather(*earlier, return_exceptions=True)
 
 
-def later(session_id: int, work) -> None:
+def later(session_id: int, work: Coroutine[Any, Any, None]) -> None:
     """Run `work` in the background. The conversation never waits for the coach."""
 
-    async def safely():
+    async def safely() -> None:
         try:
             await work
         except Exception as exc:  # a failed note must never reach the session
@@ -116,7 +118,7 @@ def later(session_id: int, work) -> None:
     failed.pop(session_id, None)  # a new attempt clears the last failure
     task = asyncio.create_task(safely())
     _pending.setdefault(session_id, []).append(task)
-    task.add_done_callback(lambda t: _pending[session_id].remove(t))
+    task.add_done_callback(_pending[session_id].remove)
 
 
 def _system(prompt: str) -> str:
@@ -124,7 +126,7 @@ def _system(prompt: str) -> str:
     return prompt + (f"\n\nThe learner's first language is {first}." if first else "")
 
 
-async def _note(ep, turn_id: int, asked: str, said: str) -> None:
+async def _note(ep: llm.Endpoint, turn_id: int, asked: str, said: str) -> None:
     reply = await llm.patiently(
         ep,
         [
@@ -145,7 +147,7 @@ def note(session_id: int, turn_id: int, asked: str, said: str) -> None:
         later(session_id, _note(ep, turn_id, asked, said))
 
 
-async def _summarise(ep, session_id: int) -> None:
+async def _summarise(ep: llm.Endpoint, session_id: int) -> None:
     await settled(session_id)  # the notes go into the summary
     rows = (
         store.db()

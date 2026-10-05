@@ -12,7 +12,7 @@ Each one remembers what it already sent, so a restart never sends it twice.
 
 import datetime as dt
 
-from . import coach, history, picture, relay, settings, sheet, store
+from . import coach, history, layout, picture, relay, settings, sheet, store
 
 
 def _on(key: str) -> bool:
@@ -104,7 +104,7 @@ async def _session(session_id: int) -> None:
     relay.remember(f"session:{session_id}", str(d["answers"]))
 
 
-async def _send_sheet(doc, day: str, key: str) -> None:
+async def _send_sheet(doc: layout.Doc, day: str, key: str) -> None:
     """The study sheet as a PDF - a line saying what it is, then the file, as Relay's
     recipe has it. As its pages, one image each, on a Relay from before file blocks."""
     pdf = doc.pdf()
@@ -176,7 +176,7 @@ async def weekly(now: dt.date | None = None) -> None:
             if d in by_day
             else [d[5:], "-", "-", "-"]
             for d in days
-        ],  # fmt: skip
+        ],
     }
     this = _period(days[0], days[-1])
     last = _period(
