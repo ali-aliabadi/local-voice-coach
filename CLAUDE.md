@@ -39,7 +39,7 @@ make install                         # uv sync: exactly what uv.lock pins, ruff 
 make models                          # Kokoro weights into models/ (~340MB, once)
 make run                             # native, serves http://127.0.0.1:8000
 make up / down / logs                # the same thing in Docker
-make check                           # ruff, format, mypy, line budget, pytest + coverage (CI)
+make check                           # ruff, mypy, linters, gitleaks, pip-audit, pytest (CI)
 make e2e                             # real server, real socket, a spoken answer
 ```
 

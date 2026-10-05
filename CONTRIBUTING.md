@@ -6,8 +6,8 @@
 make check
 ```
 
-Runs ruff, the formatter, mypy, the line budget, hadolint and actionlint (when installed)
-and the tests with coverage. Green before you push.
+Runs ruff, the formatter, mypy, the line budget, hadolint, actionlint and gitleaks (when
+installed), pip-audit, and the tests with coverage. Green before you push.
 `make` on its own lists every target.
 
 ## Running it
@@ -66,6 +66,17 @@ before it is used.
 
 The Dockerfile is linted by hadolint and the workflows by actionlint. CI installs both at
 pinned versions; `brew install hadolint actionlint` runs them locally too.
+
+## Security
+
+- **No secrets in git, ever.** gitleaks scans the whole history in CI (`brew install
+  gitleaks` to run it locally). Keys live in `.env`, which is ignored.
+- **No known-vulnerable dependency.** pip-audit checks every version `uv.lock` pins, dev
+  tools included, on every `make check`. Dependabot opens weekly PRs for Python packages,
+  Actions and the Docker base image; CI must pass on them like any other change.
+- **The image installs exactly `uv.lock`.** Never `pip install` an unpinned version into
+  it.
+- Vulnerabilities are reported privately - see [SECURITY.md](SECURITY.md).
 
 Two conventions no tool can check:
 
