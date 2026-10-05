@@ -32,15 +32,16 @@ COPY src/ ./src/
 COPY web/ ./web/
 
 # Whisper and Kokoro are big; keep them on volumes rather than in the image.
-RUN useradd --create-home --uid 1000 app \
+RUN groupadd --gid 1000 app \
+    && useradd --create-home --uid 1000 --gid 1000 app \
     && mkdir -p /data /cache /models \
     && chown -R app:app /app /data /cache
-USER app
+USER 1000:1000
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/modes', timeout=4)"
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/modes', timeout=4)"]
 
 # 0.0.0.0 inside the container; compose only publishes it to 127.0.0.1 on the host.
 CMD ["python", "main.py", "--host", "0.0.0.0", "--port", "8000", "--no-open"]
