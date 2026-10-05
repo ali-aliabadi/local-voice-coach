@@ -1,42 +1,38 @@
-"""End to end over a real socket. Run: python tests/test_wire.py  (or `make e2e`)
+"""End to end over a real socket: `make e2e`.
 
 The real server, a real WebSocket client, a spoken answer synthesised by Kokoro, and a
 fake OpenAI-compatible model that records what it was sent. Starlette's TestClient fakes
 the socket in-process and once passed while the real app could not connect at all.
 
-Needs the Kokoro weights (`make models`) and loads Whisper, so it is not in check.sh.
+Needs the Kokoro weights (`make models`) and loads Whisper, so plain `pytest` skips it.
 """
 
 import asyncio
+import contextlib
 import json
-import os
 import pathlib
 import socket
 import sqlite3
-import sys
-import tempfile
 import threading
 import time
 
-from coach import config  # noqa: I001
+import numpy as np
+import pytest
+import uvicorn
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse, StreamingResponse
+from starlette.routing import Route
+from websockets.asyncio.client import connect
 
-data = pathlib.Path(tempfile.mkdtemp())
-config.DB_PATH = str(data / "wire.db")
-config.RECORDINGS = data / "recordings"
-config.FIRST_WORD_SECONDS = 1.0  # so a hung model is abandoned in a second, not twenty
-if not pathlib.Path(config.TTS_MODEL_PATH).exists():
-    print("skipped: no Kokoro weights - run `make models`")
-    sys.exit(0)
+from coach import config, tts
+from coach.server.app import app
 
-import numpy as np  # noqa: E402
-import uvicorn  # noqa: E402
-from starlette.applications import Starlette  # noqa: E402
-from starlette.responses import JSONResponse, StreamingResponse  # noqa: E402
-from starlette.routing import Route  # noqa: E402
-from websockets.asyncio.client import connect  # noqa: E402
-
-from coach import tts  # noqa: E402
-from coach.server.app import app  # noqa: E402
+pytestmark = [
+    pytest.mark.e2e,
+    pytest.mark.skipif(
+        not pathlib.Path(config.TTS_MODEL_PATH).exists(), reason="no Kokoro weights: make models"
+    ),
+]
 
 # ---- a fake model: each request pops the next scripted reply; "HANG" never answers ----
 script: list[str] = []
@@ -91,22 +87,20 @@ def free_port() -> int:
         return s.getsockname()[1]
 
 
-def serve(application, port: int) -> None:
+@contextlib.contextmanager
+def serving(application, port: int):
+    """Run a server in a thread for the length of the block, then stop it cleanly."""
     server = uvicorn.Server(uvicorn.Config(application, port=port, log_level="error"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     while not server.started:
         assert thread.is_alive(), "server failed to start"
         time.sleep(0.1)
-
-
-# The database belongs to the server's thread (sqlite refuses to share a connection), so
-# the fake model is wired in through the environment, not settings.set().
-fake_port, app_port = free_port(), free_port()
-os.environ["LM_STUDIO_URL"] = f"http://127.0.0.1:{fake_port}/v1"
-os.environ["COACH_BACKEND"] = "gemma4-e4b"  # a local model, so the coach uses the fake too
-serve(fake, fake_port)
-serve(app, app_port)  # loads Whisper and Kokoro before it reports started
+    try:
+        yield
+    finally:
+        server.should_exit = True
+        thread.join(timeout=30)
 
 
 def speech(text: str) -> bytes:
@@ -133,7 +127,7 @@ async def speak(ws, text: str, helped=()) -> dict:
     return await until(ws, "transcript")
 
 
-async def main() -> None:
+async def conversation(app_port: int) -> None:
     script.extend(["Hi there. What did you do this weekend?", "Oh nice. Which film was it?"])
     script.extend(["HANG", "HANG", "Sorry, I lost you. Was it scary?"])
     async with connect(f"ws://127.0.0.1:{app_port}/ws") as ws:
@@ -158,6 +152,12 @@ async def main() -> None:
         await ws.send(json.dumps({"type": "retry"}))  # re-ask without speaking again
         assert (await until(ws, "sentence"))["text"] == "Sorry, I lost you."
         await until(ws, "turn_done")
+        # A session counts at two minutes, and only one that counts gets a summary.
+        with sqlite3.connect(config.DB_PATH) as db:
+            db.execute(
+                "UPDATE sessions SET started_at = datetime(started_at, '-5 minutes') WHERE id = ?",
+                (session,),
+            )
 
     # the model was sent the whole conversation, not just the last answer
     second = received[1]
@@ -200,5 +200,13 @@ async def main() -> None:
     )
 
 
-asyncio.run(main())
-print("ok")
+def test_a_spoken_conversation_over_the_real_socket(monkeypatch):
+    # The database belongs to the server's thread (sqlite refuses to share a connection),
+    # so the fake model is wired in through the environment, not settings.set().
+    fake_port, app_port = free_port(), free_port()
+    monkeypatch.setattr(config, "FIRST_WORD_SECONDS", 1.0)  # a hung model is dropped in 1s
+    monkeypatch.setenv("LM_STUDIO_URL", f"http://127.0.0.1:{fake_port}/v1")
+    monkeypatch.setenv("COACH_BACKEND", "gemma4-e4b")  # a local model: the coach uses the fake
+    # The app loads Whisper and Kokoro before it reports started.
+    with serving(fake, fake_port), serving(app, app_port):
+        asyncio.run(conversation(app_port))

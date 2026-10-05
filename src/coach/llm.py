@@ -28,12 +28,28 @@ class Endpoint(NamedTuple):
     extra: dict
 
 
+_clients: dict[tuple[str, str], AsyncOpenAI] = {}
+
+
 def _client(base_url: str, api_key: str) -> AsyncOpenAI:
+    """One client per server and key, kept. Each holds a connection pool: a new one per
+    call paid a fresh TLS handshake every time, and left the old pool open."""
     # The SDK refuses to build a client without a key, which turned "no key set yet" into
     # a crash on every page that so much as asks which model the coach uses. Without one,
     # the request fails instead, and `explain` tells the user to add a key in Settings.
-    key = api_key or "no-key-set"
-    return AsyncOpenAI(base_url=base_url, api_key=key, timeout=config.REQUEST_TIMEOUT)
+    key = (base_url, api_key or "no-key-set")
+    if key not in _clients:
+        _clients[key] = AsyncOpenAI(
+            base_url=base_url, api_key=key[1], timeout=config.REQUEST_TIMEOUT
+        )
+    return _clients[key]
+
+
+async def close() -> None:
+    """Close every connection pool, as the server stops."""
+    for client in _clients.values():
+        await client.close()
+    _clients.clear()
 
 
 OPENING_NUDGE = "Begin."

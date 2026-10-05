@@ -58,7 +58,8 @@ def counted() -> str:
     return (
         "(SELECT s.id FROM sessions s JOIN turns t ON t.session_id = s.id GROUP BY s.id"
         f" HAVING SUM(t.role = 'you') >= {MIN_ANSWERS}"
-        f" AND (julianday(MAX(t.at)) - julianday(s.started_at)) * 1440 >= {MIN_MINUTES})"
+        # whole seconds: julianday's float arithmetic put exactly two minutes at 1.9999
+        f" AND strftime('%s', MAX(t.at)) - strftime('%s', s.started_at) >= {MIN_MINUTES * 60})"
     )
 
 

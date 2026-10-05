@@ -23,3 +23,8 @@ practice.db
 
 # Recordings (auto-purged, never uploaded)
 recordings/
+
+# Test output
+.coverage
+coverage.xml
+htmlcov/
