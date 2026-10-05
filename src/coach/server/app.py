@@ -99,6 +99,7 @@ async def lifespan(_app):
     yield
     ticking.cancel()
     await finish_up()
+    await llm.close()
 
 
 app = Starlette(
