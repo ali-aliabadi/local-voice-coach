@@ -122,5 +122,5 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
 [[tool.mypy.overrides]]
-module = ["kokoro_onnx.*", "faster_whisper.*"]  # no type information published
+module = ["kokoro_onnx.*", "faster_whisper.*", "tqdm.*"]  # no type information published
 ignore_missing_imports = true

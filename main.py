@@ -9,7 +9,9 @@ reaches a model, and only if you pick a cloud backend.
 """
 
 import argparse
+import socket
 import threading
+import time
 import webbrowser
 
 import uvicorn
@@ -20,8 +22,23 @@ BANNER = """
 """
 
 
-def open_when_up(url: str, delay: float = 2.5) -> None:
-    threading.Timer(delay, lambda: webbrowser.open(url)).start()
+def open_when_up(url: str, host: str, port: int) -> None:
+    """Open the browser once the server answers.
+
+    It only listens after Whisper and Kokoro load, which on a first run means downloading
+    Whisper; a fixed delay opened a dead page minutes early.
+    """
+
+    def wait() -> None:
+        while True:
+            try:
+                socket.create_connection((host, port), timeout=1).close()
+                break
+            except OSError:
+                time.sleep(0.5)
+        webbrowser.open(url)
+
+    threading.Thread(target=wait, daemon=True).start()
 
 
 def main() -> None:
@@ -45,7 +62,7 @@ def main() -> None:
         print("  ! serving beyond localhost. Microphone access needs https from another device.\n")
     print(f"  {url}\n")
     if not args.no_open:
-        open_when_up(url)
+        open_when_up(url, args.host, args.port)
 
     uvicorn.run("coach.server.app:app", host=args.host, port=args.port, log_level="warning")
 

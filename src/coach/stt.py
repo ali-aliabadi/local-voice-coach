@@ -9,6 +9,9 @@ from typing import Any
 
 import numpy as np
 from faster_whisper import WhisperModel
+from faster_whisper.utils import _MODELS
+from huggingface_hub import snapshot_download
+from tqdm.auto import tqdm
 
 from . import config, settings
 
@@ -69,12 +72,22 @@ def word_rows(words: Sequence[Any]) -> list[dict]:
     return rows
 
 
+def fetch(name: str) -> str:
+    """The model's folder, downloaded on first use with a progress bar.
+
+    faster-whisper hides its own: a first run spent minutes on a silent 460MB download and
+    looked hung at "loading Whisper". A plain tqdm class also stops Hugging Face hiding the
+    bar when there is no terminal, as in Docker's logs.
+    """
+    return snapshot_download(_MODELS.get(name, name), tqdm_class=tqdm)
+
+
 class Transcriber:
     """Holds the loaded Whisper model; transcribing runs off the event loop."""
 
     def __init__(self) -> None:
         self.model = WhisperModel(
-            settings.get("whisper_model"),
+            fetch(settings.get("whisper_model")),
             device=config.WHISPER_DEVICE,
             compute_type=config.WHISPER_COMPUTE,
         )
