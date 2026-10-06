@@ -143,6 +143,17 @@ space disappears and the next token glues onto the last word (`"wordword"`); and
 length cap is a backstop for output that never punctuates, not a routine cut — a low
 value reintroduces the original bug.
 
+Never cut at a comma either, not even to start sooner. Kokoro voices each chunk as its own
+utterance, so cutting the first sentence at "Oh, nice one," brought the same symptom back
+in 21 of 26 replies of a real session, to save 0.8s of a 7.8s wait. That wait is mostly
+the model's first words and Whisper, so look there.
+
+### Every accent at the user's own pace
+A different accent each session gave each session a different pace: Kokoro's voices range
+from 185 to 235 words a minute, and the slowest one made a whole session feel slow.
+`tts.PACE` holds each accent's measured pace and `tts.pace()` brings it to the user's own
+voice. A new accent needs its pace measured before it joins `ACCENTS`; a test enforces it.
+
 ### The palette is validated, not eyeballed
 Sky blue accent with an orange warn: blue and orange is the one pair that stays distinct
 under every kind of colour blindness. Both modes were run through the dataviz validator

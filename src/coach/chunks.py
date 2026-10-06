@@ -29,12 +29,7 @@ def _boundaries(text: str) -> Iterator[int]:
         yield match.end()
 
 
-# A clause ends at , ; : or a dash followed by a space - so "1,000" never splits.
-CLAUSE = re.compile(r"[,;:\u2013\u2014](?=\s)")
-EAGER_WORDS = 3  # a first chunk shorter than this sounds clipped
-
-
-def split_for_speech(buffer: str, flush: bool = False, eager: bool = False) -> tuple[str, str]:
+def split_for_speech(buffer: str, flush: bool = False) -> tuple[str, str]:
     """Split the buffer into (speak now, keep buffering).
 
     Splits at the LAST complete sentence inside the buffer, rather than only when the
@@ -46,9 +41,9 @@ def split_for_speech(buffer: str, flush: bool = False, eager: bool = False) -> t
     The returned buffer is never stripped: the trailing space is what keeps the next
     token from being glued onto the last word.
 
-    `eager` is for the first words of a reply, which are the wait the user feels: a
-    27-word opening sentence took Kokoro 1.5s to voice before anything played, so the
-    first chunk may end at a clause instead ("Oh, nice one,") once it has a few words.
+    Never cut at a comma, not even to start sooner. Kokoro voices each piece as its own
+    utterance, so a sentence split at "Oh, nice one," ended there and began again: the
+    partner audibly stopped mid-sentence in 21 of 26 replies, to save 0.8s of a 7.8s wait.
     """
     if flush:
         return buffer.strip(), ""
@@ -58,10 +53,6 @@ def split_for_speech(buffer: str, flush: bool = False, eager: bool = False) -> t
     cuts = list(_boundaries(buffer))
     if cuts:
         return buffer[: cuts[-1]].strip(), buffer[cuts[-1] :].lstrip()
-    if eager:
-        for clause in CLAUSE.finditer(buffer):
-            if len(buffer[: clause.end()].split()) >= EAGER_WORDS:
-                return buffer[: clause.end()].strip(), buffer[clause.end() :].lstrip()
 
     # Nothing has ended yet. Only give up waiting once this has run on far too long, and
     # then break between words - never inside one.
