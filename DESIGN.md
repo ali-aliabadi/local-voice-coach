@@ -16,9 +16,11 @@ requirement, not a feature.
 
 ## Three rules that decide most arguments
 
-1. **Audio never leaves the machine.** Whisper and Kokoro run locally; only transcript text
-   reaches a model, and only if the user picked a cloud backend. This is the one promise no
-   hosted competitor can make, and nothing gets to break it.
+1. **Audio never leaves the machine.** Whisper and Kokoro run locally; only text - the
+   transcript, the profile, the resume and job posting - reaches a model, and only if the
+   user picked a cloud backend. A job search sends Himalayas its search words, and only
+   when the user searches. This is the one promise no hosted competitor can make, and
+   nothing gets to break it.
 2. **Never present an estimate as a measurement.** The backend table labels published
    latency `est.`; the `Yours` column is measured from the user's own sessions.
 3. **Fluency metrics stay arithmetic.** wpm, pauses and lead-in come from word timestamps.
