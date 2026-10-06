@@ -1,6 +1,8 @@
 """Keeping things: settings, sessions, latency and recordings."""
 
-from coach import history, settings, store
+import os
+
+from coach import clock, history, settings, store
 
 METRICS = {"words": 40, "wpm": 120, "fillers": 1, "pauses": 2, "longest_pause": 1, "lead_in": 1}
 STORED = "SELECT COUNT(*) FROM settings WHERE key = ?"
@@ -77,3 +79,18 @@ def test_forgetting_everything_leaves_nothing(counted):
     assert history.trend() == []
     assert store.measured_latency() == {}
     assert history.count() == 0
+
+
+def test_recordings_are_kept_forever_unless_you_say_otherwise(tmp_path):
+    """They never leave the machine, so deleting them after a week protected nothing."""
+    old = tmp_path / "old.wav"
+    old.write_bytes(b"RIFF")
+    os.utime(old, (0, 0))  # recorded in 1970
+    session = store.start("talk", "flash-lite", "m")
+    turn = store.record(session, "you", "an answer", METRICS, audio_path=str(old))
+    clock.expire_recordings()
+    assert old.exists()
+    assert store.audio_path(turn) == str(old)
+    settings.set("audio_retention_days", 7)
+    clock.expire_recordings()
+    assert not old.exists()

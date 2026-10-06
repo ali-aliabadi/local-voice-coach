@@ -1,6 +1,7 @@
 import { go, render, route } from "./router.js";
 import { apply } from "./theme.js";
 import * as history_ from "./views/history.js";
+import * as jobs from "./views/jobs.js";
 import * as practice from "./views/practice.js";
 import * as profile from "./views/profile.js";
 import * as progress from "./views/progress.js";
@@ -14,6 +15,7 @@ route("/practice", practice);
 route("/history", history_.list);
 route("/history/:id", history_.detail);
 route("/progress", progress);
+route("/jobs", jobs);
 route("/profile", profile);
 route("/settings", settings);
 route("/today", today);

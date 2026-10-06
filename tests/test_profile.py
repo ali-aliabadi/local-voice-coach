@@ -2,7 +2,7 @@
 
 import json
 
-from coach import profile, settings, store
+from coach import config, profile, settings, store
 
 ENGINEER = {
     "name": "Ali",
@@ -63,3 +63,26 @@ def test_talk_remembers_the_last_recap_when_asked_to(counted):
     store.db().commit()
     assert "Se7en" in profile.system_prompt("talk", "X", interview=False, memory=True)
     assert "Se7en" not in profile.system_prompt("roleplay", "X", interview=False)
+
+
+def test_an_interviewer_has_read_the_resume_and_may_ask_about_it():
+    profile.save({**ENGINEER, "resume": "Payments team at Acme, 2021-2024."})
+    prompt = profile.system_prompt("panel", "BASE", pacing=False)
+    assert "<resume>\nPayments team at Acme, 2021-2024.\n</resume>" in prompt
+    assert "name the company or project" in prompt
+    assert "Resume:" not in prompt  # not one of the never-mention lines
+    assert "<job>" not in prompt  # no posting given, so no company to work for
+    assert "Acme" not in profile.system_prompt("talk", "BASE", interview=False)
+
+
+def test_the_job_posting_makes_the_interviewer_work_there():
+    profile.save({"job": "Globex is hiring a Go engineer."})
+    prompt = profile.system_prompt("review", "BASE", pacing=False)
+    assert "<job>\nGlobex is hiring a Go engineer.\n</job>" in prompt
+    assert "You work at this company" in prompt
+    assert "<resume>" not in prompt
+
+
+def test_a_long_resume_is_cut_before_it_crowds_out_the_conversation():
+    profile.save({"resume": "x" * (config.DOCUMENT_CHARS + 500)})
+    assert "x" * config.DOCUMENT_CHARS + "\n</resume>" in profile.reading()

@@ -122,7 +122,9 @@ that, so there is no frontend change and no hand-written form field. Secrets set
 
 One row in `FIELDS` in `src/coach/profile.py`. It appears on the profile page and inside
 every system prompt automatically. `label` is the question the form asks; `term` is how it
-reads to the model.
+reads to the model. `kind="document"` makes it a long text with a file upload beside it
+(read by `documents.py`), given to interviewers whole by `profile.reading()` rather than
+as a line - the resume and the job posting are the two there are.
 
 ## Adding a page
 

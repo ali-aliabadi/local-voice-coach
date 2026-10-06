@@ -11,8 +11,9 @@ warnings.filterwarnings("ignore", message="Using `httpx`")  # starlette's own tr
 from starlette.testclient import TestClient  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
-from coach import backends  # noqa: E402
+from coach import backends, documents  # noqa: E402
 from coach.modes import discover, state  # noqa: E402
+from coach.server import api  # noqa: E402
 from coach.server.guard import MIDDLEWARE  # noqa: E402
 
 HERE, EVIL = "http://127.0.0.1:8000", "https://evil.example"
@@ -84,7 +85,7 @@ def test_offline_nothing_is_available_and_it_says_why(monkeypatch):
     ("done", "shown", "locked"),
     [
         (0, {"talk"}, set()),  # a first session sees talk alone
-        (1, None, {"panel", "review"}),  # then everything, the interviews not yet open
+        (1, None, {"interview", "panel", "review"}),  # then all, the interviews not yet open
         (2, None, set()),  # then all of it
     ],
 )
@@ -93,3 +94,20 @@ def test_modes_open_as_you_practise(done, shown, locked):
     states = {name: state(module, done) for name, module in modes.items()}
     assert {n for n, s in states.items() if s != "hidden"} == (shown or set(modes))
     assert {n for n, s in states.items() if s == "locked"} == locked
+
+
+@pytest.mark.parametrize(
+    ("name", "body", "status", "key"),
+    [
+        ("cv.txt", b"Ali. Backend engineer.", 200, "text"),
+        ("cv.exe", b"MZ", 400, "error"),
+        ("cv.txt", b"x" * (documents.MAX_BYTES + 1), 413, "error"),
+    ],
+)
+def test_an_upload_comes_back_as_text_to_check_and_is_not_kept(name, body, status, key):
+    response = TestClient(Starlette(routes=api.ROUTES)).post(
+        f"/api/extract?name={name}", content=body
+    )
+    assert response.status_code == status
+    assert key in response.json()
+    assert not TestClient(Starlette(routes=api.ROUTES)).get("/api/profile").json()["resume"]

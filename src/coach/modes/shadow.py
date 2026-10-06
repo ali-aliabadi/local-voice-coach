@@ -50,7 +50,9 @@ async def run(endpoint: Endpoint, io: BrowserIO) -> None:
             messages = [
                 {
                     "role": "system",
-                    "content": profile.system_prompt("shadow", PROMPT, pacing=False),
+                    "content": profile.system_prompt(
+                        "shadow", PROMPT, pacing=False, interview=False
+                    ),
                 },
                 {"role": "user", "content": ask},
             ]

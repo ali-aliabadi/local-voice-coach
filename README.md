@@ -52,7 +52,8 @@ make run       # fetches the voice weights once, then opens http://127.0.0.1:800
 Or `make up` to run it in Docker (`make logs`, `make down`). On a Mac, native is faster.
 
 Then fill in your [profile](http://127.0.0.1:8000/profile) so the partner knows who it
-is talking to.
+is talking to. For interviews, add your resume (PDF, Word, ODT, text or Markdown) and, if
+you have one, the job posting: the interviewer reads both before you start.
 
 ## Modes
 
@@ -63,10 +64,16 @@ is talking to.
 | **retell** | Hear a short story, tell it back |
 | **repeat** | The 4/3/2 drill: one topic in 90, 60 and 45 seconds |
 | **shadow** | Repeat a sentence straight back |
+| **interview** | A whole interview built on your resume, from hello to your questions for them |
 | **panel** | Three interviewers, closer to a real onsite |
-| **review** | One hard technical question, then a written critique |
+| **review** | One hard technical question, then a written critique out of 10 |
 
 More modes unlock as you complete sessions.
+
+After an interview, the session page has the interviewer's verdict: a rating out of 10,
+whether they would hire you, and why. Telegram gets only the rating and the decision.
+[Jobs](http://127.0.0.1:8000/jobs) lists real remote postings from
+[Himalayas](https://himalayas.app); pick one and your next interview is for that job.
 
 ## The numbers
 
@@ -84,7 +91,8 @@ come from word timestamps and are exact. Every session is kept: `/history` repla
 ## Your data
 
 Sessions and recordings stay in `data/` (Docker) or the repo root (native), never
-uploaded. Recordings delete after 7 days. `make reset` erases everything.
+uploaded. Recordings are kept forever, about 40MB an hour, unless you set a number of
+days in Settings. `make reset` erases everything.
 
 ## Contributing
 

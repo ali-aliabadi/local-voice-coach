@@ -133,3 +133,15 @@ def test_who_it_goes_to(monkeypatch, env, recipient):
     for name, value in env.items():
         monkeypatch.setenv(name, value)
     assert relay.recipient() == recipient
+
+
+def test_an_interviews_report_carries_its_verdict_in_the_title_and_no_more(telegram, counted):
+    """The user asked not to be spammed: the verdict rides in the message already sent."""
+    session = counted("interview", goal=45)
+    full = {"rating": 7, "decision": "Yes", "summary": "SECRET CRITIQUE", "answers": 2}
+    store.db().execute("UPDATE sessions SET verdict = ? WHERE id = ?", (json.dumps(full), session))
+    store.db().commit()
+    report(session)
+    [message] = telegram.sent
+    assert message["title"] == "Interview: 7/10 · Yes · 5 min of a 45 min goal"
+    assert "SECRET CRITIQUE" not in json.dumps(message), "the full verdict stays on the site"

@@ -4,7 +4,8 @@ The app only runs while you practise, so everything goes when a session ends - t
 no evening to remind you in, or Sunday to wait for. Each message is off unless Relay is
 set up (relay.py) and its setting is on:
   - the session: a chart of each answer, what the page says beside it, then the study
-    sheet or the coach's lessons
+    sheet or the coach's lessons; after an interview its title carries the verdict's
+    rating and decision, and nothing more of it
   - last week, after the first session since it ended: each day, against the week before
 
 Each one remembers what it already sent, so a restart never sends it twice.
@@ -12,7 +13,7 @@ Each one remembers what it already sent, so a restart never sends it twice.
 
 import datetime as dt
 
-from . import coach, history, layout, picture, relay, settings, sheet, store
+from . import coach, history, layout, picture, relay, settings, sheet, store, verdict
 
 
 def _on(key: str) -> bool:
@@ -98,7 +99,10 @@ async def _session(session_id: int) -> None:
     if doc is None:
         blocks += _lessons(d["summary"])  # the sheet carries them when there is one
     key = f"session-{session_id}-{d['answers']}"
-    await relay.send(f"Session done: {minutes} min{goal}", blocks, key=key)
+    title = f"Session done: {minutes} min{goal}"
+    if d["verdict"]:  # the headline only: the full verdict stays on the session page
+        title = f"{d['mode'].title()}: {verdict.headline(d['verdict'])} · {minutes} min{goal}"
+    await relay.send(title, blocks, key=key)
     if doc:
         await _send_sheet(doc, d["started_at"][:10], key)
     relay.remember(f"session:{session_id}", str(d["answers"]))

@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 HELP = "one hard question, then a written critique"
 ENDPOINT = "deep"
 UNLOCK = 2  # an interview: once everyday talk has had two sessions
+INTERVIEW = True
 
 PROMPT = (
     "You are a staff engineer interviewing a candidate for a software engineering role. "
@@ -32,7 +33,7 @@ CRITIQUE_PROMPT = (
     "You are a staff engineer who just heard a candidate answer an interview question. "
     "Write a direct, specific critique. Be honest - flattery wastes their time.\n\n"
     "Use these headings:\n"
-    "1. Verdict - one line, and a score out of 5.\n"
+    "1. Verdict - one line, and a score out of 10.\n"
     "2. What was right - name the specific claims that held up.\n"
     "3. What was wrong, missing or vague - quote their words where useful.\n"
     "4. What a real interviewer would ask next to probe the weak spot.\n"

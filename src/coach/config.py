@@ -30,6 +30,10 @@ REQUEST_TIMEOUT = 45.0  # a cold call measured 16s and one hung at 51s, so this 
 # abandoned and asked again once - a cold call measured 16s, and one stream sat silent for
 # the full 45s and then gave up, leaving the user to repeat themselves.
 FIRST_WORD_SECONDS = 20.0
+# A resume or job posting is cut to this before it goes into a prompt. A two-page resume
+# is about 5k characters; LM Studio models often run a 4-8k token context, so a ten-page
+# CV pasted whole would crowd out the conversation itself.
+DOCUMENT_CHARS = 10_000
 
 # ---- STT (local) ----
 WHISPER_DEVICE = "cpu"

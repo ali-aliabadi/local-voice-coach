@@ -15,12 +15,16 @@ const card = (m) => (m.state === "open"
 
 export const modes = {
   async render(root) {
-    const [list, { isSet }] = await Promise.all([get("/api/modes"), get("/api/profile")]);
+    const [list, { isSet, resume }] = await Promise.all([get("/api/modes"), get("/api/profile")]);
+    const interviews = list.some((m) => m.interview && m.state === "open");
     root.innerHTML = `
       <h1>What are we practising?</h1>
       ${isSet ? "" : `<p class="callout">Fill in <a href="/profile">your profile</a> first
         so it knows what to call you, your first language, and — for the interview modes —
-        your level and what you work on.</p>`}
+        your level, what you work on, and your resume.</p>`}
+      ${isSet && !resume && interviews ? `<p class="callout">The interview modes read your
+        resume first, like a real interviewer. Add it — and the job posting, if you have
+        one — in <a href="/profile">your profile</a>.</p>` : ""}
       <div class="cards">${list.filter((m) => m.state !== "hidden").map(card).join("")}</div>
       ${list.some((m) => m.state === "hidden") ? `<p class="foot">Start with a conversation.
         More modes open as you practise.</p>` : ""}`;

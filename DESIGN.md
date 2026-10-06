@@ -16,9 +16,11 @@ requirement, not a feature.
 
 ## Three rules that decide most arguments
 
-1. **Audio never leaves the machine.** Whisper and Kokoro run locally; only transcript text
-   reaches a model, and only if the user picked a cloud backend. This is the one promise no
-   hosted competitor can make, and nothing gets to break it.
+1. **Audio never leaves the machine.** Whisper and Kokoro run locally; only text - the
+   transcript, the profile, the resume and job posting - reaches a model, and only if the
+   user picked a cloud backend. A job search sends Himalayas its search words, and only
+   when the user searches. This is the one promise no hosted competitor can make, and
+   nothing gets to break it.
 2. **Never present an estimate as a measurement.** The backend table labels published
    latency `est.`; the `Yours` column is measured from the user's own sessions.
 3. **Fluency metrics stay arithmetic.** wpm, pauses and lead-in come from word timestamps.
@@ -123,7 +125,9 @@ where they are and how far that is from where they want to be.
 | Settings | SQLite `settings` table | survives restarts, editable from the UI |
 | Secrets | `.env`, never returned to the browser | the API key is write-only over the wire, masked on read |
 
-Recordings auto-delete after `audio_retention_days` (default 7), checked by mtime every ten minutes while the server runs (`clock.py`).
+Recordings are kept forever by default: they never leave the machine, so deleting them
+protects nothing. `audio_retention_days` deletes older ones for anyone short of disk,
+checked by mtime every ten minutes while the server runs (`clock.py`).
 Roughly 1MB per answer, ~40MB per hour of practice, so steady state is a few hundred MB.
 There is a visible delete-everything button, because the whole pitch is that this data is
 yours.

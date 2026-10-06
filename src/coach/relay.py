@@ -10,8 +10,8 @@ secret and is read from the environment only):
     RELAY_USER     who this app sends to; optional, default "admin" (RELAY_ADMIN, its
                    old name, still works when RELAY_USER is unset)
 
-What leaves: numbers, a chart, and - if you allow it - the coach's lessons. Never audio,
-never whole transcripts. Message ids are logged; contents and the key never are.
+What leaves: numbers, a chart, an interview's rating and hire decision, and - if you
+allow it - the coach's lessons. Never audio, never whole transcripts. Message ids are logged; contents and the key never are.
 """
 
 import asyncio

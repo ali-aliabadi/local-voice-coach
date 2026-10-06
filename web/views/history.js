@@ -4,6 +4,7 @@ import { moved } from "../chart.js";
 import { escape, get, post } from "../form.js";
 import * as notes from "../notes.js";
 import * as draw from "../render.js";
+import * as verdict from "../verdict.js";
 
 const when = (stamp) => (stamp || "").slice(0, 16).replace("T", " ");
 
@@ -113,6 +114,8 @@ const STEPS = [
     "Looking for patterns, not slips…", "Deciding what actually matters…"]],
   ["sheet", "Drawing your study sheet", ["Picking phrases worth stealing…",
     "Choosing fonts like it is a wedding invitation…", "Ironing the PDF flat…"]],
+  ["verdict", "The interviewer is writing their verdict", ["Checking your answers against "
+    + "your resume…", "Arguing with the bar raiser…", "Deciding between yes and not sure…"]],
   ["telegram", "Sending it to Telegram", ["Folding it into a paper plane…",
     "Licking the stamp…"]],
 ];
@@ -121,9 +124,9 @@ const STEPS = [
 function progress(s) {
   const noted = s.turns.filter((t) => t.role === "you" && t.notes).length;
   const done = { notes: noted >= s.answers, summary: !!s.summary, sheet: s.sheet,
-    telegram: s.telegram };
+    verdict: !!s.verdict, telegram: s.telegram };
   const applies = { notes: s.coaching !== "off", summary: s.coaching !== "off",
-    sheet: s.can_sheet, telegram: s.telegram != null };
+    sheet: s.can_sheet, verdict: s.interview && s.can_verdict, telegram: s.telegram != null };
   let now = null;
   const items = STEPS.filter(([key]) => applies[key]).map(([key, label, lines]) => {
     const count = key === "notes" ? ` · ${noted} of ${s.answers}` : "";
@@ -187,6 +190,7 @@ export const detail = {
       ${waits(session.turns)}
       ${changed(session.averages, session.previous)}
       ${session.answers ? '<div class="metrics" id="session-average"></div>' : ""}
+      ${verdict.section(session)}
       <div id="coaching">${coaching(session)}</div>
       <h2>The conversation</h2>
       ${expired ? `<p class="foot">Recordings from this session have expired — they are
@@ -224,6 +228,11 @@ export const detail = {
       again();
     }, 2000);
     root.querySelector("#coach-now")?.addEventListener("click", async () => {
+      await post(`/api/sessions/${params.id}/coach`, {});
+      again();
+    });
+    root.querySelector("#verdict-now")?.addEventListener("click", async (event) => {
+      event.target.textContent = "Writing the verdict…";
       await post(`/api/sessions/${params.id}/coach`, {});
       again();
     });

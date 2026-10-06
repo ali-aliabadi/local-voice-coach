@@ -61,13 +61,16 @@ make e2e                             # real server, real socket, a spoken answer
 | `src/coach/store.py` | SQLite: writing sessions, turns, settings, retention |
 | `src/coach/history.py` | reading it back: one session, all sessions, totals; `RATES` |
 | `src/coach/today.py` | today's minutes, the streak, the last session's advice |
-| `src/coach/profile.py` | who the user is, past-session recaps, the system prompt |
+| `src/coach/profile.py` | who the user is, their resume and job posting, past-session recaps, the system prompt |
+| `src/coach/documents.py` | an uploaded resume or posting (PDF, Word, ODT, text) to plain text |
 | `src/coach/coach.py` | the second model: notes on each answer, the session summary |
+| `src/coach/verdict.py` | after an interview: rating out of 10, hire decision, scores by area |
+| `src/coach/jobs.py` | real postings from Himalayas' public API, for the jobs page |
 | `src/coach/clock.py` | jobs that run on a timer while the server is up |
 | `src/coach/relay.py` | the Relay client: Telegram, off unless `RELAY_*` is set |
 | `src/coach/reports.py` | what goes to Telegram and when |
 | `src/coach/picture.py` | the charts as PNG, for Telegram (Pillow) |
-| `src/coach/server/` | `app.py` assembly + websocket, `api.py` JSON routes, `session.py` the `io` modes talk to, `guard.py` localhost-only, `models.py` loaded models |
+| `src/coach/server/` | `app.py` assembly + websocket, `api.py` JSON routes, `past.py` the routes about one finished session, `session.py` the `io` modes talk to, `guard.py` localhost-only, `models.py` loaded models |
 | `src/coach/modes/` | one file per mode, discovered automatically; `_`-prefixed files are helpers |
 | `web/` | plain ES modules, no build step; `views/` is one file per route; `screen.js` draws the practice page that `views/practice.js` drives |
 | `models/` | Kokoro weights, gitignored, fetched by `make models` |
@@ -91,7 +94,8 @@ make e2e                             # real server, real socket, a spoken answer
 **Adding a mode must never require editing another file.** Modes are discovered with
 `pkgutil` in `src/coach/modes/__init__.py`. A mode declares `HELP`, `ENDPOINT` (`"fast"`
 or `"deep"`), and `async def run(endpoint, io)`; optionally `UNLOCK`, the sessions done
-before it opens. A first session sees only `talk` (0); interviews open at 2.
+before it opens, and `INTERVIEW = True` for a job interview, which gets the resume nudge
+and the verdict afterwards. A first session sees only `talk` (0); interviews open at 2.
 
 `io` is the browser, for one session: `await io.answer()` hears, scores and saves an
 answer; `await io.reply(endpoint, messages)` speaks the model's reply as it streams and
@@ -202,6 +206,42 @@ asks open questions so the user does most of the speaking. It calls
 language): stack, role and focus pulled every chat back to engineering. It may echo a
 garbled sentence back naturally ("Oh, so you ended up...") but never points it out, so
 the no-correction rule still holds.
+
+### The interviewer has read the resume
+No real interview starts before the interviewer has read the resume. `profile.reading()`
+gives interview prompts the resume and the optional job posting, inside `<resume>` and
+`<job>` tags, and - unlike the other profile fields, which are "never mention" - tells the
+model to ask about them by name and probe their claims. Each is cut to
+`config.DOCUMENT_CHARS`, for local models' small contexts. A prompt built with
+`interview=False` never sees either: `shadow` used to take the interview profile, and was
+switched when the resume arrived. Uploads are read by `documents.py`: pypdf for PDF;
+Word and ODT are zipped XML with the tags stripped by regex, so no XML parser (bandit
+S314) and no multipart parser - the file is the request body. Without a resume the
+`interview` prompt asks for a walk-through instead; nothing is gated on it.
+
+### The verdict is the interviewer's, and Telegram gets one line of it
+After a session of a mode with `INTERVIEW = True`, `verdict.py` writes what a real
+interviewer submits: a rating out of 10, a decision on `DECISIONS` (If they're hired, I
+leave - "it is my place or theirs", the strongest no, not praise - then No, Not sure, Yes,
+Definitely hire: the user's own scale), the level, a score per
+area, evidence, and on a panel each interviewer's vote. It is calibrated, not kind, and
+never judges the English - that is the coach's. It runs in the coach's queue before the
+report, and is checked: a reply without a 1-10 rating and a decision on the scale is
+reported, not stored. The session page shows all of it; Telegram gets only its headline,
+in the title of the session report already sent. The user asked not to be spammed: do
+not add a message for it.
+
+### Jobs come from Himalayas
+`jobs.py` searches Himalayas' public API: no key, 60 requests a minute. Its terms require
+a visible link back and naming it as the source - the jobs page does both; keep them.
+Remotive was rejected: jobs a day late and four calls a day. Postings not in English are
+dropped by a count of common English words, because a third of a real first page was
+Portuguese, Spanish or Ukrainian.
+
+### Recordings are kept forever
+They never leave the machine, so deleting them protects nothing; the user asked for them
+to be kept. `audio_retention_days` defaults to 0 (forever) and stays only for someone
+short of disk. Do not bring back a default expiry.
 
 ### Correction lives with the coach, not the partner
 The conversation partner never corrects the user — being corrected mid-answer is what

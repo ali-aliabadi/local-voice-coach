@@ -61,11 +61,12 @@ SPEC: dict[str, Setting] = {
         help="Space separated. Repeated letters are matched too, so 'mm' also catches 'mmmm'.",
     ),
     "audio_retention_days": Setting(
-        7,
+        0,  # they never leave this machine, so nothing is gained by deleting them
         "Keep recordings for (days)",
         "Scoring",
         kind="number",
-        help="Recordings are deleted after this many days. 0 keeps them forever.",
+        help="0 keeps them forever. They never leave this machine; they take about 40MB "
+        "per hour of practice. Set a number of days to have older ones deleted.",
     ),
     # ---- Model ----
     "temperature": Setting(0.7, "Temperature", "Model", kind="number", step=0.1),
@@ -163,6 +164,14 @@ SPEC: dict[str, Setting] = {
         "phrases for your conversations, what to practise tomorrow. A PDF on the session "
         "page, and images on Telegram. One request per session, so a stronger model is "
         "affordable here. 'off' turns it off.",
+    ),
+    "verdict_backend": Setting(
+        "flash",
+        "Interview verdict model",
+        "Coach",
+        kind="select",
+        help="After each interview, the feedback a real interviewer would submit: a rating "
+        "out of 10, hire or not, a score for each area. Telegram gets only the headline.",
     ),
     "relay_sheet": Setting(
         "on", "Send the study sheet", "Telegram", kind="select", choices=("on", "off")

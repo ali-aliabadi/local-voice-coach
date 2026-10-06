@@ -1,13 +1,22 @@
 """The JSON API. One endpoint per thing the browser needs, kept out of app.py."""
 
+import asyncio
 import datetime as dt
-import pathlib
 
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse, Response
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from .. import backends, coach, history, llm, profile, reports, settings, sheet, store, today
+from .. import (
+    backends,
+    documents,
+    history,
+    jobs,
+    profile,
+    settings,
+    store,
+    today,
+)
 from ..modes import discover, state, unlock
 from . import models
 
@@ -53,6 +62,7 @@ async def get_modes(_request: Request) -> Response:
                 "unlock": unlock(module),
                 "state": state(module, done),
                 "left": max(0, unlock(module) - done),
+                "interview": getattr(module, "INTERVIEW", False),
             }
             for name, module in sorted(MODES.items(), key=lambda kv: (unlock(kv[1]), kv[0]))
         ]
@@ -79,7 +89,13 @@ async def get_backends(request: Request) -> Response:
 
 
 async def get_profile(_request: Request) -> Response:
-    return JSONResponse({"fields": profile.as_form(), "isSet": profile.is_set()})
+    return JSONResponse(
+        {
+            "fields": profile.as_form(),
+            "isSet": profile.is_set(),
+            "resume": bool(profile.get("resume").strip()),
+        }
+    )
 
 
 async def save_profile(request: Request) -> Response:
@@ -87,11 +103,46 @@ async def save_profile(request: Request) -> Response:
     return JSONResponse({"ok": True})
 
 
+async def extract(request: Request) -> Response:
+    """The text of an uploaded resume or job posting, for the profile form to show before it
+    is saved. The file is the whole body, so there is no multipart parser to depend on."""
+    data = await request.body()
+    if len(data) > documents.MAX_BYTES:
+        return JSONResponse({"error": "That file is over 5MB."}, status_code=413)
+    try:
+        text = await asyncio.to_thread(documents.text, request.query_params.get("name", ""), data)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse({"text": text})
+
+
+async def get_jobs(request: Request) -> Response:
+    """Real postings to practise for, searched by the role and level in the profile unless
+    the page asks for something else."""
+    ask = request.query_params
+    words = ask.get("q") or profile.get("role").strip() or "software engineer"
+    seniority = ask.get("seniority", jobs.LEVELS.get(profile.get("seniority"), ""))
+    page = ask.get("page", "1")
+    try:
+        found = await asyncio.to_thread(
+            jobs.search,
+            words,
+            seniority,
+            ask.get("country", "").strip(),
+            ask.get("worldwide") == "1",
+            int(page) if page.isdigit() else 1,
+        )
+    except RuntimeError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=502)
+    return JSONResponse({**found, "q": words, "seniority": seniority})
+
+
 async def get_settings(_request: Request) -> Response:
     choices = {
         "tts_voice": models.voice_names(),
         "coach_backend": ("off", *backends.BY_KEY),
         "sheet_backend": ("off", *backends.BY_KEY),
+        "verdict_backend": ("off", *backends.BY_KEY),
     }
     return JSONResponse(settings.as_form(choices) + prompt_fields())
 
@@ -108,58 +159,6 @@ async def save_settings(request: Request) -> Response:
                 settings.set(key, value)
             except ValueError:
                 return JSONResponse({"error": f"{key}: not a valid number"}, status_code=400)
-    return JSONResponse({"ok": True})
-
-
-async def get_sessions(request: Request) -> Response:
-    before = request.query_params.get("before")
-    return JSONResponse(history.sessions(before=int(before) if before else None))
-
-
-async def get_session(request: Request) -> Response:
-    found = history.detail(int(request.path_params["session"]))
-    if found is None:
-        return JSONResponse({"error": "no such session"}, status_code=404)
-    coaching = "pending" if coach.pending(found["id"]) else "on" if coach.endpoint() else "off"
-    return JSONResponse(
-        {
-            **found,
-            "partner": partner(found["mode"]),
-            "coaching": coaching,
-            "coach_error": coach.failed.get(found["id"]),
-            "sheet": sheet.stored(found["id"]) is not None,
-            "can_sheet": sheet.endpoint() is not None and found["answers"] >= sheet.MIN_ANSWERS,
-            "counted": history.is_counted(found["id"]),
-            "minimum": {"answers": history.MIN_ANSWERS, "minutes": history.MIN_MINUTES},
-            "telegram": reports.sent(found["id"], found["answers"]),
-            "waiting": llm.waiting,
-        }
-    )
-
-
-async def write_sheet(request: Request) -> Response:
-    """(Re)write a session's study sheet in the background."""
-    sheet.later(int(request.path_params["session"]))
-    return JSONResponse({"ok": True})
-
-
-async def get_sheet(request: Request) -> Response:
-    """The study sheet as a PDF, drawn fresh from what the model wrote."""
-    session_id = int(request.path_params["session"])
-    doc = sheet.render(session_id)
-    if doc is None:
-        return JSONResponse({"error": "no study sheet for this session yet"}, status_code=404)
-    name = f"study-sheet-{session_id}.pdf"
-    return Response(
-        doc.pdf(),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{name}"'},
-    )
-
-
-async def coach_session(request: Request) -> Response:
-    """Notes for answers that have none, then the summary. Old sessions get a report too."""
-    coach.catch_up(int(request.path_params["session"]))
     return JSONResponse({"ok": True})
 
 
@@ -182,13 +181,6 @@ async def get_today(_request: Request) -> Response:
     return JSONResponse(today.summary(dt.date.today()))
 
 
-async def get_audio(request: Request) -> Response:
-    path = store.audio_path(int(request.path_params["turn"]))
-    if not path or not pathlib.Path(path).exists():
-        return JSONResponse({"error": "recording expired or deleted"}, status_code=404)
-    return FileResponse(path, media_type="audio/wav")
-
-
 async def forget(_request: Request) -> Response:
     store.forget_everything()
     return JSONResponse({"ok": True})
@@ -199,15 +191,11 @@ ROUTES = [
     Route("/api/backends", get_backends),
     Route("/api/profile", get_profile, methods=["GET"]),
     Route("/api/profile", save_profile, methods=["POST"]),
+    Route("/api/extract", extract, methods=["POST"]),
+    Route("/api/jobs", get_jobs),
     Route("/api/settings", get_settings, methods=["GET"]),
     Route("/api/settings", save_settings, methods=["POST"]),
-    Route("/api/sessions", get_sessions),
-    Route("/api/sessions/{session:int}", get_session),
-    Route("/api/sessions/{session:int}/coach", coach_session, methods=["POST"]),
-    Route("/api/sessions/{session:int}/sheet", write_sheet, methods=["POST"]),
-    Route("/api/sessions/{session:int}/sheet.pdf", get_sheet),
     Route("/api/progress", get_progress),
     Route("/api/today", get_today),
-    Route("/api/audio/{turn:int}", get_audio),
     Route("/api/forget", forget, methods=["POST"]),
 ]
