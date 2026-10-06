@@ -5,10 +5,17 @@ then reproducing its rhythm. Scored by matching words - arithmetic - beside the 
 fluency numbers. A sentence you mostly missed is said again, up to twice.
 """
 
+from __future__ import annotations
+
 import difflib
 import re
+from typing import TYPE_CHECKING
 
 from .. import profile
+
+if TYPE_CHECKING:
+    from ..llm import Endpoint
+    from ..server.session import BrowserIO
 
 HELP = "repeat natural sentences back, scored word by word"
 ENDPOINT = "fast"
@@ -34,7 +41,7 @@ def match(target: str, said: str) -> tuple[float, list[str]]:
     return len(hit) / len(a), [w for i, w in enumerate(a) if i not in hit]
 
 
-async def run(endpoint, io) -> None:
+async def run(endpoint: Endpoint, io: BrowserIO) -> None:
     used: list[str] = []  # so the model does not repeat itself
     sentence, tries = None, 0
     while True:
@@ -53,7 +60,7 @@ async def run(endpoint, io) -> None:
             if sentence:
                 used.append(sentence)
         said = await io.answer()
-        if sentence is None or said is None or said is io.RETRY:
+        if sentence is None or said is None or said == io.RETRY:
             continue
         tries += 1
         score, missed = match(sentence, said.text)

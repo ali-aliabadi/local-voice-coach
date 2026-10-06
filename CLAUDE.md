@@ -39,7 +39,7 @@ make install                         # uv sync: exactly what uv.lock pins, ruff 
 make models                          # Kokoro weights into models/ (~340MB, once)
 make run                             # native, serves http://127.0.0.1:8000
 make up / down / logs                # the same thing in Docker
-make check                           # ruff + format + line budget + pytest with coverage (CI)
+make check                           # ruff, mypy, linters, gitleaks, pip-audit, pytest (CI)
 make e2e                             # real server, real socket, a spoken answer
 ```
 
@@ -80,7 +80,9 @@ make e2e                             # real server, real socket, a spoken answer
 - **300 lines per file, hard cap**, warned at 240, enforced by `scripts/check_lines.py`.
   An agent pays for every line twice — reading it and reasoning about it. When a file
   crosses, split along a real seam; two tangled files are worse than one coherent one.
-- **`ruff` is the standard**, configured in `pyproject.toml`. `./scripts/check.sh` runs
+- **`ruff` and `mypy` are the standard**, configured in `pyproject.toml`: complexity 10,
+  five positional arguments, bandit on, the app fully annotated. Split, don't excuse.
+- **`ruff` formats**, configured in `pyproject.toml`. `./scripts/check.sh` runs
   everything CI would. `# fmt: off` only for data tables where alignment carries meaning.
 - Full detail in [CONTRIBUTING.md](CONTRIBUTING.md).
 

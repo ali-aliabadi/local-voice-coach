@@ -38,7 +38,7 @@ MIN_ANSWERS = 3  # fewer, and there is not enough to write a sheet about
 SHEET_TOKENS = 8000  # a thinking model spends much of it before writing a word
 
 
-def endpoint():
+def endpoint() -> llm.Endpoint | None:
     backend = backends.BY_KEY.get(settings.get("sheet_backend"))
     return llm.endpoint_for(backend) if backend else None
 
@@ -158,6 +158,16 @@ def render(session_id: int) -> layout.Doc | None:
         return None
     day = dt.datetime.strptime(d["started_at"][:10], "%Y-%m-%d").strftime("%-d %B %Y")
     doc = layout.Doc(footer=f"Study sheet · {day}")
+    _head(doc, s, d, day)
+    _fixes(doc, s.get("fixes") or [])
+    _phrases(doc, s.get("phrases") or [])
+    _lists(doc, s)
+    _charts(doc, session_id, d)
+    return doc
+
+
+def _head(doc: layout.Doc, s: dict, d: dict, day: str) -> None:
+    """The headline, what went well, the numbers, and where the time went."""
     minutes = f" · {round(d['minutes'])} min" if d.get("minutes") else ""
     doc.text(f"STUDY SHEET · {d['mode'].upper()} · {day.upper()}{minutes}", 20, color=picture.MUTED)
     doc.text(s.get("title") or "Your session", 46, bold=True, after=18)
@@ -176,22 +186,34 @@ def render(session_id: int) -> layout.Doc | None:
             color=picture.MUTED,
             after=10,
         )
-    if s.get("fixes"):
-        doc.heading("Say it better")
-        for fix in s["fixes"]:
-            doc.room(150)  # an item stays on one page
-            doc.text(f"You said: {fix.get('said', '')}", 24, color=picture.MUTED, after=2)
-            doc.text(f"Try: {fix.get('better', '')}", 27, bold=True, after=2)
-            doc.text(fix.get("why", ""), 22, color=picture.MUTED, after=18)
-    if s.get("phrases"):
-        doc.heading("Phrases for your conversations")
-        for p in s["phrases"]:
-            doc.room(150)
-            doc.text(f"{p.get('phrase', '')} — {p.get('meaning', '')}", 26, bold=True, after=2)
-            if p.get("instead_of"):
-                doc.text(f"instead of “{p['instead_of']}”", 22, color=picture.MUTED, after=2)
-            if p.get("example"):
-                doc.text(f"“{p['example']}”", 24, color=picture.ACCENT, after=18)
+
+
+def _fixes(doc: layout.Doc, fixes: list[dict]) -> None:
+    if not fixes:
+        return
+    doc.heading("Say it better")
+    for fix in fixes:
+        doc.room(150)  # an item stays on one page
+        doc.text(f"You said: {fix.get('said', '')}", 24, color=picture.MUTED, after=2)
+        doc.text(f"Try: {fix.get('better', '')}", 27, bold=True, after=2)
+        doc.text(fix.get("why", ""), 22, color=picture.MUTED, after=18)
+
+
+def _phrases(doc: layout.Doc, phrases: list[dict]) -> None:
+    if not phrases:
+        return
+    doc.heading("Phrases for your conversations")
+    for p in phrases:
+        doc.room(150)
+        doc.text(f"{p.get('phrase', '')} — {p.get('meaning', '')}", 26, bold=True, after=2)
+        if p.get("instead_of"):
+            doc.text(f"instead of “{p['instead_of']}”", 22, color=picture.MUTED, after=2)
+        if p.get("example"):
+            doc.text(f"“{p['example']}”", 24, color=picture.ACCENT, after=18)
+
+
+def _lists(doc: layout.Doc, s: dict) -> None:
+    """What to say instead of um, and what to practise tomorrow."""
     if s.get("instead_of_um"):
         doc.heading("Instead of “um”, try")
         for phrase in s["instead_of_um"]:
@@ -200,5 +222,3 @@ def render(session_id: int) -> layout.Doc | None:
         doc.heading("For tomorrow")
         for n, task in enumerate(s["practice"], 1):
             doc.bullet(task, marker=f"{n}.")
-    _charts(doc, session_id, d)
-    return doc

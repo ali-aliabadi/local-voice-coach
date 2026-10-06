@@ -1,9 +1,13 @@
 """Speech to text, plus the fluency numbers derived from word timings."""
 
 import asyncio
+import itertools
 import re
 import time
+from collections.abc import Sequence
+from typing import Any
 
+import numpy as np
 from faster_whisper import WhisperModel
 
 from . import config, settings
@@ -23,19 +27,19 @@ def filler_pattern(words: str) -> re.Pattern:
     return re.compile("|".join(parts) if parts else r"(?!)", re.I)
 
 
-def fluency(words) -> dict | None:
+def fluency(words: Sequence[Any]) -> dict | None:
     """Per-answer stats from word timestamps. Pure arithmetic - no model, no network."""
     if not words:
         return None
     pause_seconds = settings.get("pause_seconds")
     filler_re = filler_pattern(settings.get("filler_words"))
     speaking = float(words[-1].end) - float(words[0].start)
-    gaps = [float(b.start) - float(a.end) for a, b in zip(words, words[1:], strict=False)]
+    gaps = [float(b.start) - float(a.end) for a, b in itertools.pairwise(words)]
     # int()/float() are load-bearing: faster-whisper returns numpy scalars, which are
     # neither JSON serialisable nor accepted by sqlite3.
     return {
         "words": len(words),
-        "wpm": int(round(len(words) / speaking * 60)) if speaking > 0 else 0,
+        "wpm": round(len(words) / speaking * 60) if speaking > 0 else 0,
         "fillers": int(sum(bool(filler_re.fullmatch(w.word.strip(" ,.!?-"))) for w in words)),
         "pauses": int(sum(g >= pause_seconds for g in gaps)),
         "longest_pause": round(max(max(gaps, default=0.0), 0.0), 1),
@@ -43,7 +47,7 @@ def fluency(words) -> dict | None:
     }
 
 
-def word_rows(words) -> list[dict]:
+def word_rows(words: Sequence[Any]) -> list[dict]:
     """Per-word data for the browser: it draws the highlighted transcript and the timeline."""
     filler_re = filler_pattern(settings.get("filler_words"))
     pause_seconds = settings.get("pause_seconds")
@@ -75,7 +79,7 @@ class Transcriber:
             compute_type=config.WHISPER_COMPUTE,
         )
 
-    async def transcribe(self, audio) -> tuple[str, dict | None, list[dict], float]:
+    async def transcribe(self, audio: np.ndarray) -> tuple[str, dict | None, list[dict], float]:
         """Returns (text, metrics, per-word rows, elapsed ms)."""
         loop = asyncio.get_running_loop()
         started = time.perf_counter()

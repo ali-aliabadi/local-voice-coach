@@ -1,17 +1,57 @@
-# The same checks as `make check`, on every push and pull request.
+# The same checks as `make check`, on every push and pull request, and the image built
+# so a broken Dockerfile is caught before it ships.
 name: check
 on: [push, pull_request]
+
+permissions:
+  contents: read
+
+env:
+  # Pinned, and checked against their published checksums; bump deliberately.
+  HADOLINT_VERSION: v2.15.1
+  HADOLINT_SHA256: c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507
+  ACTIONLINT_VERSION: 1.7.12
+  ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
 
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # gitleaks reads the whole history, not just the last commit
       - uses: astral-sh/setup-uv@v6
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install hadolint, actionlint and gitleaks
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cd "$HOME/.local/bin"
+          curl -fsSL -o hadolint \
+            "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-linux-x86_64"
+          echo "${HADOLINT_SHA256}  hadolint" | sha256sum -c -
+          chmod +x hadolint
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum -c -
+          tar -xzf "$archive" actionlint
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum -c -
+          tar -xzf "$archive" gitleaks
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: uv sync --frozen
       # tests/test_wire.py needs the Kokoro weights and a Whisper download, so it is
       # `make e2e`, run by hand, rather than part of this.
       - run: ./scripts/check.sh
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --tag local-voice-coach:ci .

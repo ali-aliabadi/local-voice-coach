@@ -26,9 +26,7 @@ async def run() -> None:
     while True:
         for job in JOBS:
             try:
-                result = job()
-                if asyncio.iscoroutine(result):
-                    await result
+                job()
             except Exception as exc:  # one failing job must not stop the others
                 print(f"  {job.__name__} failed: {exc}")
         await asyncio.sleep(TICK_SECONDS)

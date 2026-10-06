@@ -50,7 +50,8 @@ def test_each_session_keeps_its_own_answers():
     one, two = store.start("talk", "flash-lite", "m"), store.start("talk", "flash-lite", "m")
     store.record(one, "you", "an answer", METRICS)
     store.record(two, "you", "another", METRICS)
-    assert len(store.session_scores(one)) == 1 and len(store.session_scores(two)) == 1
+    assert len(store.session_scores(one)) == 1
+    assert len(store.session_scores(two)) == 1
 
 
 def test_a_missing_recording_is_cleared_and_zero_days_keeps_them_forever():
@@ -66,10 +67,13 @@ def test_the_trend_has_one_point_per_day_not_per_session(counted):
     counted()
     counted("review")
     trend = history.trend()
-    assert len(trend) == 1 and trend[0]["sessions"] == 2
+    assert len(trend) == 1
+    assert trend[0]["sessions"] == 2
 
 
 def test_forgetting_everything_leaves_nothing(counted):
     counted()
     store.forget_everything()
-    assert history.trend() == [] and store.measured_latency() == {} and history.count() == 0
+    assert history.trend() == []
+    assert store.measured_latency() == {}
+    assert history.count() == 0

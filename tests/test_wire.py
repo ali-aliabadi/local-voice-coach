@@ -142,13 +142,15 @@ async def conversation(app_port: int) -> None:
 
         heard = await speak(ws, "I watched a film at home with my wife.", ["slower", "text"])
         assert "film" in heard["text"].lower(), heard["text"]
-        assert heard["metrics"]["wpm"] > 0 and heard["turn"]
+        assert heard["metrics"]["wpm"] > 0
+        assert heard["turn"]
         await until(ws, "turn_done")
 
         # the model hangs twice: one silent retry, then a visible error offering another
         await speak(ws, "It was Seven, the old one with Brad Pitt.")
         failed = await until(ws, "error")
-        assert failed["retry"] and "try again" in failed["text"], failed
+        assert failed["retry"], failed
+        assert "try again" in failed["text"], failed
         await ws.send(json.dumps({"type": "retry"}))  # re-ask without speaking again
         assert (await until(ws, "sentence"))["text"] == "Sorry, I lost you."
         await until(ws, "turn_done")
@@ -165,7 +167,8 @@ async def conversation(app_port: int) -> None:
     assert "film" in second[-1]["content"].lower()
     # and the answer that got no reply was kept for the retry, not dropped
     retried = received[-1]
-    assert len(retried) == 6 and "brad pitt" in retried[-1]["content"].lower(), retried
+    assert len(retried) == 6, retried
+    assert "brad pitt" in retried[-1]["content"].lower(), retried
     saved = sqlite3.connect(config.DB_PATH).execute(
         "SELECT role FROM turns WHERE session_id = ? ORDER BY id", (session,)
     )
@@ -179,7 +182,11 @@ async def conversation(app_port: int) -> None:
     timings = [json.loads(t[0]) if t[0] else None for t in sqlite3.connect(config.DB_PATH).execute(
         "SELECT timing FROM turns WHERE session_id = ? AND role = 'interviewer' ORDER BY id",
         (session,))]  # fmt: skip
-    assert "total" not in timings[0] and timings[1]["total"] >= timings[1]["hearing"] > 0, timings
+    opener, first = timings[0], timings[1]
+    assert opener is not None
+    assert first is not None
+    assert "total" not in opener, timings
+    assert first["total"] >= first["hearing"] > 0, timings
     # the reply it was sent for; the next one was followed by ear; the last is unanswered
     assert [m[0] for m in marks] == ["slower,text", "", None], marks
 
@@ -190,14 +197,13 @@ async def conversation(app_port: int) -> None:
             "SELECT notes FROM turns WHERE session_id = ? AND role = 'you'", (session,)
         ).fetchall()
         summary = db.execute("SELECT summary FROM sessions WHERE id = ?", (session,)).fetchone()
-        if all(n[0] for n in notes) and summary[0]:
+        if all(n[0] for n in notes) and summary is not None and summary[0]:
             break
         await asyncio.sleep(0.2)
     assert all(json.loads(n[0]) == NOTES for n in notes), notes
-    assert (
-        json.loads(summary[0])["recap"] == SUMMARY["recap"]
-        and json.loads(summary[0])["answers"] == 2
-    )
+    assert summary is not None
+    assert json.loads(summary[0])["recap"] == SUMMARY["recap"]
+    assert json.loads(summary[0])["answers"] == 2
 
 
 def test_a_spoken_conversation_over_the_real_socket(monkeypatch):

@@ -5,6 +5,7 @@ and progress pages.
 """
 
 import json
+import sqlite3
 
 from . import store
 
@@ -35,7 +36,7 @@ LENGTH = (
 )
 
 
-def rates(m: dict | None) -> dict | None:
+def rates(m: dict) -> dict:
     """One answer's counts as rates, the same way RATES treats many."""
     if not m:
         return m
@@ -246,7 +247,7 @@ def trend(days: int = 366) -> list[dict]:
     return [dict(r) for r in reversed(rows)]
 
 
-def _turn(row) -> dict:
+def _turn(row: sqlite3.Row) -> dict:
     turn = dict(row)
     turn["word_rows"] = json.loads(turn["word_rows"]) if turn["word_rows"] else []
     turn["notes"] = json.loads(turn["notes"]) if turn["notes"] else None

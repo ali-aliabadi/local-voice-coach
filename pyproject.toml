@@ -20,6 +20,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mypy>=2.4.0",
+    "pip-audit>=2.10.1",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.6",
@@ -51,14 +53,39 @@ select = [
     "C4",        # comprehensions
     "RET",       # returns
     "ARG",       # unused arguments
+    "C90",       # mccabe - cyclomatic complexity
+    "PL",        # pylint - function size, branches, arguments, and its own bug checks
+    "S",         # bandit - security
+    "N",         # pep8-naming
+    "PT",        # pytest style
+    "PTH",       # pathlib over os.path and open()
+    "RUF",       # ruff's own checks
 ]
 ignore = [
     "E501",      # line length is ruff format's job, not a lint error
     "B008",      # we do call functions in defaults deliberately
+    "PLR2004",   # a threshold in a comparison reads clearer inline; ones that mean something are named
+    "S608",      # SQL is composed from module constants only; every value is a ? parameter
+    "S311",      # `random` picks topics and voices, never anything secret
+    "RUF001",    # the dashes and quotes in user-facing text are typography, on purpose
 ]
 
+# Relay's limits, in Python terms: a function that outgrows them is split, not excused.
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-positional-args = 5  # past five, a call stops saying what it passes; name the rest
+max-args = 10            # keyword-only extras with defaults read fine at every call
+max-branches = 12
+max-statements = 50
+max-returns = 6
+
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E402"]    # tests import mid-file on purpose, to reset module state
+"tests/*" = [
+    "S101",      # assert is how pytest checks
+    "PLR0913",   # parametrized tests take one argument per column
+]
 
 # ---- tests: `make check` runs pytest with coverage; `make e2e` the end-to-end test ----
 [tool.pytest.ini_options]
@@ -75,3 +102,25 @@ branch = true
 show_missing = true
 skip_covered = true
 fail_under = 65  # where it stands; raise it as tests are added, never lower it
+
+# ---- types: mypy over everything; the app fully annotated, the tests' bodies checked ----
+[tool.mypy]
+python_version = "3.12"
+files = ["src", "tests", "scripts", "main.py"]
+mypy_path = "src"
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+strict_equality = true
+warn_unreachable = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "check_lines"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[[tool.mypy.overrides]]
+module = ["kokoro_onnx.*", "faster_whisper.*"]  # no type information published
+ignore_missing_imports = true

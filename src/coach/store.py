@@ -8,6 +8,7 @@ import json
 import pathlib
 import sqlite3
 import time
+from typing import cast
 
 from . import config
 
@@ -80,7 +81,7 @@ def _migrate(connection: sqlite3.Connection) -> None:
 
 
 def db() -> sqlite3.Connection:
-    global _db
+    global _db  # noqa: PLW0603 - one connection per process, opened on first use
     if _db is None:
         _db = sqlite3.connect(config.DB_PATH)
         _db.row_factory = sqlite3.Row
@@ -99,7 +100,7 @@ def start(mode: str, backend: str, model: str, goal: int | None = None) -> int:
         (time.strftime("%Y-%m-%d %H:%M:%S"), mode, backend, model, goal or None),
     )
     db().commit()
-    return cur.lastrowid
+    return cast(int, cur.lastrowid)  # always set after an INSERT
 
 
 def elapsed(session_id: int) -> float:
@@ -154,12 +155,13 @@ def record(
     role: str,
     text: str,
     metrics: dict | None = None,
+    *,
     stt_ms: float | None = None,
     reply_ms: float | None = None,
     audio_path: str | None = None,
     word_rows: list[dict] | None = None,
     timing: dict | None = None,
-) -> int | None:
+) -> int:
     """Persist one turn. Returns its id, which the browser uses to fetch the recording."""
     m = metrics or {}
     cursor = db().execute(
@@ -185,7 +187,7 @@ def record(
         ),
     )
     db().commit()
-    return cursor.lastrowid
+    return cast(int, cursor.lastrowid)
 
 
 def last_said(session_id: int) -> str:

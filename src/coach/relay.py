@@ -34,7 +34,10 @@ def recipient() -> str:
 
 
 def enabled() -> bool:
-    return bool(_env("RELAY_URL") and _env("RELAY_API_KEY") and _env("RELAY_APP"))
+    url = _env("RELAY_URL")
+    return url.startswith(("http://", "https://")) and bool(
+        _env("RELAY_API_KEY") and _env("RELAY_APP")
+    )
 
 
 # Cloudflare in front of a Relay answered Python's default "Python-urllib" agent with
@@ -43,7 +46,7 @@ AGENT = "local-voice-coach (+relay-notify)"
 
 
 def _call(method: str, path: str, body: dict | None = None) -> dict:
-    request = Request(
+    request = Request(  # noqa: S310 - http(s) only, see enabled()
         _env("RELAY_URL").rstrip("/") + path,
         data=json.dumps(body).encode() if body is not None else None,
         method=method,
@@ -54,7 +57,7 @@ def _call(method: str, path: str, body: dict | None = None) -> dict:
         },
     )
     try:
-        with urlopen(request, timeout=15) as response:
+        with urlopen(request, timeout=15) as response:  # noqa: S310 - http(s) only, see enabled()
             return json.load(response)
     except HTTPError as exc:  # Relay's own error code and problems, never our content
         raw = exc.read()

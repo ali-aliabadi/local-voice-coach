@@ -30,7 +30,8 @@ def written(monkeypatch, counted):
     """A session of four answers whose sheet a faked model has written."""
 
     async def model(_ep, messages, max_tokens=None):  # noqa: ARG001 - the real signature
-        assert "study sheet" in messages[0]["content"] and "LEARNER:" in messages[1]["content"]
+        assert "study sheet" in messages[0]["content"]
+        assert "LEARNER:" in messages[1]["content"]
         return llm.Reply(json.dumps(WRITTEN), 1.0)
 
     monkeypatch.setattr(llm, "patiently", model)  # the one call that reaches a model
@@ -40,9 +41,12 @@ def written(monkeypatch, counted):
 
 
 def test_the_sheet_is_written_and_drawn(written):
-    assert sheet.stored(written)["title"] == "A good session"
-    doc = sheet.render(written)
-    assert doc.pdf()[:4] == b"%PDF" and len(doc.pngs()) >= 1
+    stored, doc = sheet.stored(written), sheet.render(written)
+    assert stored is not None
+    assert doc is not None
+    assert stored["title"] == "A good session"
+    assert doc.pdf()[:4] == b"%PDF"
+    assert len(doc.pngs()) >= 1
     assert len(doc.pages) >= 2, "the session's answers, charted at the end"
 
 
@@ -56,7 +60,8 @@ def test_time_on_the_sheet_is_only_what_was_measured():
     }
     tiles = sheet._time_tiles(detail)
     assert tiles[0] == ("34 min", "session", "goal 30 min, reached", True)
-    assert tiles[1][0] == "15 min" and tiles[1][2] == "43% of the session"
+    assert tiles[1][0] == "15 min"
+    assert tiles[1][2] == "43% of the session"
     assert tiles[2][0] == "4.0s", "the mean of the two timed replies"
     assert tiles[3][0] == "17/20"
 
@@ -93,11 +98,13 @@ def test_long_text_runs_onto_another_page():
     doc = layout.Doc()
     for _ in range(80):
         doc.text("A long line about cinemas, small talk and leftovers — again and again. " * 2)
-    assert len(doc.pages) >= 2 and doc.pdf()[:4] == b"%PDF"
+    assert len(doc.pages) >= 2
+    assert doc.pdf()[:4] == b"%PDF"
 
 
 def test_without_the_font_it_still_renders_in_plain_ascii(monkeypatch):
     monkeypatch.setattr(config, "REPORT_FONT", "/nowhere/Inter.ttf")
     plain = layout.Doc()
-    assert plain.plain and plain.clean("café → “ok” — fine") == 'cafe -> "ok" - fine'
+    assert plain.plain
+    assert plain.clean("café → “ok” — fine") == 'cafe -> "ok" - fine'
     assert plain.pdf()[:4] == b"%PDF"

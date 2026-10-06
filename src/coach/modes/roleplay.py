@@ -4,10 +4,17 @@ Ordering, booking, returning something, small talk with a stranger. Each session
 one scene, and the partner is the other person in it. A scene is one row in SCENES.
 """
 
+from __future__ import annotations
+
 import random
+from typing import TYPE_CHECKING
 
 from .. import profile
 from ._converse import converse
+
+if TYPE_CHECKING:
+    from ..llm import Endpoint
+    from ..server.session import BrowserIO
 
 HELP = "real-life scenes: ordering, booking, complaining, small talk"
 ENDPOINT = "fast"
@@ -42,7 +49,7 @@ PROMPT = (
 OPENER = "Begin the scene in character, with the first thing your character would say."
 
 
-async def run(endpoint, io) -> None:
+async def run(endpoint: Endpoint, io: BrowserIO) -> None:
     # The same scene for the whole session, and again after a reload.
     scene, role = random.Random(io.session).choice(list(SCENES.items()))
     await io.send(type="scene", text=scene)

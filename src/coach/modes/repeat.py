@@ -5,10 +5,17 @@ settled, so the effort goes into saying it smoothly - and the numbers usually sh
 Scripted: the topics are a list and the comparison is arithmetic, so no model is called.
 """
 
+from __future__ import annotations
+
 import random
+from typing import TYPE_CHECKING
 
 from .. import history, picture
 from ._topics import TOPICS
+
+if TYPE_CHECKING:
+    from ..llm import Endpoint
+    from ..server.session import BrowserIO
 
 HELP = "one topic three times, faster each time (the 4/3/2 drill)"
 ENDPOINT = "fast"  # the contract asks for one; this mode never calls it
@@ -37,7 +44,7 @@ def change(first: dict, last: dict) -> str:
     return "From the first telling to the last: " + ", ".join(said) + "."
 
 
-async def run(_endpoint, io) -> None:
+async def run(_endpoint: Endpoint, io: BrowserIO) -> None:
     pick = random.Random(io.session)
     while True:
         topic = pick.choice(TOPICS)
@@ -53,9 +60,9 @@ async def run(_endpoint, io) -> None:
             while True:
                 await io.send(type="limit", seconds=seconds)
                 said = await io.answer()
-                if said is not None and said is not io.RETRY:
+                if said is not None and said != io.RETRY:
                     break
-            tries.append(history.rates(said.metrics) or {})
+            tries.append(history.rates(said.metrics or {}))
         verdict = change(tries[0], tries[-1])
         await io.send(
             type="card", title=f"Three tellings: {topic}", rows=table(tries), text=verdict

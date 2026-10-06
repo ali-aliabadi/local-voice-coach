@@ -1,5 +1,8 @@
 # local-voice-coach
 
+[![check](https://github.com/ali-aliabadi/local-voice-coach/actions/workflows/check.yml/badge.svg)](https://github.com/ali-aliabadi/local-voice-coach/actions/workflows/check.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 Spoken English practice for non-native speakers that **measures your hesitation**.
 
 You talk out loud in the browser — everyday conversation, real-life roleplays, stories to

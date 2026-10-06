@@ -64,16 +64,20 @@ def test_a_foreign_page_cannot_open_the_practice_socket():
 def test_backends_are_offered_by_role():
     fast = {b.key for b, _ in backends.survey("fast")[0]}
     deep = {b.key for b, _ in backends.survey("deep")[0]}
-    assert "flash-lite" in fast and "flash-lite" not in deep
-    assert "bonsai27" in deep and "bonsai27" not in fast
-    assert "flash" in fast and "flash" in deep
+    assert "flash-lite" in fast
+    assert "flash-lite" not in deep
+    assert "bonsai27" in deep
+    assert "bonsai27" not in fast
+    assert "flash" in fast
+    assert "flash" in deep
 
 
 def test_offline_nothing_is_available_and_it_says_why(monkeypatch):
     monkeypatch.setattr(backends, "online", lambda _timeout=2.0: False)
     monkeypatch.setattr(backends, "lm_studio_models", lambda _timeout=1.5: set())
     rows, available = backends.survey("fast")
-    assert not available and any(why == "no internet" for _, why in rows)
+    assert not available
+    assert any(why == "no internet" for _, why in rows)
 
 
 @pytest.mark.parametrize(

@@ -6,6 +6,7 @@ ponytail: the app knows its real first-token times - record medians here if the 
 annoy you.
 """
 
+import json
 import socket
 from typing import NamedTuple
 from urllib.request import urlopen
@@ -29,15 +30,14 @@ class Backend(NamedTuple):
 
 # Credentials are not here on purpose: llm.endpoint_for resolves them from settings at
 # use time, so editing the API key in the UI works without a restart.
-CLOUD = {"local": False}
 
 # A data table: column alignment reads better here than one argument per line.
 # fmt: off
 #        key             label                    model                        roles            latency          cost        free   ram       note
 CATALOGUE: list[Backend] = [
     # ---- cloud ----
-    Backend("flash-lite",    "Gemini 3.5 Flash-Lite", "gemini-3.5-flash-lite",     ("fast",),        "1.1s measured", "$0.42/mo", False, "cloud",  "best conversation latency; free tier covers an hour a day", **CLOUD),
-    Backend("flash",         "Gemini 3.8 Flash",      "gemini-3.8-flash",          ("fast", "deep"), "3-9s measured", "$1.08/mo", False, "cloud",  "smartest option here; thinking stays on", **CLOUD),
+    Backend("flash-lite",    "Gemini 3.5 Flash-Lite", "gemini-3.5-flash-lite",     ("fast",),        "1.1s measured", "$0.42/mo", False, "cloud",  "best conversation latency; free tier covers an hour a day", local=False),
+    Backend("flash",         "Gemini 3.8 Flash",      "gemini-3.8-flash",          ("fast", "deep"), "3-9s measured", "$1.08/mo", False, "cloud",  "smartest option here; thinking stays on", local=False),
 
     # ---- local: conversation ----
     Backend("lfm2.5",        "LFM2.5 1.2B",           "liquid/lfm2.5-1.2b",        ("fast",),        "<0.5s est.",    "free",     True,  "0.95GB", "emergency fallback; fastest, weakest, no reasoning"),
@@ -67,11 +67,11 @@ def online(timeout: float = 2.0) -> bool:
 
 def lm_studio_models(timeout: float = 1.5) -> set[str]:
     """Model ids LM Studio is serving. Empty set if it isn't running."""
+    url = str(settings.get("lm_studio_url"))
+    if not url.startswith(("http://", "https://")):  # a setting: never a file: URL
+        return set()
     try:
-        import json
-
-        url = settings.get("lm_studio_url")
-        with urlopen(f"{url}/models", timeout=timeout) as response:
+        with urlopen(f"{url}/models", timeout=timeout) as response:  # noqa: S310 - checked above
             return {m["id"] for m in json.load(response).get("data", [])}
     except Exception:
         return set()

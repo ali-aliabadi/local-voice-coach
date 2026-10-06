@@ -6,6 +6,7 @@ the user waits. Pure text in, text out: no model, no audio.
 """
 
 import re
+from collections.abc import Container, Iterator
 
 from . import config
 
@@ -15,7 +16,7 @@ TERMINATOR = re.compile(r"[.!?…]+[\"')\]]*(?=\s|$)")
 ABBREVIATION = re.compile(r"\b(?:Mr|Mrs|Ms|Dr|St|vs|etc|e\.g|i\.e|No|Inc|Ltd|Jr|Sr)\.$")
 
 
-def _boundaries(text: str):
+def _boundaries(text: str) -> Iterator[int]:
     """Offsets where a sentence genuinely ends. Abbreviations are not endings."""
     settled = len(text.rstrip())
     for match in TERMINATOR.finditer(text):
@@ -74,7 +75,7 @@ def split_for_speech(buffer: str, flush: bool = False, eager: bool = False) -> t
 SPEAKER = re.compile(r"^\s*([A-Z][A-Z]+)\s*:\s*")
 
 
-def split_speaker(text: str, cast) -> tuple[str | None, str]:
+def split_speaker(text: str, cast: Container[str]) -> tuple[str | None, str]:
     """Pull a leading 'NAME:' off a reply. Returns (name if it is in `cast`, rest)."""
     match = SPEAKER.match(text)
     if not match:

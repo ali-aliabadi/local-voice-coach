@@ -22,8 +22,11 @@ def test_the_profile_is_given_once_and_never_recited():
     profile.save(ENGINEER)
     prompt = profile.as_prompt()
     assert profile.is_set()
-    assert "Ali" in prompt and "Backend engineer" in prompt and "System design." in prompt
-    assert "nonsense" not in prompt and "ignored" not in prompt  # unknown keys are dropped
+    assert "Ali" in prompt
+    assert "Backend engineer" in prompt
+    assert "System design." in prompt
+    assert "nonsense" not in prompt
+    assert "ignored" not in prompt
     assert "Years of experience" not in prompt  # an empty field, or the model speculates
     assert "Never read this back" in prompt
 
@@ -32,7 +35,9 @@ def test_everyday_talk_keeps_the_name_but_not_the_engineering():
     profile.save(ENGINEER)
     assert profile.system_prompt("talk", "BASE").startswith("BASE")
     chat = profile.system_prompt("talk", "BASE", interview=False)
-    assert "Ali" in chat and "Backend engineer" not in chat and "System design." not in chat
+    assert "Ali" in chat
+    assert "Backend engineer" not in chat
+    assert "System design." not in chat
 
 
 def test_the_users_own_prompt_replaces_the_modes():
@@ -42,9 +47,12 @@ def test_the_users_own_prompt_replaces_the_modes():
 
 def test_the_pacing_note_forbids_commenting_on_speech():
     note = profile.coaching_note({"answers": 9, "wpm": 105, "fillers": 4.2, "lead_in": 3.1})
-    assert "105" in note and "4.2" in note
-    assert "Never mention these numbers" in note and "Never correct their English" in note
-    assert profile.coaching_note({}) == "" and profile.coaching_note(None) == ""
+    assert "105" in note
+    assert "4.2" in note
+    assert "Never mention these numbers" in note
+    assert "Never correct their English" in note
+    assert profile.coaching_note({}) == ""
+    assert profile.coaching_note(None) == ""
     assert "For pacing only" not in profile.system_prompt("talk", "X", pacing=False)
 
 

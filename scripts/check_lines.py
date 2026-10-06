@@ -50,7 +50,7 @@ def main(quiet: bool = False) -> int:
         for lines, path in counts:
             flag = "OVER" if lines > LIMIT else "warn" if lines >= WARN else ""
             bar = "█" * round(lines / LIMIT * 24)
-            print(f"  {str(path):<{width}}  {lines:>4}  {bar:<24} {flag}")
+            print(f"  {path!s:<{width}}  {lines:>4}  {bar:<24} {flag}")
         total = sum(n for n, _ in counts)
         print(
             f"\n  {len(counts)} files, {total} lines, "

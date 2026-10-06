@@ -8,10 +8,14 @@ is drawn rather than embedded, so it cannot be selected - a study sheet does not
 import io
 import pathlib
 import unicodedata
+from collections.abc import Sequence
+from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
 from . import config, picture
+
+Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
 
 W, H, MARGIN = 1240, 1754, 100  # A4 at 150 dpi
 WIDTH = W - 2 * MARGIN
@@ -46,7 +50,7 @@ class Doc:
         self.draw = ImageDraw.Draw(self.pages[-1])
         self.y = MARGIN
 
-    def font(self, size: int, bold: bool = False):
+    def font(self, size: int, bold: bool = False) -> Font:
         if (size, bold) not in self.fonts:
             if self.plain:
                 font = ImageFont.load_default(size=size)
@@ -67,7 +71,16 @@ class Doc:
         if self.y + height > H - MARGIN - FOOT:
             self._page()
 
-    def text(self, text, size=26, bold=False, color=picture.INK, indent=0, after=14) -> None:
+    def text(
+        self,
+        text: str,
+        size: int = 26,
+        *,
+        bold: bool = False,
+        color: str = picture.INK,
+        indent: int = 0,
+        after: int = 14,
+    ) -> None:
         font = self.font(size, bold)
         step = round(size * 1.45)
         for line in wrap(self.clean(str(text)), font, WIDTH - indent):
@@ -83,14 +96,14 @@ class Doc:
         self.draw.line((MARGIN, self.y, W - MARGIN, self.y), fill=picture.LINE, width=2)
         self.y += 22
 
-    def bullet(self, text: str, marker: str = "•", **style) -> None:
+    def bullet(self, text: str, marker: str = "•", **style: Any) -> None:
         self.room(40)
         self.draw.text(
             (MARGIN, self.y), self.clean(marker), font=self.font(26), fill=picture.ACCENT
         )
         self.text(text, indent=44, after=10, **style)
 
-    def tiles(self, items: list[tuple[str, str, str, bool | None]]) -> None:
+    def tiles(self, items: Sequence[tuple[str, str, str, bool | None]]) -> None:
         """A row of numbers: (value, what it is, a note, whether the note is good news).
         None is neither - "44% of the session" is a fact, not a verdict."""
         gap = 24
@@ -115,7 +128,9 @@ class Doc:
         img = Image.open(io.BytesIO(png)).convert("RGB")
         height = round(img.height * WIDTH / img.width)
         self.room(height + 70)
-        self.pages[-1].paste(img.resize((WIDTH, height), Image.LANCZOS), (MARGIN, self.y))
+        self.pages[-1].paste(
+            img.resize((WIDTH, height), Image.Resampling.LANCZOS), (MARGIN, self.y)
+        )
         self.y += height + 12
         if caption:
             self.text(caption, 20, color=picture.MUTED, after=28)
@@ -147,7 +162,7 @@ class Doc:
         return out
 
 
-def wrap(text: str, font, width: float) -> list[str]:
+def wrap(text: str, font: Font, width: float) -> list[str]:
     """Greedy word wrap by measured width. A word wider than the line gets a line alone."""
     lines, line = [], ""
     for word in text.split():
