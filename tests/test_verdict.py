@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import pathlib
+import re
 
 import pytest
 
@@ -45,6 +47,9 @@ def test_a_verdict_needs_a_rating_out_of_ten_and_a_decision_on_the_scale():
     shouted = verdict.valid({**WRITTEN, "decision": " definitely HIRE"})
     assert shouted is not None
     assert shouted["decision"] == "Definitely hire"
+    curly = verdict.valid({**WRITTEN, "decision": "If they’re hired, I leave"})
+    assert curly is not None
+    assert curly["decision"] == verdict.DECISIONS[0]
     assert verdict.valid(None) is None
     assert verdict.headline(kept) == "7/10 · Yes"
 
@@ -110,3 +115,13 @@ def test_a_verdict_is_written_once_unless_the_interview_went_on(counted, monkeyp
     assert asyncio.run(ask()) is False
     store.record(session, "you", "One more answer.")
     assert asyncio.run(ask()) is True
+
+
+def test_the_page_shows_the_same_scale_worst_first():
+    """The first step is the strongest no - "it is my place or theirs" - never praise."""
+    page = (pathlib.Path(__file__).parents[1] / "web" / "verdict.js").read_text()
+    shown = re.search(r"DECISIONS = (\[.*?\]);", page)
+    assert shown is not None
+    assert json.loads(shown.group(1)) == list(verdict.DECISIONS)
+    assert verdict.DECISIONS[0] == "If they're hired, I leave"
+    assert verdict.DECISIONS[-1] == "Definitely hire"

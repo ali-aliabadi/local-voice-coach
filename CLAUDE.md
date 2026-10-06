@@ -221,8 +221,9 @@ S314) and no multipart parser - the file is the request body. Without a resume t
 
 ### The verdict is the interviewer's, and Telegram gets one line of it
 After a session of a mode with `INTERVIEW = True`, `verdict.py` writes what a real
-interviewer submits: a rating out of 10, a decision on `DECISIONS` (No, Not sure, Yes,
-Definitely hire, They could have my job - the user's own scale), the level, a score per
+interviewer submits: a rating out of 10, a decision on `DECISIONS` (If they're hired, I
+leave - "it is my place or theirs", the strongest no, not praise - then No, Not sure, Yes,
+Definitely hire: the user's own scale), the level, a score per
 area, evidence, and on a panel each interviewer's vote. It is calibrated, not kind, and
 never judges the English - that is the coach's. It runs in the coach's queue before the
 report, and is checked: a reply without a 1-10 rating and a decision on the scale is

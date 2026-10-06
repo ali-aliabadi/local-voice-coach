@@ -14,7 +14,9 @@ import json
 from . import backends, coach, config, history, llm, profile, settings, sheet, store
 from .modes import discover
 
-DECISIONS = ("No", "Not sure", "Yes", "Definitely hire", "They could have my job")
+# Worst to best. The first is the user's own: "it is either my place or theirs" - hire them
+# and I leave. The strongest no there is, not a compliment.
+DECISIONS = ("If they're hired, I leave", "No", "Not sure", "Yes", "Definitely hire")
 AREAS = (
     "technical depth", "problem solving", "communication", "ownership and impact",
     "resume holds up",
@@ -25,8 +27,9 @@ VERDICT_PROMPT = (
     "resume and the job posting, when there were any, then the transcript of the interview. "
     "Write the feedback you would submit to the hiring committee.\n\n"
     "Be honest and calibrated the way real interviewers are: most candidates are not a 9, "
-    "and 'Yes' means you would hire them at the level they are aiming for. 'They could have "
-    "my job' is only for someone so strong your own seat feels at risk. Judge what they "
+    "and 'Yes' means you would hire them at the level they are aiming for. 'If they're "
+    "hired, I leave' is the strongest no: only for a candidate you would refuse to work "
+    "with - their claims fell apart, or they were dishonest or hostile. Judge what they "
     "said: depth, specifics, ownership, reasoning, and whether their answers backed up what "
     "the resume claims. The transcript comes from speech recognition: ignore words that look "
     "misheard, and never judge grammar, accent, vocabulary or spelling. Communication means "
@@ -67,7 +70,7 @@ def _score(value: object) -> int | None:
 
 def valid(found: dict | None) -> dict | None:
     """The verdict, if it says what a verdict has to: a rating out of 10 and a decision."""
-    said = str((found or {}).get("decision", "")).strip().lower()
+    said = str((found or {}).get("decision", "")).replace("’", "'").strip().lower()
     decision = next((d for d in DECISIONS if d.lower() == said), None)
     rating = _score((found or {}).get("rating"))
     if not found or decision is None or rating is None:

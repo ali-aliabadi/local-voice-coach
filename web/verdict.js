@@ -1,10 +1,11 @@
 // An interview's verdict, the way a real interviewer submits it: a rating out of 10, the
-// decision on its whole scale - so "Yes" reads as the middle of five, not a pass - a score
-// for each area, and the evidence. Telegram only gets the headline; all of it is here.
+// decision on its whole scale - so you see how far from the top it landed - a score for
+// each area, and the evidence. Telegram only gets the headline; all of it is here.
 
 import { escape } from "./form.js";
 
-export const DECISIONS = ["No", "Not sure", "Yes", "Definitely hire", "They could have my job"];
+// Worst to best. "If they're hired, I leave" is the strongest no, not praise.
+export const DECISIONS = ["If they're hired, I leave", "No", "Not sure", "Yes", "Definitely hire"];
 
 const list = (title, items) => (items?.length
   ? `<h3>${title}</h3><ul>${items.map((item) => `<li>${escape(item)}</li>`).join("")}</ul>`
