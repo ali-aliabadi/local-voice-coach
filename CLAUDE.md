@@ -148,11 +148,13 @@ utterance, so cutting the first sentence at "Oh, nice one," brought the same sym
 in 21 of 26 replies of a real session, to save 0.8s of a 7.8s wait. That wait is mostly
 the model's first words and Whisper, so look there.
 
-### Every accent at the user's own pace
+### Every accent at a fluent speaker's pace
 A different accent each session gave each session a different pace: Kokoro's voices range
-from 185 to 235 words a minute, and the slowest one made a whole session feel slow.
-`tts.PACE` holds each accent's measured pace and `tts.pace()` brings it to the user's own
-voice. A new accent needs its pace measured before it joins `ACCENTS`; a test enforces it.
+from 185 to 235 words a minute, and the slowest one made a whole session feel slow. The
+user is a learner who needs to hear a fluent native speaker, so `tts.FLUENT` is a fixed
+target (am_puck's natural 235), never the learner's pace and never whichever voice is
+picked in Settings; Speech speed is the one knob for slowing down. `tts.PACE` holds each
+accent's measured pace. A new accent needs it measured before joining `ACCENTS`.
 
 ### The palette is validated, not eyeballed
 Sky blue accent with an orange warn: blue and orange is the one pair that stays distinct

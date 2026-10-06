@@ -131,12 +131,13 @@ def test_a_colon_mid_sentence_is_not_a_speaker():
     assert split_speaker("So the trade-off is: latency versus cost.", PANEL)[0] is None
 
 
-def test_every_accent_talks_at_the_pace_of_your_own_voice():
+def test_every_accent_talks_at_a_fluent_speakers_pace():
     """A different accent each session used to mean a different pace: 185 to 235 words a
-    minute, so one session felt slow for no reason anyone chose."""
+    minute, so one session felt slow. The target is fixed - a learner never sets it by
+    picking a slower voice."""
     assert set(ACCENTS) <= set(tts.PACE), "measure a new accent's pace before adding it"
-    settings.set("tts_voice", "am_puck")
-    for voice in ACCENTS:
-        assert round(tts.PACE[voice] * tts.pace(voice)) == tts.PACE["am_puck"]
-    assert tts.pace("am_puck") == 1.0  # your own voice is never changed
+    for chosen in ("am_puck", "am_michael"):
+        settings.set("tts_voice", chosen)
+        for voice in ACCENTS:
+            assert round(tts.PACE[voice] * tts.pace(voice)) == tts.FLUENT
     assert tts.pace("not_a_measured_voice") == 1.0
