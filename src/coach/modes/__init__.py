@@ -9,6 +9,10 @@ A mode module declares these:
                     "interviewer" when left out.
     UNLOCK    int   optional: sessions done before it opens; 1 when left out. A first
                     session sees only the UNLOCK 0 mode; after one, all are shown.
+    INTERVIEW bool  optional: it is a job interview. The mode picker asks for a resume
+                    when there is none, and the interviewer's verdict is written after.
+                    Build the prompt with profile.system_prompt(..., interview=True) -
+                    the default - and it reads the resume and the job posting.
     async def run(endpoint, io)
                     endpoint bundles .client, .model and .extra for your ENDPOINT.
                     io is the browser, for one session:

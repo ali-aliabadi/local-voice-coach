@@ -14,7 +14,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket
 
 from .. import backends, clock, coach, history, llm, reports, settings, sheet, store
-from . import models
+from . import models, past
 from .api import MODES, ROUTES, partner
 from .guard import MIDDLEWARE
 from .session import BrowserIO, SessionClosed
@@ -110,6 +110,7 @@ app = Starlette(
     middleware=MIDDLEWARE,
     routes=[
         *ROUTES,
+        *past.ROUTES,
         WebSocketRoute("/ws", websocket_session),
         Mount("/static", StaticFiles(directory=WEB), name="static"),
         # Last, so it only catches what nothing above claimed: the client's own routes

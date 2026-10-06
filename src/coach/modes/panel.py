@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 HELP = "several interviewers, one voice each"
 ENDPOINT = "fast"
 UNLOCK = 2  # an interview: once everyday talk has had two sessions
+INTERVIEW = True
 PARTNER = "panel"
 
 # name -> (kokoro voice, what they care about). Add a row and they join the panel.

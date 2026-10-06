@@ -8,7 +8,7 @@ interviewer asks generic questions.
 import json
 from dataclasses import dataclass, field
 
-from . import history, settings, store
+from . import config, history, settings, store
 
 SENIORITY = ("", "intern", "junior", "mid-level", "senior", "staff", "principal")
 
@@ -64,6 +64,21 @@ FIELDS: tuple[Field, ...] = (
         placeholder="Persian",
         help="Only so it can pitch its English at you. It will never correct your grammar.",
     ),
+    Field(
+        "resume",
+        "Your resume",
+        "Resume",
+        kind="document",
+        help="Upload it or paste it. The interviewer reads exactly this text, so check what "
+        "came out of the file.",
+    ),
+    Field(
+        "job",
+        "The job you are interviewing for",
+        "Job posting",
+        kind="document",
+        help="Optional. The posting: the interviewer works there and asks against it.",
+    ),
 )
 
 BY_KEY = {f.key: f for f in FIELDS}
@@ -112,6 +127,8 @@ def is_set() -> bool:
 # All a conversation partner needs: what to call them and how to pitch the English.
 # Stack, role and focus would pull every chat back to engineering.
 PERSONAL = ("name", "native_language")
+# An interviewer's notes on them. The resume and the job posting are read differently.
+NOTES = tuple(f.key for f in FIELDS if f.kind != "document")
 
 
 def as_prompt(interview: bool = True) -> str:
@@ -120,7 +137,7 @@ def as_prompt(interview: bool = True) -> str:
     Only non-empty fields appear, so a half-filled profile does not feed the model a list
     of blanks to speculate about.
     """
-    fields = FIELDS if interview else [BY_KEY[k] for k in PERSONAL]
+    fields = [BY_KEY[k] for k in (NOTES if interview else PERSONAL)]
     lines = [f"- {f.term}: {get(f.key).strip()}" for f in fields if get(f.key).strip()]
     if not lines:
         return ""
@@ -137,6 +154,28 @@ def as_prompt(interview: bool = True) -> str:
         "into the stack and projects they actually named, and push on what they said they "
         "want to improve. Never read this back to them or mention that you have it."
     )
+
+
+def reading() -> str:
+    """The resume and the job posting, for an interviewer. Unlike the rest of the profile,
+    meant to be referred to: every real interviewer has read your resume before you walk in."""
+    resume, job = (get(key).strip()[: config.DOCUMENT_CHARS] for key in ("resume", "job"))
+    text = ""
+    if resume:
+        text += (
+            "\n\nTheir resume, which you read before the interview, as every interviewer "
+            f"does:\n<resume>\n{resume}\n</resume>\nRefer to it the way a real interviewer "
+            "does: name the company or project you are asking about, ask them to walk you "
+            "through it, and probe the claims - what they personally did, why they chose what "
+            "they chose, how they knew it worked. Never recite it back to them."
+        )
+    if job:
+        text += (
+            "\n\nThe job they are interviewing for. You work at this company and are hiring "
+            f"for this role:\n<job>\n{job}\n</job>\nAsk against what the role requires, and "
+            "answer their questions about the role and the team from this posting."
+        )
+    return text
 
 
 def coaching_note(recent: dict | None) -> str:
@@ -186,9 +225,12 @@ def system_prompt(
 
     `pacing` is off for written critique, where delivery is not being judged.
     `interview` is off for plain conversation, which gets their name and language instead
-    of their CV. `memory` adds what earlier sessions were about.
+    of their CV. `memory` adds what earlier sessions were about. An interview also gets
+    the resume and the job posting.
     """
     prompt = settings.prompt(mode, default) + as_prompt(interview)
+    if interview:
+        prompt += reading()
     if memory:
         prompt += recaps()
     if pacing:

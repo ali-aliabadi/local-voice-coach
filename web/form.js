@@ -15,6 +15,14 @@ export function field(item) {
   ].filter(Boolean).join(" ");
 
   let input;
+  if (item.kind === "document") {
+    // A file is read into the box by the server (documents.py), to check before saving.
+    return `<label for="${id}"><span>${escape(item.label)}</span>
+      <textarea id="${id}" name="${item.key}" rows="10">${escape(item.value)}</textarea>
+      <small id="${id}-note">${escape(note)}</small></label>
+      <input type="file" class="upload" accept=".pdf,.docx,.odt,.txt,.md" data-into="${id}"
+        aria-label="Upload a file for: ${escape(item.label)}">`;
+  }
   if (item.kind === "textarea") {
     const hint = item.placeholder || (item.default || "").slice(0, 110);
     input = `<textarea id="${id}" name="${item.key}" rows="4"

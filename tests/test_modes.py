@@ -1,11 +1,13 @@
 """What the modes say and hear: chunking a reply for speech, routing a panel's voices, and
 the arithmetic behind shadow and repeat."""
 
+import asyncio
+
 import pytest
 
-from coach import picture, settings, tts
+from coach import picture, profile, settings, store, tts
 from coach.chunks import split_for_speech, split_speaker
-from coach.modes import repeat, shadow
+from coach.modes import interview, repeat, shadow
 from coach.modes.panel import PANEL
 from coach.server.session import ACCENTS
 
@@ -141,3 +143,56 @@ def test_every_accent_talks_at_a_fluent_speakers_pace():
         for voice in ACCENTS:
             assert round(tts.PACE[voice] * tts.pace(voice)) == tts.FLUENT
     assert tts.pace("not_a_measured_voice") == 1.0
+
+
+class Overheard(Exception):  # noqa: N818 - control flow, not an error
+    """Stops a mode at its first request to the model."""
+
+
+class Ear:
+    """Stands in for the browser just long enough to hear what a mode tells the model."""
+
+    RETRY = "retry"
+
+    def __init__(self, session: int = 0):
+        self.session = session
+        self.system = ""
+
+    def prior_turns(self):
+        return []
+
+    async def send(self, **_event):
+        pass
+
+    async def reply(self, _endpoint, messages, **_how):
+        self.system = messages[0]["content"]
+        raise Overheard
+
+
+def overhear(mode, session: int = 0) -> str:
+    """The system prompt a mode opens with."""
+    ear = Ear(session)
+    with pytest.raises(Overheard):
+        asyncio.run(mode.run(None, ear))
+    return ear.system
+
+
+def test_shadow_is_everyday_english_not_an_interview():
+    """It was given the interview profile, and with it would have been given the resume."""
+    profile.save({"role": "Backend engineer", "resume": "Payments at Acme."})
+    heard = overhear(shadow)
+    assert "Acme" not in heard
+    assert "interviewing" not in heard
+
+
+@pytest.mark.parametrize(("goal", "length"), [(20, 20), (None, interview.MINUTES)])
+def test_the_interviewer_keeps_to_the_sessions_time(goal, length):
+    session = store.start("interview", "flash-lite", "m", goal)
+    assert interview.clock(session) == f"\n\nTime: 0 minutes into a {length}-minute interview."
+
+
+def test_the_interviewer_has_your_resume_and_the_time():
+    profile.save({"resume": "Payments at Acme."})
+    heard = overhear(interview, store.start("interview", "flash-lite", "m", 30))
+    assert "<resume>\nPayments at Acme.\n</resume>" in heard
+    assert heard.endswith("Time: 0 minutes into a 30-minute interview.")

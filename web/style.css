@@ -231,6 +231,11 @@ input, select, textarea {
 input[type="number"] { max-width: 9rem; }
 textarea { min-height: 8.5rem; line-height: 1.6; resize: vertical; }
 .saved { color: var(--accent); font-size: 0.85rem; }
+.upload {
+  width: auto; margin: -0.6rem 0 1.75rem; padding: 0; border: 0; background: none;
+  font-size: 0.85rem; color: var(--muted);
+}
+label small.bad { color: var(--warn); }
 
 svg { display: block; max-width: 100%; }
 
