@@ -97,7 +97,7 @@ def detail(session_id: int) -> dict | None:
         store.db()
         .execute(
             "SELECT s.id, s.started_at, s.ended_at, s.mode, s.backend, s.model, s.goal_minutes,"
-            f" s.summary, {LENGTH} FROM sessions s WHERE s.id = ?",
+            f" s.summary, s.verdict, {LENGTH} FROM sessions s WHERE s.id = ?",
             (session_id,),
         )
         .fetchone()
@@ -118,6 +118,7 @@ def detail(session_id: int) -> dict | None:
     return {
         **dict(head),
         "summary": json.loads(head["summary"]) if head["summary"] else None,
+        "verdict": json.loads(head["verdict"]) if head["verdict"] else None,
         "listening": listening("", "", session_id),
         "turns": [_turn(t) for t in turns],
         "answers": len(answers),

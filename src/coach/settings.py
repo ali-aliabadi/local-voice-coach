@@ -164,6 +164,14 @@ SPEC: dict[str, Setting] = {
         "page, and images on Telegram. One request per session, so a stronger model is "
         "affordable here. 'off' turns it off.",
     ),
+    "verdict_backend": Setting(
+        "flash",
+        "Interview verdict model",
+        "Coach",
+        kind="select",
+        help="After each interview, the feedback a real interviewer would submit: a rating "
+        "out of 10, hire or not, a score for each area. Telegram gets only the headline.",
+    ),
     "relay_sheet": Setting(
         "on", "Send the study sheet", "Telegram", kind="select", choices=("on", "off")
     ),

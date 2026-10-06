@@ -13,7 +13,7 @@ from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket
 
-from .. import backends, clock, coach, history, llm, reports, settings, sheet, store
+from .. import backends, clock, coach, history, llm, reports, settings, sheet, store, verdict
 from . import models, past
 from .api import MODES, ROUTES, partner
 from .guard import MIDDLEWARE
@@ -69,6 +69,7 @@ async def websocket_session(websocket: WebSocket) -> None:
             # Each skips a session too short to count, and waits for the ones before it.
             coach.summarise(session)  # once the notes are in; skipped if already current
             sheet.later(session)  # after the summary: the take-away page
+            verdict.later(session)  # an interview's verdict, before the report carries it
             coach.later(session, reports.after_session(session))  # to Telegram, last
 
 

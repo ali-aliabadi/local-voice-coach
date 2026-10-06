@@ -120,6 +120,7 @@ async def get_settings(_request: Request) -> Response:
         "tts_voice": models.voice_names(),
         "coach_backend": ("off", *backends.BY_KEY),
         "sheet_backend": ("off", *backends.BY_KEY),
+        "verdict_backend": ("off", *backends.BY_KEY),
     }
     return JSONResponse(settings.as_form(choices) + prompt_fields())
 

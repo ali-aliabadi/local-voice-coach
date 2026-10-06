@@ -7,7 +7,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route
 
-from .. import coach, history, llm, reports, sheet, store
+from .. import coach, history, llm, reports, sheet, store, verdict
 from .api import partner
 
 
@@ -32,6 +32,8 @@ async def get_session(request: Request) -> Response:
             "counted": history.is_counted(found["id"]),
             "minimum": {"answers": history.MIN_ANSWERS, "minutes": history.MIN_MINUTES},
             "telegram": reports.sent(found["id"], found["answers"]),
+            "interview": verdict.is_interview(found["id"]),
+            "can_verdict": verdict.endpoint() is not None,
             "waiting": llm.waiting,
         }
     )
@@ -58,8 +60,10 @@ async def get_sheet(request: Request) -> Response:
 
 
 async def coach_session(request: Request) -> Response:
-    """Notes for answers that have none, then the summary. Old sessions get a report too."""
+    """Notes for answers that have none, then the summary, and an interview's verdict.
+    Old sessions get a report too."""
     coach.catch_up(int(request.path_params["session"]))
+    verdict.later(int(request.path_params["session"]))
     return JSONResponse({"ok": True})
 
 

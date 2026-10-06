@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { MOVED, PHRASE, SERIES, moved, verdict } from "../web/chart.js";
 import { mmss } from "../web/clock.js";
 import { untilSilence } from "../web/audio.js";
+import { DECISIONS, card, section } from "../web/verdict.js";
 
 // ---- the session clock reads naturally past an hour ----
 assert.equal(mmss(75), "01:15");
@@ -70,6 +71,20 @@ for (const [key, phrase] of Object.entries(PHRASE)) {
     assert.ok(!/^-/.test(text), `${key} must not surface a minus sign: ${text}`);
     assert.ok(!text.includes("NaN"), `${key} produced NaN`);
   }
+}
+
+// ---- an interview's verdict: the whole scale shown, the one they chose marked in words ----
+{
+  const html = card({ rating: 7, decision: "Yes", level: "mid-level",
+    scores: { "technical depth": 8 }, strengths: ["<b>named</b> the trade-off"] });
+  for (const d of DECISIONS) assert.ok(html.includes(d), `the scale shows "${d}"`);
+  assert.match(html, /<li aria-current="true">Yes<\/li>/);
+  assert.equal((html.match(/aria-current/g) || []).length, 1);
+  assert.ok(html.includes("width: 80%"), "a score of 8 fills 80% of a fixed 0-10 track");
+  assert.ok(!html.includes("<b>named</b>"), "the model's words are escaped");
+  const waiting = { interview: true, counted: true, coaching: "on", can_verdict: true };
+  assert.ok(section(waiting).includes("verdict-now"), "a missing verdict can be asked for");
+  assert.equal(section({ ...waiting, interview: false }), "", "only interviews get one");
 }
 
 // ---- hands-free: stops after you have spoken and gone quiet, never before you start ----
