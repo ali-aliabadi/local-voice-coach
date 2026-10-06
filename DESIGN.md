@@ -123,7 +123,9 @@ where they are and how far that is from where they want to be.
 | Settings | SQLite `settings` table | survives restarts, editable from the UI |
 | Secrets | `.env`, never returned to the browser | the API key is write-only over the wire, masked on read |
 
-Recordings auto-delete after `audio_retention_days` (default 7), checked by mtime every ten minutes while the server runs (`clock.py`).
+Recordings are kept forever by default: they never leave the machine, so deleting them
+protects nothing. `audio_retention_days` deletes older ones for anyone short of disk,
+checked by mtime every ten minutes while the server runs (`clock.py`).
 Roughly 1MB per answer, ~40MB per hour of practice, so steady state is a few hundred MB.
 There is a visible delete-everything button, because the whole pitch is that this data is
 yours.

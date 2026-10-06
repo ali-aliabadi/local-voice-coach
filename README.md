@@ -84,7 +84,8 @@ come from word timestamps and are exact. Every session is kept: `/history` repla
 ## Your data
 
 Sessions and recordings stay in `data/` (Docker) or the repo root (native), never
-uploaded. Recordings delete after 7 days. `make reset` erases everything.
+uploaded. Recordings are kept forever, about 40MB an hour, unless you set a number of
+days in Settings. `make reset` erases everything.
 
 ## Contributing
 

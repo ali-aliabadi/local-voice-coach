@@ -61,11 +61,12 @@ SPEC: dict[str, Setting] = {
         help="Space separated. Repeated letters are matched too, so 'mm' also catches 'mmmm'.",
     ),
     "audio_retention_days": Setting(
-        7,
+        0,  # they never leave this machine, so nothing is gained by deleting them
         "Keep recordings for (days)",
         "Scoring",
         kind="number",
-        help="Recordings are deleted after this many days. 0 keeps them forever.",
+        help="0 keeps them forever. They never leave this machine; they take about 40MB "
+        "per hour of practice. Set a number of days to have older ones deleted.",
     ),
     # ---- Model ----
     "temperature": Setting(0.7, "Temperature", "Model", kind="number", step=0.1),
