@@ -11,6 +11,7 @@ from .. import (
     backends,
     documents,
     history,
+    jobs,
     profile,
     settings,
     store,
@@ -115,6 +116,27 @@ async def extract(request: Request) -> Response:
     return JSONResponse({"text": text})
 
 
+async def get_jobs(request: Request) -> Response:
+    """Real postings to practise for, searched by the role and level in the profile unless
+    the page asks for something else."""
+    ask = request.query_params
+    words = ask.get("q") or profile.get("role").strip() or "software engineer"
+    seniority = ask.get("seniority", jobs.LEVELS.get(profile.get("seniority"), ""))
+    page = ask.get("page", "1")
+    try:
+        found = await asyncio.to_thread(
+            jobs.search,
+            words,
+            seniority,
+            ask.get("country", "").strip(),
+            ask.get("worldwide") == "1",
+            int(page) if page.isdigit() else 1,
+        )
+    except RuntimeError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=502)
+    return JSONResponse({**found, "q": words, "seniority": seniority})
+
+
 async def get_settings(_request: Request) -> Response:
     choices = {
         "tts_voice": models.voice_names(),
@@ -170,6 +192,7 @@ ROUTES = [
     Route("/api/profile", get_profile, methods=["GET"]),
     Route("/api/profile", save_profile, methods=["POST"]),
     Route("/api/extract", extract, methods=["POST"]),
+    Route("/api/jobs", get_jobs),
     Route("/api/settings", get_settings, methods=["GET"]),
     Route("/api/settings", save_settings, methods=["POST"]),
     Route("/api/progress", get_progress),

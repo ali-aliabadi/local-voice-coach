@@ -236,6 +236,10 @@ textarea { min-height: 8.5rem; line-height: 1.6; resize: vertical; }
   font-size: 0.85rem; color: var(--muted);
 }
 label small.bad { color: var(--warn); }
+.check { display: flex; align-items: center; gap: 0.5rem; }
+.check input { width: auto; }
+.job { border-top: 1px solid var(--line); padding: 1.1rem 0 1.4rem; }
+.job h2 { margin: 0 0 0.3rem; }
 
 svg { display: block; max-width: 100%; }
 
