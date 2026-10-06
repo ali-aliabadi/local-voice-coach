@@ -165,16 +165,14 @@ async def stream_sentences(
     # Measured from the first attempt: the wait the user actually sat through.
     first_ms = (time.perf_counter() - started) * 1000
     full = buffer
-    spoke = False  # until the first chunk is out, a clause is enough
     async for chunk in stream:
         token = chunk.choices[0].delta.content if chunk.choices else ""
         if not token:
             continue
         buffer += token
         full += token
-        speak, buffer = split_for_speech(buffer, eager=not spoke)
+        speak, buffer = split_for_speech(buffer)
         if speak:
-            spoke = True
             yield "sentence", speak
     speak, _ = split_for_speech(buffer, flush=True)
     if speak:
