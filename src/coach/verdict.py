@@ -67,16 +67,17 @@ def _score(value: object) -> int | None:
 
 def valid(found: dict | None) -> dict | None:
     """The verdict, if it says what a verdict has to: a rating out of 10 and a decision."""
-    if not found or found.get("decision") not in DECISIONS:
-        return None
-    rating = _score(found.get("rating"))
-    if rating is None:
+    said = str((found or {}).get("decision", "")).strip().lower()
+    decision = next((d for d in DECISIONS if d.lower() == said), None)
+    rating = _score((found or {}).get("rating"))
+    if not found or decision is None or rating is None:
         return None
     scores = found.get("scores")
     marked = {str(k): _score(v) for k, v in scores.items()} if isinstance(scores, dict) else {}
     return {
         **found,
         "rating": rating,
+        "decision": decision,
         "scores": {area: score for area, score in marked.items() if score is not None},
     }
 
@@ -122,7 +123,11 @@ async def write(session_id: int) -> None:
     )
     found = valid(coach.parse(reply.text))
     if found is None:
-        raise RuntimeError("The interviewer's verdict came back malformed. Ask for it again.")
+        said = " ".join(reply.text.split())[:120]
+        raise RuntimeError(
+            f"{ep.model}'s verdict was not usable, so ask for it again: "
+            + (f'it said "{said}"' if said else "it returned nothing, its budget spent thinking")
+        )
     found["answers"] = answers  # what it covers, so a resumed interview is judged again
     store.db().execute(
         "UPDATE sessions SET verdict = ? WHERE id = ?", (json.dumps(found), session_id)

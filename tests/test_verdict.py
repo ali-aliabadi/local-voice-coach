@@ -42,6 +42,9 @@ def test_a_verdict_needs_a_rating_out_of_ten_and_a_decision_on_the_scale():
     assert verdict.valid({**WRITTEN, "rating": 11}) is None
     assert verdict.valid({**WRITTEN, "rating": "great"}) is None
     assert verdict.valid({**WRITTEN, "decision": "Strong hire"}) is None
+    shouted = verdict.valid({**WRITTEN, "decision": " definitely HIRE"})
+    assert shouted is not None
+    assert shouted["decision"] == "Definitely hire"
     assert verdict.valid(None) is None
     assert verdict.headline(kept) == "7/10 · Yes"
 
@@ -62,7 +65,10 @@ def test_the_interviewer_judges_the_interview_against_the_resume(counted, monkey
 def test_a_malformed_verdict_is_reported_not_kept(counted, monkeypatch):
     session = counted("panel")
     answered(monkeypatch, "I would probably hire them.")
-    with pytest.raises(RuntimeError, match="malformed"):
+    with pytest.raises(RuntimeError, match=r'not usable.*"I would probably hire them\."'):
+        asyncio.run(verdict.write(session))
+    answered(monkeypatch, "")
+    with pytest.raises(RuntimeError, match="returned nothing"):
         asyncio.run(verdict.write(session))
     assert stored(session) is None
 
