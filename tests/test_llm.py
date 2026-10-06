@@ -2,6 +2,7 @@
 
 import asyncio
 import itertools
+from types import SimpleNamespace
 from typing import ClassVar
 
 import httpx
@@ -110,3 +111,26 @@ def test_a_client_is_kept_per_server_and_key_and_closed_on_shutdown():
     asyncio.run(llm.close())
     assert first.is_closed()
     assert llm._client("https://model.test", "key") is not first
+
+
+def test_a_reply_is_spoken_in_whole_sentences_never_cut_at_a_comma(monkeypatch):
+    """Cutting the first sentence at its first comma got the first sound out 0.8s sooner,
+    but Kokoro voices each piece as its own utterance: the partner audibly stopped
+    mid-sentence, then started again, in 21 of 26 replies of a real session."""
+    tokens = ["Oh, nice", " one, getting home", " so early. What", " did you do after?"]
+
+    async def streamed():
+        for token in tokens[1:]:
+            yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=token))])
+
+    async def first_words(_ep, _messages, _max_tokens):
+        return streamed(), tokens[0]
+
+    async def spoken():
+        return [c async for kind, c in llm.stream_sentences(FLASH, []) if kind == "sentence"]
+
+    monkeypatch.setattr(llm, "_first_words", first_words)
+    assert asyncio.run(spoken()) == [
+        "Oh, nice one, getting home so early.",
+        "What did you do after?",
+    ]

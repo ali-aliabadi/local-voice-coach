@@ -3,10 +3,11 @@ the arithmetic behind shadow and repeat."""
 
 import pytest
 
-from coach import picture
+from coach import picture, settings, tts
 from coach.chunks import split_for_speech, split_speaker
 from coach.modes import repeat, shadow
 from coach.modes.panel import PANEL
+from coach.server.session import ACCENTS
 
 
 def stream(tokens):
@@ -68,19 +69,9 @@ def test_a_run_on_breaks_between_words_never_inside_one():
     assert not any(c.endswith("wor") or c.startswith("rd") for c in run_on)
 
 
-@pytest.mark.parametrize(
-    ("buffer", "eager", "split"),
-    [
-        ("Oh, nice one, getting home", True, ("Oh, nice one,", "getting home")),
-        ("Oh, ", True, ("", "Oh, ")),  # too short to sound natural
-        ("About 1,000 people came", True, ("", "About 1,000 people came")),  # not a clause
-        ("Oh, nice one, getting home", False, ("", "Oh, nice one, getting home")),
-        ("Done. And then, more", True, ("Done.", "And then, more")),
-    ],
-)
-def test_the_first_words_may_end_at_a_clause(buffer, eager, split):
-    """The first words of a reply are the wait you feel, so they need not wait for a full stop."""
-    assert split_for_speech(buffer, eager=eager) == split
+def test_a_comma_never_ends_a_piece_of_speech():
+    assert split_for_speech("Oh, nice one, getting home") == ("", "Oh, nice one, getting home")
+    assert split_for_speech("Done. And then, more") == ("Done.", "And then, more")
 
 
 @pytest.mark.parametrize(
@@ -138,3 +129,15 @@ def test_a_panel_line_goes_to_its_speakers_voice(line, routed):
 
 def test_a_colon_mid_sentence_is_not_a_speaker():
     assert split_speaker("So the trade-off is: latency versus cost.", PANEL)[0] is None
+
+
+def test_every_accent_talks_at_a_fluent_speakers_pace():
+    """A different accent each session used to mean a different pace: 185 to 235 words a
+    minute, so one session felt slow. The target is fixed - a learner never sets it by
+    picking a slower voice."""
+    assert set(ACCENTS) <= set(tts.PACE), "measure a new accent's pace before adding it"
+    for chosen in ("am_puck", "am_michael"):
+        settings.set("tts_voice", chosen)
+        for voice in ACCENTS:
+            assert round(tts.PACE[voice] * tts.pace(voice)) == tts.FLUENT
+    assert tts.pace("not_a_measured_voice") == 1.0
