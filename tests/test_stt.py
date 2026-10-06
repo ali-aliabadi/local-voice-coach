@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import pytest
 
+from coach import stt
 from coach.stt import filler_pattern, fluency, word_rows
 
 
@@ -104,3 +105,9 @@ def test_low_confidence_is_marked_unclear_never_scored_as_pronunciation():
     rows = word_rows([W(0.0, 0.4, "middling", probability=0.31), W(0.5, 0.9, "mind")])
     assert rows[0]["unclear"]
     assert not rows[1]["unclear"]
+
+
+def test_fetch_downloads_the_repo_faster_whisper_would(monkeypatch):
+    monkeypatch.setattr(stt, "snapshot_download", lambda repo, **_: repo)
+    assert stt.fetch("small.en") == "Systran/faster-whisper-small.en"
+    assert stt.fetch("distil-small.en") == "Systran/faster-distil-whisper-small.en"
