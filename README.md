@@ -3,209 +3,95 @@
 [![check](https://github.com/ali-aliabadi/local-voice-coach/actions/workflows/check.yml/badge.svg)](https://github.com/ali-aliabadi/local-voice-coach/actions/workflows/check.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-Spoken English practice for non-native speakers that **measures your hesitation**.
+Spoken English practice that **measures your hesitation**. You talk in the browser, a
+model plays the other side, and every answer is scored for speed, filler words, pauses
+and how long you took to start. A coach writes up your grammar and phrasing afterwards.
 
-You talk out loud in the browser — everyday conversation, real-life roleplays, stories to
-retell, fluency drills, or a job interview — and every answer is scored: words per
-minute, filler words, pauses, and how long you took to start talking. A coach writes up
-your grammar and word choice after the session, and you listen back to yourself.
-
-**Your voice never leaves your machine.** Whisper and Kokoro run locally. Only transcript
-text reaches a model, and only if you choose a cloud backend — pick a local one and
-nothing leaves at all.
-
-<!-- TODO: 20-second screencast goes here. It converts better than anything written below. -->
-
-Built for one problem: *"I can't speak English confidently. There are a lot of mmmm and
-my sentences take a long time to form."* Most tools can't even measure that, because
-speech-to-text is trained to tidy disfluencies away before anything sees them.
+Whisper and Kokoro run locally, so your voice never leaves your machine. Only transcript
+text goes to the model, and with a local model nothing leaves at all.
 
 ## Setup
 
+You need [uv](https://docs.astral.sh/uv/) and `make`. Docker is optional.
+
+**1. Gemini key.** Free, no card: [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
+To stay offline, skip it and load a model in [LM Studio](https://lmstudio.ai/); it shows
+up in the model picker.
+
+**2. Relay (optional): reports on Telegram.** Needs a
+[Relay](https://github.com/ali-aliabadi/relay) server. Its admin runs:
+
 ```bash
-make install     # Python dependencies
-make run         # fetches the voice weights, then serves http://127.0.0.1:8000
+relay clients create voice-coach                  # prints this app's API key once
+relay recipients add <you> --name "Your Name"     # you, as a Relay user
+relay recipients link <you> @your_telegram_name   # then open the bot and tap Start
 ```
 
-Or in Docker:
+On a Docker-hosted Relay, prefix each with `docker compose exec relay`.
+
+**3. `.env`** in the repo root:
 
 ```bash
-make up          # build and start
-make logs        # watch it come up
-make down
+GEMINI_API_KEY=...
+RELAY_URL=https://relay.example.com
+RELAY_API_KEY=rk_...
+RELAY_APP=voice-coach
+RELAY_USER=<you>
 ```
 
-`make` on its own lists everything. To skip building the image, use the published one:
-`IMAGE=ghcr.io/<owner>/local-voice-coach make pull up`.
+Set `RELAY_USER` to your own recipient. Left unset it is `admin`, the person who runs
+Relay, and your reports go to them. Leave the `RELAY_*` lines out to keep Telegram off.
 
-Add a Gemini key in Settings (free, no card, from
-[aistudio.google.com/apikey](https://aistudio.google.com/apikey)), or skip it and use a
-local model through [LM Studio](https://lmstudio.ai/).
+**4. Run.**
 
-**Native is faster than Docker on a Mac.** Docker runs Linux in a VM there, so Whisper
-gets less CPU and no access to the Neural Engine. Use Docker for a clean or shared
-environment; use `make run` for daily practice.
+```bash
+make install   # Python dependencies
+make run       # fetches the voice weights once, then opens http://127.0.0.1:8000
+```
 
-The container reaches LM Studio on your machine at `host.docker.internal:1234` — already
-configured, since `localhost` inside a container means the container.
+Or `make up` to run it in Docker (`make logs`, `make down`). On a Mac, native is faster.
 
-## It knows who you are
-
-Fill in [your profile](http://127.0.0.1:8000/profile). Every mode gets your name and
-first language. The interview modes also get your target role, level, the stack you
-actually use, and what you want to get better at: they pitch difficulty at your level,
-dig into the projects you named, and push on the thing you said you freeze on. Nothing is
-ever read back at you.
-
-It also sees how you have been speaking lately, and asks shorter, more concrete questions
-when you have been hesitating. It is told, in the prompt, never to mention your speech:
-being corrected mid-answer is what makes people freeze.
+Then fill in your [profile](http://127.0.0.1:8000/profile) so the partner knows who it
+is talking to.
 
 ## Modes
 
 | Mode | What it is |
 |---|---|
-| **talk** | Everyday conversation, not an interview — a friendly partner chats about ordinary things and talks enough to give you something to listen to. It remembers your last few sessions. |
-| **roleplay** | A real-life scene — ordering with an allergy, booking a doctor, returning broken headphones, small talk with a new colleague — with the partner playing the other person. |
-| **retell** | It tells a short story; you tell it back in your own words, and it says what you caught and what you missed. Listening and speaking in one. |
-| **repeat** | The 4/3/2 drill: one topic three times, in 90, 60 and 45 seconds, then a table of how your numbers moved between the first telling and the last. |
-| **shadow** | It says a natural sentence; you say it straight back. Scored by the words you matched, and a sentence you mostly missed is said again. |
-| **panel** | Three interviewers with distinct voices — a hiring manager, a staff engineer, and a bar raiser who pushes back. Closer to a real onsite. |
-| **review** | One hard technical question, then a written critique: what held up, what was vague, what a real interviewer would probe next. Deliberately slow. |
+| **talk** | Everyday conversation with a partner who remembers your last sessions |
+| **roleplay** | A real-life scene: a restaurant, a doctor, a return, a new colleague |
+| **retell** | Hear a short story, tell it back |
+| **repeat** | The 4/3/2 drill: one topic in 90, 60 and 45 seconds |
+| **shadow** | Repeat a sentence straight back |
+| **panel** | Three interviewers, closer to a real onsite |
+| **review** | One hard technical question, then a written critique |
 
-What the partner says is blurred until you tap **show text** — hear it first. **again**
-replays it, **slower** says it again at four fifths of the speed, and how often you needed
-either is tracked, so you can watch your ear improve. Each session gets a different
-American or British voice.
-
-Tap the circle to answer, tap again when you're done. Space works too.
+More modes unlock as you complete sessions.
 
 ## The numbers
 
-| Metric | Meaning | Direction |
+| Metric | Meaning | Aim |
 |---|---|---|
-| **wpm** | words per minute while actually speaking | up — native conversational is ~140–160 |
-| **fillers** | "um", "uh", "mmm", "er", "hmm" — per 100 words | down — 2 or fewer is barely noticeable |
-| **pauses** | silences past your threshold (0.6s) mid-answer — per minute | down |
-| **lead-in** | seconds before your first word | down — this is *"sentences take long to form"* |
+| **wpm** | words per minute while speaking | up, ~140–160 |
+| **fillers** | "um", "uh", "mmm" per 100 words | 2 or fewer |
+| **pauses** | silences over 0.6s, per minute | down |
+| **lead-in** | seconds before your first word | down |
 
-After each answer you get the transcript with **every filler highlighted**, a **timeline**
-of your answer with the silences drawn as gaps, and **playback of your own voice**.
-
-**Every session is kept and replayable.** End one and you land on its full review: the
-whole conversation, each answer scored, the highlighted transcript and timeline for each,
-and your recordings. `/history` lists them all; `/progress` totals everything you have
-ever done and charts the four numbers over time.
-
-Fillers and pauses are rates, not counts per answer: a long answer has more of them in it
-without being any worse, and averages are weighted by words so one short answer cannot
-swing a session.
-
-Filler counts are a floor, not a census: Whisper drops some disfluencies even with the
-prompt biasing it toward verbatim. Pauses, wpm and lead-in come from word timestamps and
-are exact.
-
-## The coach
-
-A second model reads each answer in the background while you keep talking, and leaves
-notes you read after the session: grammar fixes as *what you said → a better version*, a
-more natural way to say the whole thing, phrases and idioms that fit the topic, and one
-thing you did well. The session gets a summary at the top — the three things to work on,
-phrases worth learning, and phrases to buy thinking time instead of "um". The coach is
-told to be kind, to skip anything a native listener would let pass, and to ignore what
-speech recognition probably misheard. The fixes it keeps making are counted on the
-progress page, so a pattern stands out from a one-off slip.
-
-The partner you talk to never corrects you — being corrected mid-answer is what makes
-people freeze. Correction lives with the coach, written, after the fact.
-
-`talk` also remembers your last few sessions from the coach's recaps, so "do you
-remember the film I told you about?" gets a real answer. Choose the coach's model, or
-turn it off, in Settings.
-
-After every session of three answers or more, a model writes your **study sheet**: a page
-or two to keep — what went well, the fixes worth the most, phrases for the conversations
-you actually have (each shown against what you said, with an example), what to say
-instead of "um", three small things to practise tomorrow, how the session's time went
-(its length against your goal, how much of it was you speaking, how fast replies came,
-how many you followed by ear) and charts of every answer and of your last two weeks. Open it as a PDF from the
-session page; with Telegram set up it is sent to you too. Phrases in the coach's notes
-are anchored the same way: *instead of "I don't like cinema" → "not really my thing"*.
-
-## On your phone
-
-With [Relay](https://github.com/ali-aliabadi/relay) set up, the app sends to Telegram:
-
-- **after each session**: how long it ran against your goal, what changed since last
-  time, how many replies you followed by ear, a chart of every answer with its trend, and
-  your study sheet as a PDF to download (as page images, on a Relay from before file
-  blocks). Sent by itself once the coach has finished.
-- **last week's report**, after the first session of a new week: each day, against the
-  week before
-
-The app is meant to run only while you practise, so everything is sent when a session
-ends; quitting with Ctrl-C waits for the study sheet and report (Ctrl-C again skips
-them). Put `RELAY_URL`, `RELAY_API_KEY` and `RELAY_APP` in `.env`; each message has an
-on/off in Settings. Only numbers, a chart and — if you allow it — the coach's lessons are
-sent. Audio never is.
-
-## Cost
-
-Measured on a real turn: 995 input tokens, 20 output. At ~40 answers (about an hour) a day:
-
-| Backend | If billed | First token |
-|---|---|---|
-| `gemini-3.5-flash-lite` | **$0.42/month** | ~1.1s |
-| `gemini-3.8-flash` | ~$1.08/month | ~3–9s |
-| anything local | **free** | see below |
-
-Free tier covers roughly 500 requests/day, well above the ~40 an hour needs. Run a local
-model and it's free and offline regardless.
-
-Those figures were measured with 8 turns of history and no coach. The partner now sees the
-whole session — so it remembers what you said twenty minutes ago — and the coach adds one
-Flash-Lite call per answer, so a turn costs several times the 995 tokens above. Still
-well inside the free tier for an hour a day; the billed price has not been re-measured.
-
-The picker shows published latency next to **Yours** — the average measured from your own
-past sessions. Trust that column, not the estimate.
-
-## Offline
-
-Start LM Studio, load any of these, and it appears in the picker automatically:
-
-| Model | Role | RAM |
-|---|---|---|
-| [LFM2.5 1.2B](https://lmstudio.ai/models/liquid/lfm2.5-1.2b) | talk | 0.95GB |
-| [Ministral 3 3B](https://lmstudio.ai/models/mistralai/ministral-3-3b) | talk | 2GB |
-| [Gemma 4 E2B](https://lmstudio.ai/models/google/gemma-4-e2b) | talk | 4GB |
-| [Nemotron 3 Nano 4B](https://lmstudio.ai/models/nvidia/nemotron-3-nano-4b) | talk | 5GB |
-| [Gemma 4 E4B](https://lmstudio.ai/models/google/gemma-4-e4b) | both | 6GB |
-| [Bonsai 27B](https://lmstudio.ai/models/prism-ml/bonsai-27b) | review | 4GB — 27B reasoning, keeps 94.6% of FP16 |
-| [Qwen3.5 9B](https://lmstudio.ai/models/qwen/qwen3.5-9b) | review | 7GB |
-| [gpt-oss-20b](https://lmstudio.ai/models/openai/gpt-oss-20b) | review | 12GB |
-
-Local reasoning models need a generous token budget — Bonsai-27B returns an *empty* reply
-if thinking eats it all. Raise "Review max tokens" in Settings if that happens.
+Whisper drops some fillers even when told not to, so filler counts are a floor. The rest
+come from word timestamps and are exact. Every session is kept: `/history` replays them,
+`/progress` charts the trend.
 
 ## Your data
 
-Sessions, metrics and recordings live in `data/` (or the repo root when running natively
-without `DATA_DIR`). Both are gitignored and neither is ever uploaded. Recordings
-auto-delete after 7 days, Settings has a button that erases everything, and `make reset`
-does the same from the terminal.
+Sessions and recordings stay in `data/` (Docker) or the repo root (native), never
+uploaded. Recordings delete after 7 days. `make reset` erases everything.
 
 ## Contributing
 
-Adding a mode is one file. Adding a model is one row. Adding a setting is one row, and the
-form builds itself. See [CONTRIBUTING.md](CONTRIBUTING.md) and [DESIGN.md](DESIGN.md).
-
-```bash
-make install            # exactly what uv.lock pins, ruff included
-make check              # ruff, formatter, 300-line budget, tests with coverage - what CI runs
-make e2e                # the real server over a real socket (needs `make models`)
-```
+A mode is one file, a model one row, a setting one row. See
+[CONTRIBUTING.md](CONTRIBUTING.md) and [DESIGN.md](DESIGN.md); `make check` runs what CI
+runs.
 
 ## License
 
-[Apache-2.0](LICENSE).
+[Apache-2.0](LICENSE)
