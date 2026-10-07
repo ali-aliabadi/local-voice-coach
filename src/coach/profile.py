@@ -6,11 +6,9 @@ interviewer asks generic questions.
 """
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from . import config, history, settings, store
-
-SENIORITY = ("", "intern", "junior", "mid-level", "senior", "staff", "principal")
 
 
 @dataclass(frozen=True)
@@ -21,48 +19,25 @@ class Field:
     kind: str = "text"
     help: str = ""
     placeholder: str = ""
-    choices: tuple[str, ...] = field(default_factory=tuple)
 
 
+# No role, stack or years: the resume and the job posting say all that, and asking
+# everyone for their tech stack made a conversation app look like an engineering one.
 FIELDS: tuple[Field, ...] = (
-    Field("name", "What should the interviewer call you?", "Name", placeholder="Ali"),
-    Field("role", "Role you are interviewing for", "Target role", placeholder="Backend engineer"),
-    Field("seniority", "Level you are aiming at", "Level", kind="select", choices=SENIORITY),
-    Field("years", "Years of experience", "Years of experience", kind="number"),
-    Field(
-        "companies",
-        "Companies or kind of company",
-        "Targeting",
-        placeholder="Series B startups, remote",
-    ),
-    Field(
-        "stack",
-        "What you actually work with",
-        "Works with",
-        placeholder="Python, Postgres, Kubernetes",
-        help="The interviewer digs into these instead of guessing.",
-    ),
-    Field(
-        "background",
-        "A sentence or two about your experience",
-        "Background",
-        kind="textarea",
-        help="The project you would bring up in an interview. Gives it something to pull on.",
-    ),
-    Field(
-        "focus",
-        "What you want to get better at",
-        "Wants to improve",
-        kind="textarea",
-        placeholder="System design. I freeze when asked to estimate scale.",
-        help="The trainer leans on this. Be specific about what goes wrong.",
-    ),
+    Field("name", "What should your partner call you?", "Name"),
     Field(
         "native_language",
         "Your first language",
         "First language",
-        placeholder="Persian",
         help="Only so it can pitch its English at you. It will never correct your grammar.",
+    ),
+    Field(
+        "focus",
+        "What you want to get better at in interviews",
+        "Wants to improve",
+        kind="textarea",
+        placeholder="Long pauses before I answer a technical question.",
+        help="The interviewer leans on this. Be specific about what goes wrong.",
     ),
     Field(
         "resume",
@@ -113,7 +88,6 @@ def as_form() -> list[dict]:
             "kind": f.kind,
             "help": f.help,
             "placeholder": f.placeholder,
-            "choices": list(f.choices),
             "value": get(f.key),
         }
         for f in FIELDS
@@ -125,7 +99,7 @@ def is_set() -> bool:
 
 
 # All a conversation partner needs: what to call them and how to pitch the English.
-# Stack, role and focus would pull every chat back to engineering.
+# Their interview focus would pull every chat back to interviews.
 PERSONAL = ("name", "native_language")
 # An interviewer's notes on them. The resume and the job posting are read differently.
 NOTES = tuple(f.key for f in FIELDS if f.kind != "document")
@@ -150,9 +124,8 @@ def as_prompt(interview: bool = True) -> str:
     return (
         "\n\nYou are interviewing this specific person:\n"
         + "\n".join(lines)
-        + "\n\nUse this to choose what to ask: pitch the difficulty at their level, dig "
-        "into the stack and projects they actually named, and push on what they said they "
-        "want to improve. Never read this back to them or mention that you have it."
+        + "\n\nUse this to choose what to ask, and push on what they said they want to "
+        "improve. Never read this back to them or mention that you have it."
     )
 
 

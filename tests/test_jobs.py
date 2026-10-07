@@ -9,7 +9,7 @@ from starlette.applications import Starlette
 warnings.filterwarnings("ignore", message="Using `httpx`")  # starlette's own transition
 from starlette.testclient import TestClient  # noqa: E402
 
-from coach import jobs, profile  # noqa: E402
+from coach import jobs  # noqa: E402
 from coach.server import api  # noqa: E402
 
 # One posting, as Himalayas sent it on 2026-10-06, trimmed.
@@ -72,10 +72,6 @@ def test_postings_with_less_or_different_detail(changed, location, salary, url):
         assert job["url"] == url, "only an https link reaches the page"
 
 
-def test_every_level_in_the_profile_has_a_search_level():
-    assert set(jobs.LEVELS) == set(profile.SENIORITY) - {""}
-
-
 def test_a_search_is_asked_once_an_hour_and_says_what_it_filters(himalayas):
     jobs.search("go", "Senior", "DE", worldwide=True, page=2)
     jobs.search("go", "Senior", "DE", worldwide=True, page=2)
@@ -87,13 +83,12 @@ def test_a_search_is_asked_once_an_hour_and_says_what_it_filters(himalayas):
 
 
 @pytest.mark.usefixtures("himalayas")
-def test_the_jobs_page_searches_the_profile_unless_told_otherwise():
-    # One client for the whole test: the database belongs to the thread that opened it.
-    with TestClient(Starlette(routes=api.ROUTES)) as client:
-        client.post("/api/profile", json={"role": "Backend engineer", "seniority": "staff"})
-        found = client.get("/api/jobs").json()
-        assert (found["q"], found["seniority"], found["total"]) == ("Backend engineer", "Senior", 1)
-        assert client.get("/api/jobs?q=rust&seniority=").json()["seniority"] == ""
+def test_the_jobs_page_searches_software_engineering_unless_told_otherwise():
+    client = TestClient(Starlette(routes=api.ROUTES))
+    found = client.get("/api/jobs").json()
+    assert (found["q"], found["seniority"], found["total"]) == ("software engineer", "", 1)
+    found = client.get("/api/jobs?q=rust&seniority=Senior").json()
+    assert (found["q"], found["seniority"]) == ("rust", "Senior")
 
 
 def test_no_internet_is_said_not_crashed_on(monkeypatch):

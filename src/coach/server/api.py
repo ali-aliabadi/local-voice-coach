@@ -117,11 +117,11 @@ async def extract(request: Request) -> Response:
 
 
 async def get_jobs(request: Request) -> Response:
-    """Real postings to practise for, searched by the role and level in the profile unless
-    the page asks for something else."""
+    """Real postings to practise for. Software engineering unless the page asks for
+    something else: that is what the interview modes interview for."""
     ask = request.query_params
-    words = ask.get("q") or profile.get("role").strip() or "software engineer"
-    seniority = ask.get("seniority", jobs.LEVELS.get(profile.get("seniority"), ""))
+    words = ask.get("q") or "software engineer"
+    seniority = ask.get("seniority", "")
     page = ask.get("page", "1")
     try:
         found = await asyncio.to_thread(

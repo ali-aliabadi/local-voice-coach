@@ -4,13 +4,7 @@ import json
 
 from coach import config, profile, settings, store
 
-ENGINEER = {
-    "name": "Ali",
-    "role": "Backend engineer",
-    "seniority": "mid-level",
-    "focus": "System design.",
-    "nonsense": "ignored",
-}
+PROFILE = {"name": "Sam", "focus": "System design.", "nonsense": "ignored"}
 
 
 def test_an_empty_profile_gives_the_model_no_blanks_to_guess_at():
@@ -19,24 +13,22 @@ def test_an_empty_profile_gives_the_model_no_blanks_to_guess_at():
 
 
 def test_the_profile_is_given_once_and_never_recited():
-    profile.save(ENGINEER)
+    profile.save(PROFILE)
     prompt = profile.as_prompt()
     assert profile.is_set()
-    assert "Ali" in prompt
-    assert "Backend engineer" in prompt
+    assert "Sam" in prompt
     assert "System design." in prompt
     assert "nonsense" not in prompt
     assert "ignored" not in prompt
-    assert "Years of experience" not in prompt  # an empty field, or the model speculates
+    assert "First language" not in prompt  # an empty field, or the model speculates
     assert "Never read this back" in prompt
 
 
-def test_everyday_talk_keeps_the_name_but_not_the_engineering():
-    profile.save(ENGINEER)
+def test_everyday_talk_keeps_the_name_but_not_the_interview_focus():
+    profile.save(PROFILE)
     assert profile.system_prompt("talk", "BASE").startswith("BASE")
     chat = profile.system_prompt("talk", "BASE", interview=False)
-    assert "Ali" in chat
-    assert "Backend engineer" not in chat
+    assert "Sam" in chat
     assert "System design." not in chat
 
 
@@ -66,7 +58,7 @@ def test_talk_remembers_the_last_recap_when_asked_to(counted):
 
 
 def test_an_interviewer_has_read_the_resume_and_may_ask_about_it():
-    profile.save({**ENGINEER, "resume": "Payments team at Acme, 2021-2024."})
+    profile.save({**PROFILE, "resume": "Payments team at Acme, 2021-2024."})
     prompt = profile.system_prompt("panel", "BASE", pacing=False)
     assert "<resume>\nPayments team at Acme, 2021-2024.\n</resume>" in prompt
     assert "name the company or project" in prompt
