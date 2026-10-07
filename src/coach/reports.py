@@ -83,7 +83,13 @@ async def after_session(session_id: int) -> None:
 
 async def _session(session_id: int) -> None:
     d = history.detail(session_id)
-    if not d or not history.is_counted(session_id) or sent(session_id, d["answers"]):
+    if not d or sent(session_id, d["answers"]):
+        return
+    if not history.is_counted(session_id):  # said, or a test session looks like a broken Relay
+        print(
+            f"  telegram: not sent - a session counts at {history.MIN_ANSWERS} answers "
+            f"and {history.MIN_MINUTES} minutes"
+        )
         return
     minutes = round(d["minutes"] or 0)
     goal = f" of a {d['goal_minutes']} min goal" if d["goal_minutes"] else ""

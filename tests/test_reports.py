@@ -7,9 +7,12 @@ import pathlib
 import re
 
 import pytest
+from starlette.applications import Starlette
+from starlette.testclient import TestClient
 
 from coach import picture, relay, reports, settings, store
 from coach import today as today_
+from coach.server import api
 
 METRICS = {"words": 40, "wpm": 120, "fillers": 1, "pauses": 2, "longest_pause": 1, "lead_in": 1}
 CHART_JS = (pathlib.Path(__file__).parents[1] / "web" / "chart.js").read_text()
@@ -89,12 +92,13 @@ def test_lessons_stay_off_telegram_when_asked(telegram, counted, lessons):
     assert "breath of fresh air" not in json.dumps(telegram.sent)
 
 
-def test_a_try_is_never_reported(telegram, backdate):
+def test_a_try_is_never_reported_and_says_so(telegram, backdate, capsys):
     session = store.start("talk", "flash-lite", "m")
     store.record(session, "you", "Short one.", METRICS)
     store.record(session, "you", "And a second, quickly.", METRICS)
     report(session)
     assert telegram.sent == [], "two answers, but under two minutes"
+    assert "counts at 2 answers and 2 minutes" in capsys.readouterr().out
     backdate(session)
     report(session)
     assert len(telegram.sent) == 1, "long enough now"
@@ -118,6 +122,30 @@ def test_last_weeks_report_once_the_week_is_over(telegram, counted):
 def test_nothing_is_sent_without_relays_variables(counted):
     report(counted())  # no fake: a call to Relay would fail the test
     assert not relay.enabled()
+    assert relay.status() == "telegram: off - not set: RELAY_URL, RELAY_API_KEY, RELAY_APP"
+
+
+def test_the_first_page_says_whether_telegram_is_on(monkeypatch):
+    client = TestClient(Starlette(routes=api.ROUTES))
+    assert client.get("/api/today").json()["wired"]["telegram"] == [
+        "RELAY_URL", "RELAY_API_KEY", "RELAY_APP",
+    ]  # fmt: skip
+    for name, value in {
+        "RELAY_URL": "https://r.test",
+        "RELAY_API_KEY": "k",
+        "RELAY_APP": "a",
+    }.items():
+        monkeypatch.setenv(name, value)
+    wired = client.get("/api/today").json()["wired"]
+    assert (wired["telegram"], wired["to"]) == ([], "admin")
+
+
+@pytest.mark.usefixtures("telegram")
+def test_the_start_says_whether_telegram_is_on(monkeypatch):
+    assert relay.status() == "telegram: on, as coach to admin"
+    assert "rk_test" not in relay.status()
+    monkeypatch.setenv("RELAY_URL", "relay.test")
+    assert relay.status() == "telegram: off - not set: RELAY_URL starting with https://"
 
 
 @pytest.mark.parametrize(

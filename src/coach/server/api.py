@@ -13,6 +13,7 @@ from .. import (
     history,
     jobs,
     profile,
+    relay,
     settings,
     store,
     today,
@@ -178,7 +179,13 @@ async def get_progress(_request: Request) -> Response:
 
 
 async def get_today(_request: Request) -> Response:
-    return JSONResponse(today.summary(dt.date.today()))
+    """Today's practice, and what is wired up: a Telegram that is off must not look broken."""
+    wired = {
+        "gemini": bool(settings.api_key()),
+        "telegram": relay.missing(),
+        "to": relay.recipient(),
+    }
+    return JSONResponse({**today.summary(dt.date.today()), "wired": wired})
 
 
 async def forget(_request: Request) -> Response:

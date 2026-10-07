@@ -35,6 +35,10 @@ export async function render(root) {
       ${usual ? `<button class="primary" id="go">Continue: ${escape(usual.mode)}</button>` : ""}
       <a href="/modes">${usual ? "or choose something else" : "Choose what to practise"}</a>
     </div>
+    <p class="foot wired">Gemini: ${t.wired.gemini ? "key set"
+      : `no key — <a href="/settings">add one</a>`} · Telegram: ${t.wired.telegram.length
+      ? `off — .env needs ${escape(t.wired.telegram.join(", "))}`
+      : `on, sends to ${escape(t.wired.to)}`}</p>
     ${t.work_on.length ? `<h2>From your last session, work on</h2>
       <ol class="advice">${t.work_on.map((w) => `<li>${escape(w)}</li>`).join("")}</ol>` : ""}
     ${t.phrases.length ? `<h2>Phrases to try out today</h2>

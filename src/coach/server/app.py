@@ -13,7 +13,7 @@ from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket
 
-from .. import backends, clock, coach, history, llm, reports, settings, sheet, store, verdict
+from .. import backends, clock, coach, history, llm, relay, reports, settings, sheet, store, verdict
 from . import models, past
 from .api import MODES, ROUTES, partner
 from .guard import MIDDLEWARE
@@ -99,6 +99,7 @@ async def lifespan(_app: Starlette) -> AsyncIterator[None]:
     """Load the models once, before the first request, and start the clock."""
     models.load()
     ticking = asyncio.create_task(clock.run())  # expiring recordings now runs from here
+    print(f"  {relay.status()}")
     print("  ready\n")
     yield
     ticking.cancel()
