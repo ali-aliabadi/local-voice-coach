@@ -33,11 +33,24 @@ def recipient() -> str:
     return _env("RELAY_USER") or _env("RELAY_ADMIN") or "admin"
 
 
+def missing() -> list[str]:
+    """What keeps Relay off: a variable unset, or a URL that is not http(s)."""
+    gaps = [name for name in ("RELAY_URL", "RELAY_API_KEY", "RELAY_APP") if not _env(name)]
+    if _env("RELAY_URL") and not _env("RELAY_URL").startswith(("http://", "https://")):
+        gaps.append("RELAY_URL starting with https://")
+    return gaps
+
+
 def enabled() -> bool:
-    url = _env("RELAY_URL")
-    return url.startswith(("http://", "https://")) and bool(
-        _env("RELAY_API_KEY") and _env("RELAY_APP")
-    )
+    return not missing()
+
+
+def status() -> str:
+    """A line for the server's start. Off used to be silent, which looks like a Relay that
+    is set up and never sends."""
+    if missing():
+        return f"telegram: off - not set: {', '.join(missing())}"
+    return f"telegram: on, as {_env('RELAY_APP')} to {recipient()}"
 
 
 # Cloudflare in front of a Relay answered Python's default "Python-urllib" agent with
