@@ -7,9 +7,12 @@ import pathlib
 import re
 
 import pytest
+from starlette.applications import Starlette
+from starlette.testclient import TestClient
 
 from coach import picture, relay, reports, settings, store
 from coach import today as today_
+from coach.server import api
 
 METRICS = {"words": 40, "wpm": 120, "fillers": 1, "pauses": 2, "longest_pause": 1, "lead_in": 1}
 CHART_JS = (pathlib.Path(__file__).parents[1] / "web" / "chart.js").read_text()
@@ -120,6 +123,21 @@ def test_nothing_is_sent_without_relays_variables(counted):
     report(counted())  # no fake: a call to Relay would fail the test
     assert not relay.enabled()
     assert relay.status() == "telegram: off - not set: RELAY_URL, RELAY_API_KEY, RELAY_APP"
+
+
+def test_the_first_page_says_whether_telegram_is_on(monkeypatch):
+    client = TestClient(Starlette(routes=api.ROUTES))
+    assert client.get("/api/today").json()["wired"]["telegram"] == [
+        "RELAY_URL", "RELAY_API_KEY", "RELAY_APP",
+    ]  # fmt: skip
+    for name, value in {
+        "RELAY_URL": "https://r.test",
+        "RELAY_API_KEY": "k",
+        "RELAY_APP": "a",
+    }.items():
+        monkeypatch.setenv(name, value)
+    wired = client.get("/api/today").json()["wired"]
+    assert (wired["telegram"], wired["to"]) == ([], "admin")
 
 
 @pytest.mark.usefixtures("telegram")

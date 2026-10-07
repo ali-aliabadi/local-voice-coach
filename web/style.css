@@ -186,6 +186,7 @@ button { font: inherit; cursor: pointer; }
 .today-bar { margin: -1.25rem 0 1.25rem; }
 .start { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; margin: 2rem 0; }
 .advice { padding-left: 1.2rem; line-height: 1.7; }
+.wired { margin: -1rem 0 2.5rem; }
 
 /* ---- goal picker ---- */
 .goals { border: 0; padding: 0; margin: 0 0 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
