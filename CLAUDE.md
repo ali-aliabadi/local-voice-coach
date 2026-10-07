@@ -203,7 +203,7 @@ what makes someone freeze, and the whole app exists to stop that.
 (contractions, phrasal verbs) in 2-3 sentences so there is something to listen to, and
 asks open questions so the user does most of the speaking. It calls
 `system_prompt(..., interview=False)`, which passes only `profile.PERSONAL` (name, first
-language): stack, role and focus pulled every chat back to engineering. It may echo a
+language): interview fields pulled every chat back to engineering. It may echo a
 garbled sentence back naturally ("Oh, so you ended up...") but never points it out, so
 the no-correction rule still holds.
 
@@ -217,7 +217,9 @@ model to ask about them by name and probe their claims. Each is cut to
 switched when the resume arrived. Uploads are read by `documents.py`: pypdf for PDF;
 Word and ODT are zipped XML with the tags stripped by regex, so no XML parser (bandit
 S314) and no multipart parser - the file is the request body. Without a resume the
-`interview` prompt asks for a walk-through instead; nothing is gated on it.
+`interview` prompt asks for a walk-through instead; nothing is gated on it. The profile
+asks for no role, stack or years: the resume and posting say all that, and asking
+everyone for a tech stack made a conversation app look like an engineering one.
 
 ### The verdict is the interviewer's, and Telegram gets one line of it
 After a session of a mode with `INTERVIEW = True`, `verdict.py` writes what a real

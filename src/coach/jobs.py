@@ -21,10 +21,6 @@ SEARCH = "https://himalayas.app/jobs/api/search"
 SOURCE = "https://himalayas.app"
 FRESH = 3600  # seconds a search is kept; Himalayas rebuilds its listings once a day
 # The profile's levels, in Himalayas' words.
-LEVELS = {
-    "intern": "Entry-level", "junior": "Entry-level", "mid-level": "Mid-level",
-    "senior": "Senior", "staff": "Senior", "principal": "Senior",
-}  # fmt: skip
 PER = {"annual": "a year", "monthly": "a month", "weekly": "a week", "hourly": "an hour"}
 
 # Words every English posting is full of and other languages' postings are not. Six of

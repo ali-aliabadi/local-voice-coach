@@ -16,6 +16,7 @@ from .modes import discover
 
 # Worst to best. The first is the user's own: "it is either my place or theirs" - hire them
 # and I leave. The strongest no there is, not a compliment.
+LEVELS = ("intern", "junior", "mid-level", "senior", "staff", "principal")
 DECISIONS = ("If they're hired, I leave", "No", "Not sure", "Yes", "Definitely hire")
 AREAS = (
     "technical depth", "problem solving", "communication", "ownership and impact",
@@ -37,7 +38,7 @@ VERDICT_PROMPT = (
     "Reply with JSON only:\n"
     '{"rating": a whole number from 1 to 10, '
     f'"decision": one of {json.dumps(DECISIONS)}, '
-    f'"level": the level they came across at, one of {json.dumps(profile.SENIORITY[1:])}, '
+    f'"level": the level they came across at, one of {json.dumps(LEVELS)}, '
     '"scores": {' + ", ".join(f'"{area}": 1-10' for area in AREAS) + "}, "
     '"summary": "2-3 sentences, as written to the committee", '
     '"strengths": [up to 3, quoting what they said], '
