@@ -68,11 +68,11 @@ body {
 }
 
 body > header {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1.25rem;
   padding: 1rem clamp(1rem, 5vw, 3rem);
   border-bottom: 1px solid var(--line);
 }
-nav { display: flex; gap: 1.25rem; }
+nav { display: flex; gap: 1.25rem; margin-left: auto; }
 body > header a {
   color: var(--muted); text-decoration: none;
   border-bottom: 1px solid transparent; padding-bottom: 1px;
@@ -80,6 +80,8 @@ body > header a {
 body > header a:hover { color: var(--ink); }
 body > header a.on { color: var(--ink); border-bottom-color: var(--accent); }
 .brand { font-weight: 550; }
+.machine { color: var(--muted); font-size: 0.8rem; }
+@media (max-width: 60rem) { .machine { order: 1; flex-basis: 100%; } }
 
 #app {
   display: block; max-width: 46rem; margin: 0 auto;

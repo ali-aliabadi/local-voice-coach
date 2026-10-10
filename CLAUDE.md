@@ -57,7 +57,8 @@ make e2e                             # real server, real socket, a spoken answer
 | `src/coach/tts.py` | Kokoro to WAV bytes; touches no audio device |
 | `src/coach/llm.py` | endpoints, streaming, retries |
 | `src/coach/chunks.py` | where to cut a streaming reply so it can be spoken |
-| `src/coach/backends.py` | the model catalogue and reachability probing |
+| `src/coach/backends.py` | the model catalogue, reachability probing, what fits this machine |
+| `src/coach/machine.py` | this computer: chip, cores, memory, the biggest local model it holds |
 | `src/coach/store.py` | SQLite: writing sessions, turns, settings, retention |
 | `src/coach/history.py` | reading it back: one session, all sessions, totals; `RATES` |
 | `src/coach/today.py` | today's minutes, the streak, the last session's advice |
@@ -309,6 +310,22 @@ test for it. Any new value derived from Whisper output needs the same treatment.
 `backends.CATALOGUE` is the single list of everything that can play the interviewer. A mode
 declares a role (`"fast"`/`"deep"`); `survey()` filters the catalogue to that role and marks
 each row reachable or not. Adding a model is one row. Never branch on backend key.
+
+### A model too big for the machine is never suggested
+`machine.specs()` reads the chip, cores and memory, and how big a model fits: on Apple
+silicon the GPU may use about 2/3 of unified memory (3/4 from 36GB), less `RESERVED_GB`
+for the system, the browser, Whisper and Kokoro. A local row whose `ram` is bigger is
+greyed in the picker with the reason, left out of the Settings selects (unless already
+chosen) and never used as a stand-in. The header shows the same numbers. In Docker it
+reads the VM, not the host where LM Studio runs.
+
+### Written work falls back to a local model
+`llm.patiently` (notes, summary, study sheet, verdict) waits out what passes: a per-minute
+limit says "retry in", a 503 is overload. A 429 without a retry hint is a spending cap or
+spent credits, and was waited on for three minutes a request, then failed. Anything that
+will not pass - budget, daily quota, no internet, a rejected key - hands the request to
+`backends.stand_in()`, a model LM Studio serves that fits, analysis models first. The
+live conversation does not fall back: it reports the error and offers a retry.
 
 ### Latency shown to the user must be honest
 The `Latency` column is published/estimated and labelled `est.` where it is a guess. The

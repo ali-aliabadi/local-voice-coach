@@ -9,7 +9,7 @@ import httpx
 import openai
 import pytest
 
-from coach import llm
+from coach import backends, llm
 from coach.llm import conversation, retry_after
 
 FLASH = llm.Endpoint(llm._client("https://model.test", "key"), "flash", {})  # never called
@@ -95,6 +95,40 @@ def test_a_daily_quota_is_reported_not_waited_for(monkeypatch):
 
     monkeypatch.setattr(llm, "complete", used_up)
     with pytest.raises(RuntimeError, match="used up its free requests"):
+        asyncio.run(llm.patiently(FLASH, []))
+
+
+def test_a_spent_budget_is_written_by_a_local_model_instead(monkeypatch):
+    """A spending cap says no "retry in": it was waited on for three minutes, then lost the
+    study sheet. A model LM Studio is serving writes it instead, at once."""
+    asked: list[str] = []
+
+    async def capped(ep, _messages, _max_tokens=None):
+        asked.append(ep.model)
+        if ep.model == "flash":
+            response = httpx.Response(429, request=httpx.Request("POST", "http://model"))
+            message = "Your billing account has exceeded its monthly spending cap"
+            raise openai.RateLimitError(message, response=response, body=None)
+        return llm.Reply("written here", 1.0)
+
+    async def never(_seconds):
+        raise AssertionError("a spent budget is not waited for")
+
+    monkeypatch.setattr(llm, "complete", capped)
+    monkeypatch.setattr(asyncio, "sleep", never)
+    loaded = {"liquid/lfm2.5-1.2b", "google/gemma-4-e4b", "prism-ml/bonsai-27b"}
+    monkeypatch.setattr(backends, "lm_studio_models", lambda _timeout=1.5: loaded)
+    assert asyncio.run(llm.patiently(FLASH, [])).text == "written here"
+    assert asked == ["flash", "prism-ml/bonsai-27b"], "an analysis model, not the weakest"
+
+
+def test_without_lm_studio_a_spent_budget_says_so(monkeypatch):
+    async def capped(_ep, _messages, _max_tokens=None):
+        response = httpx.Response(429, request=httpx.Request("POST", "http://model"))
+        raise openai.RateLimitError("exceeded its spending cap", response=response, body=None)
+
+    monkeypatch.setattr(llm, "complete", capped)
+    with pytest.raises(RuntimeError, match="run out of quota or budget"):
         asyncio.run(llm.patiently(FLASH, []))
 
 

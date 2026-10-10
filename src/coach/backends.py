@@ -11,7 +11,7 @@ import socket
 from typing import NamedTuple
 from urllib.request import urlopen
 
-from . import settings
+from . import machine, settings
 
 
 class Backend(NamedTuple):
@@ -77,6 +77,27 @@ def lm_studio_models(timeout: float = 1.5) -> set[str]:
         return set()
 
 
+def too_big(backend: Backend) -> str | None:
+    """Why this machine cannot hold a local model, or None if it can."""
+    room = machine.specs()["model_gb"]
+    if backend.local and float(backend.ram.removesuffix("GB")) > room:
+        return f"needs {backend.ram}, this machine can spare {room}GB"
+    return None
+
+
+def choices(current: str) -> tuple[str, ...]:
+    """What a settings select offers: every model this machine can hold, and the one chosen."""
+    return ("off", *(b.key for b in CATALOGUE if not too_big(b) or b.key == current))
+
+
+def stand_in() -> Backend | None:
+    """A model LM Studio is serving, to write what the chosen model could not: an analysis
+    model if there is one, in catalogue order, else any that fits. None if there is none."""
+    loaded = lm_studio_models()
+    serving = [b for b in CATALOGUE if b.local and b.model in loaded and not too_big(b)]
+    return max(serving, key=lambda b: ("deep" in b.roles, "fast" not in b.roles), default=None)
+
+
 def survey(role: str) -> tuple[list[tuple[Backend, str | None]], bool]:
     """Backends suited to `role`, each with a reason it is unusable (or None).
 
@@ -89,12 +110,9 @@ def survey(role: str) -> tuple[list[tuple[Backend, str | None]], bool]:
         if role not in backend.roles:
             continue
         if backend.local:
-            if not local_models:
-                reason = "LM Studio not running"
-            elif backend.model not in local_models:
-                reason = "not loaded in LM Studio"
-            else:
-                reason = None
+            reason = too_big(backend)
+            if reason is None and backend.model not in local_models:
+                reason = "not loaded in LM Studio" if local_models else "LM Studio not running"
         else:
             reason = None if has_net else "no internet"
             if reason is None and not settings.api_key():

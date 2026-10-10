@@ -9,13 +9,15 @@ import json
 
 import pytest
 
-from coach import coach, config, llm, relay, store
+from coach import backends, coach, config, llm, machine, relay, store
 
 READ_FROM_ENVIRONMENT = (
     "GEMINI_API_KEY", "LM_STUDIO_URL", "COACH_BACKEND",
     "RELAY_URL", "RELAY_API_KEY", "RELAY_APP", "RELAY_USER", "RELAY_ADMIN",
 )  # fmt: skip
 
+# The machine every test runs on, whatever it really runs on: an 18GB M3 Pro.
+MACHINE = {"cpu": "Apple M3 Pro", "cores": 11, "ram_gb": 18, "unified": True, "model_gb": 12}
 # A scored answer, as fluency() would hand it to the store.
 METRICS = {"words": 40, "wpm": 120, "fillers": 1, "pauses": 2, "longest_pause": 1, "lead_in": 1}
 # The coach's summary of a session: what reaches Telegram as its lessons.
@@ -39,6 +41,9 @@ def isolated(tmp_path, monkeypatch):
     coach.failed.clear()
     llm._clients.clear()  # a client belongs to the event loop that first used it
     monkeypatch.setattr(llm, "waiting", "")
+    # A developer's LM Studio would otherwise stand in for every model a test fails.
+    monkeypatch.setattr(backends, "lm_studio_models", lambda _timeout=1.5: set())
+    monkeypatch.setattr(machine, "specs", lambda: MACHINE)
     yield
     store._db = None
 

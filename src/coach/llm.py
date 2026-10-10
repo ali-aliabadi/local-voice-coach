@@ -8,17 +8,14 @@ import contextlib
 import re
 import time
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any, NamedTuple, cast
+from typing import Any, NamedTuple, cast
 
 import openai
 from openai import AsyncOpenAI, AsyncStream
 from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
 
-from . import config, settings
+from . import backends, config, settings
 from .chunks import split_for_speech
-
-if TYPE_CHECKING:
-    from .backends import Backend
 
 
 class Reply(NamedTuple):
@@ -91,7 +88,7 @@ def conversation(messages: list[dict]) -> list[ChatCompletionMessageParam]:
     return cast(list[ChatCompletionMessageParam], system + merged)
 
 
-def endpoint_for(backend: Backend, model_override: str | None = None) -> Endpoint:
+def endpoint_for(backend: backends.Backend, model_override: str | None = None) -> Endpoint:
     """Build the endpoint for a chosen backend. The only way endpoints are made.
 
     Credentials resolve here rather than in the catalogue, so editing the API key in the
@@ -223,27 +220,52 @@ waiting = ""  # what the background queue is sitting out right now, for the page
 
 async def patiently(ep: Endpoint, messages: list[dict], max_tokens: int | None = None) -> Reply:
     """`complete`, one at a time, waiting out per-minute rate limits and an overloaded
-    model ("high demand" is a 503, and passes); a daily quota that is used up fails at
-    once, saying so."""
+    model ("high demand" is a 503, and passes). A model that cannot answer at all - its
+    daily quota or budget spent, no internet, its key rejected - hands the request to one
+    LM Studio is serving, so the notes, the sheet and the verdict still get written."""
     global waiting  # noqa: PLW0603 - one queue per process, and this is what it waits on
     async with _one_at_a_time:
-        for _ in range(6):
+        try:
+            return await _waiting_out(ep, messages, max_tokens)
+        except (openai.APIError, RuntimeError) as exc:  # RuntimeError: a quota used up
+            local = await asyncio.to_thread(backends.stand_in)
+            if local is None or local.model == ep.model:
+                raise
+            print(f"  {ep.model}: {_said(exc)[:120]}\n  {local.model} is writing it instead")
+            waiting = f"{ep.model} cannot answer, so {local.model} is writing it on this machine"
             try:
-                return await complete(ep, messages, max_tokens)
-            except (openai.RateLimitError, openai.InternalServerError) as exc:
-                wait = retry_after(str(exc)) or 30
-                if wait > LONGEST_WAIT:
-                    raise RuntimeError(
-                        f"{ep.model} has used up its free requests for today; they come back "
-                        f"in {wait / 3600:.1f} hours. Choose another model in Settings."
-                    ) from None
-                busy = "busy" if isinstance(exc, openai.InternalServerError) else "rate-limited"
-                waiting = f"{ep.model} is {busy}, trying again in {wait:.0f}s"
-                try:
-                    await asyncio.sleep(wait + 1)
-                finally:
-                    waiting = ""
-        return await complete(ep, messages, max_tokens)
+                return await complete(endpoint_for(local), messages, max_tokens)
+            finally:
+                waiting = ""
+
+
+async def _waiting_out(ep: Endpoint, messages: list[dict], max_tokens: int | None) -> Reply:
+    global waiting  # noqa: PLW0603
+    for _ in range(6):
+        try:
+            return await complete(ep, messages, max_tokens)
+        except (openai.RateLimitError, openai.InternalServerError) as exc:
+            busy = isinstance(exc, openai.InternalServerError)
+            # A per-minute limit says when it passes. A spending cap, or credits run out,
+            # does not: waiting it out held every request up for three minutes, then failed.
+            wait = retry_after(str(exc)) or (30 if busy else None)
+            if wait is None:
+                raise RuntimeError(
+                    f"{ep.model} has run out of quota or budget: {_said(exc)}"
+                ) from None
+            if wait > LONGEST_WAIT:
+                raise RuntimeError(
+                    f"{ep.model} has used up its free requests for today; they come back "
+                    f"in {wait / 3600:.1f} hours. Choose another model in Settings."
+                ) from None
+            waiting = (
+                f"{ep.model} is {'busy' if busy else 'rate-limited'}, trying again in {wait:.0f}s"
+            )
+            try:
+                await asyncio.sleep(wait + 1)
+            finally:
+                waiting = ""
+    return await complete(ep, messages, max_tokens)
 
 
 async def explain(ep: Endpoint, exc: Exception) -> str:

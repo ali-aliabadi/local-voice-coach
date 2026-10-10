@@ -1,3 +1,4 @@
+import { get } from "./form.js";
 import { go, render, route } from "./router.js";
 import { apply } from "./theme.js";
 import * as history_ from "./views/history.js";
@@ -28,6 +29,13 @@ route("/", {
     go(live ? "/practice" : "/today", true);
   },
 });
+
+// What this machine can run, for choosing a local model: LM Studio's model must fit in it.
+get("/api/machine").then((m) => {
+  const memory = m.unified ? `${m.ram_gb} GB memory, shared with the GPU` : `${m.ram_gb} GB RAM`;
+  document.getElementById("machine").textContent =
+    `${m.cpu} · ${m.cores} cores · ${memory} · local models up to ${m.model_gb} GB`;
+}).catch(() => {});
 
 apply();
 render();
