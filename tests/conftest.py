@@ -103,7 +103,7 @@ class FakeRelay:
         self.takes_files = True  # an older Relay refuses the file block
         self.recipients = [{"username": "ali", "aliases": ["me"], "linked_channels": ["telegram"]}]
 
-    def __call__(self, method, path, body=None):
+    def __call__(self, method, path, body=None, **_timeout):
         if method == "GET":  # the check: the only thing ever read back from Relay
             assert path == "/v1/recipients"
             return {"recipients": self.recipients}

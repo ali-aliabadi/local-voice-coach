@@ -11,6 +11,13 @@ const LAST = "coach.last";
 export function keepLast(mode, backend) {
   try { localStorage.setItem(LAST, JSON.stringify({ mode, backend })); } catch { /* fine */ }
 }
+/** Telegram in words: off, on, or what Relay's check at the start found wrong. The header
+ * says it on every page; the Today page says it in full. */
+export const telegram = (w) => (w.telegram.length
+  ? { word: "off", detail: `.env needs ${w.telegram.join(", ")}` }
+  : w.problem ? { word: "not working", detail: w.problem }
+  : { word: "on", detail: `sends to ${w.to}` });
+
 const last = () => { try { return JSON.parse(localStorage.getItem(LAST) || "null"); } catch { return null; } };
 
 export async function render(root) {
@@ -20,6 +27,7 @@ export async function render(root) {
   const done = Math.round(t.minutes);
   const usual = last();
   const share = goal ? Math.min(100, (t.minutes / goal) * 100) : 0;
+  const relay = telegram(t.wired);
 
   root.innerHTML = `
     <h1>Today</h1>
@@ -36,10 +44,8 @@ export async function render(root) {
       <a href="/modes">${usual ? "or choose something else" : "Choose what to practise"}</a>
     </div>
     <p class="foot wired">Gemini: ${t.wired.gemini ? "key set"
-      : `no key — <a href="/settings">add one</a>`} · Telegram: ${t.wired.telegram.length
-      ? `off — .env needs ${escape(t.wired.telegram.join(", "))}`
-      : t.wired.problem ? `not working — ${escape(t.wired.problem)}`
-      : `on, sends to ${escape(t.wired.to)}`}</p>
+      : `no key — <a href="/settings">add one</a>`} · Telegram: ${relay.word} —
+      ${escape(relay.detail)}</p>
     ${t.work_on.length ? `<h2>From your last session, work on</h2>
       <ol class="advice">${t.work_on.map((w) => `<li>${escape(w)}</li>`).join("")}</ol>` : ""}
     ${t.phrases.length ? `<h2>Phrases to try out today</h2>
