@@ -176,5 +176,5 @@ real:
 
 - **Never present an estimate as a measurement.** The picker's `Latency` column is
   labelled `est.` where it is a guess; `Yours` is measured from the user's own sessions.
-- **Fluency metrics stay arithmetic.** wpm, pauses and lead-in come from word timestamps
-  and are exact. Do not replace them with a model's opinion.
+- **Fluency metrics stay arithmetic.** wpm, pauses and lead-in come from word timestamps,
+  with the first word moved to where a voice detector hears speech start, and are exact. Do not replace them with a model's opinion.

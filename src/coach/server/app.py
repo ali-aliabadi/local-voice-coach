@@ -54,7 +54,7 @@ async def websocket_session(websocket: WebSocket) -> None:
             goal=store.goal(session),
             answers=history.answers(session),
             so_far=history.so_far(session),
-            hands_free=settings.get("hands_free") == "on",
+            hybrid=settings.get("talking") == "hybrid",
             silence=settings.get("hands_free_silence"),
         )
         await mode.run(endpoint, io)

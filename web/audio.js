@@ -57,6 +57,7 @@ export class Playback {
     this.blocked = false;
     this.turn = [];     // the current reply's clips, kept so "again" needs no round trip
     this.keep = true;   // false for a replay, so "again" replays the original speed
+    this.quiet = 0;     // performance.now() when the partner last fell silent
   }
 
   push(bytes) {
@@ -81,6 +82,7 @@ export class Playback {
     const blob = this.queue.shift();
     if (!blob) {
       this.playing = false;
+      this.quiet = performance.now();
       this.waiters.splice(0).forEach((resolve) => resolve());
       return;
     }
@@ -108,6 +110,7 @@ export class Playback {
   stop() {
     this.queue.length = 0;
     this.element.pause();
+    if (this.playing) this.quiet = performance.now();
     this.playing = false;
     this.waiters.splice(0).forEach((resolve) => resolve());
   }
@@ -134,6 +137,28 @@ export function untilSilence(mic, { silence, patience = 30, done, tick = 100 }) 
     }
   }, tick);
   return () => clearInterval(timer);
+}
+
+/**
+ * Hybrid: the mic stays open and your voice starts the answer. Feed it every chunk heard
+ * between answers; it returns the chunks to send once speech has begun, the last PREROLL
+ * of them, so the syllable that crossed the threshold is not cut off. `needed` chunks in
+ * a row must be loud: over the partner's voice, one loud chunk is too easily an echo.
+ */
+export const CHUNK_MS = 256;       // recorder.worklet.js posts 4096 samples at 16kHz
+export const PREROLL = 4;          // a second of audio from before the voice was noticed
+export const CUT_IN_LEVEL = 0.05;  // calibration knob: louder than the partner's echo
+export function onset() {
+  const kept = [];
+  let loud = 0;
+  return (chunk, level, threshold, needed = 1) => {
+    kept.push(chunk);
+    if (kept.length > PREROLL) kept.shift();
+    loud = level > threshold ? loud + 1 : 0;
+    if (loud < needed) return null;
+    loud = 0;
+    return kept.splice(0);
+  };
 }
 
 /** The little bar under the mic button. Rendered from Mic.level. */

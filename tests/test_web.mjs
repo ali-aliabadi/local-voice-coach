@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { MOVED, PHRASE, SERIES, moved, verdict } from "../web/chart.js";
 import { mmss } from "../web/clock.js";
-import { untilSilence } from "../web/audio.js";
+import { CUT_IN_LEVEL, VOICE_LEVEL, onset, untilSilence } from "../web/audio.js";
 import { DECISIONS, card, section } from "../web/verdict.js";
 
 // ---- the session clock reads naturally past an hour ----
@@ -101,5 +101,20 @@ await new Promise((r) => setTimeout(r, 120));
 assert.equal(stopped, false, "a short pause mid-answer does not end it");
 await new Promise((r) => setTimeout(r, 200));
 assert.equal(stopped, true, "quiet for longer than `silence` after speaking ends it");
+
+// ---- hybrid: your voice starts the answer, with the second before it was noticed ----
+
+const voice = onset();
+for (let i = 0; i < 6; i++) assert.equal(voice(i, 0, VOICE_LEVEL), null, "silence is not an answer");
+assert.deepEqual(voice(6, 0.2, VOICE_LEVEL), [3, 4, 5, 6], "the first syllable is kept, not cut");
+assert.equal(voice(7, 0, VOICE_LEVEL), null, "and the next answer starts afresh");
+
+// Over the partner one loud chunk may be their echo; cutting in takes two in a row.
+const over = onset();
+assert.equal(over("a", 0.2, CUT_IN_LEVEL, 2), null, "one loud chunk over them is not enough");
+assert.equal(over("b", 0, CUT_IN_LEVEL, 2), null);
+assert.equal(over("c", 0.2, CUT_IN_LEVEL, 2), null, "the count restarts after a quiet chunk");
+assert.deepEqual(over("d", 0.2, CUT_IN_LEVEL, 2), ["a", "b", "c", "d"]);
+assert.equal(onset()("x", 0.2, Infinity), null, "not your turn: nothing starts an answer");
 
 console.log("ok");

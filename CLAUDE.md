@@ -112,6 +112,25 @@ in `ENDPOINT`; `backends.CATALOGUE` does the rest.
 
 ## Key decisions
 
+### Whisper cannot time the first word
+It stretches the first word back over the silence before it: 0.8s of silence then "I"
+came back as " I" from 0.0 to 0.9, so any wait under a second read as 0 and longer ones
+about 0.4s short, which also slowed the pace. `stt.to_onset` moves the first word's start
+to where Silero (shipped inside faster-whisper, ~10ms an answer) hears speech begin,
+within 30ms. Silero rejects tones, so its test uses a spoken clip, `tests/i-think-so.wav`.
+
+### Hybrid talking starts on your voice
+`talking` is `space` or `hybrid`. In hybrid the mic opens with the session and never
+closes: `audio.onset` keeps the last second of chunks and, once one is louder than
+`VOICE_LEVEL`, sends them as the start of an answer, so the first syllable survives; a
+pause of `hands_free_silence` ends it. Over the partner it takes `CUT_IN_LEVEL` for two
+chunks in a row, because their echo is what the mic hears most (headphones are the real
+fix; `echoCancellation` is on). The recording no longer starts when they stopped, so the
+page sends `began`, seconds from the end of their last sentence to the recording's
+start, and `BrowserIO.answer` adds it to the lead-in; cutting in counts as 0. A cut-in
+mutes the rest of the reply only while `turn_done` has not come: muting after it was set
+with nothing left to clear it, and the next reply played silent.
+
 ### Fluency metrics are arithmetic, not a model
 `fluency()` counts words and measures gaps between timestamps. Deliberately not an LLM
 call: counting is exact, free, offline and instant. Do not replace it.

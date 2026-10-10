@@ -26,7 +26,7 @@ export function mount(node) {
       <button id="mic" class="mic" disabled aria-label="Answer" aria-pressed="false"></button>
       <p class="mic-label" id="mic-label">connecting</p>
       <canvas id="level" width="240" height="28" aria-hidden="true"></canvas>
-      <p class="hint">space bar works too · answer out loud, as if it were real</p>
+      <p class="hint" id="how">space bar works too · answer out loud, as if it were real</p>
       <p class="notice" id="notice" role="alert" hidden></p>
     </div>
     <section id="card" class="card-result" aria-live="polite" hidden></section>
@@ -102,6 +102,19 @@ export function notice(text, { retry = null, good = false } = {}) {
 export function status(answered, detail) {
   $("#status").textContent =
     `${answered === 0 ? "no answers yet" : `${answered} answered`}  ·  ${detail}`;
+}
+
+/** While you speak there is only the mic: the session panel dims, the last answer goes. */
+export function recording(on) {
+  if (on) {
+    $("#listen-tools").hidden = true;
+    reset();
+    card(null);
+  }
+  $("#session").classList.toggle("dim", on);
+  $("#mic").setAttribute("aria-pressed", String(on));
+  $("#mic").classList.toggle("recording", on);
+  $("#level").classList.toggle("on", on);
 }
 
 /** Clear the last answer's details: a new turn is starting. */
