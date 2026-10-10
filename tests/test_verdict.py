@@ -78,6 +78,23 @@ def test_a_malformed_verdict_is_reported_not_kept(counted, monkeypatch):
     assert stored(session) is None
 
 
+def test_an_unusable_verdict_is_asked_for_once_more(counted, monkeypatch):
+    """Gemini 3.8 Flash sent a panel's verdict as broken JSON, then the same request was fine."""
+    session = counted("panel")
+    replies = iter(
+        ['```json {"rating": 7, "decision": "Yes", "scores": {"techn', json.dumps(WRITTEN)]
+    )
+
+    async def model(_ep, _messages, **_budget):
+        return llm.Reply(next(replies), 900.0)
+
+    monkeypatch.setattr(llm, "patiently", model)
+    asyncio.run(verdict.write(session))
+    kept = stored(session)
+    assert kept is not None
+    assert kept["rating"] == 7
+
+
 @pytest.mark.parametrize(
     ("mode", "answers", "queued"),
     [

@@ -113,7 +113,7 @@ def later(session_id: int, work: Coroutine[Any, Any, None]) -> None:
             await work
         except Exception as exc:  # a failed note must never reach the session
             failed[session_id] = llm._said(exc)[:300]
-            print(f"  coach: {failed[session_id][:160]}")
+            print(f"  coach: {failed[session_id]}")
 
     failed.pop(session_id, None)  # a new attempt clears the last failure
     task = asyncio.create_task(safely())

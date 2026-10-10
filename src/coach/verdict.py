@@ -117,20 +117,27 @@ async def write(session_id: int) -> None:
         for key in ("resume", "job")
         if profile.get(key).strip()
     ]
-    reply = await llm.patiently(
-        ep,
-        [
-            {"role": "system", "content": VERDICT_PROMPT},
-            {"role": "user", "content": "\n\n".join([*papers, transcript])},
-        ],
-        max_tokens=sheet.SHEET_TOKENS,
-    )
-    found = valid(coach.parse(reply.text))
+    # Twice: Gemini 3.8 Flash once sent a panel's verdict as JSON that would not parse, and
+    # the same request came back fine the next time.
+    for _ in range(2):
+        reply = await llm.patiently(
+            ep,
+            [
+                {"role": "system", "content": VERDICT_PROMPT},
+                {"role": "user", "content": "\n\n".join([*papers, transcript])},
+            ],
+            max_tokens=sheet.SHEET_TOKENS,
+        )
+        found = valid(coach.parse(reply.text))
+        if found is not None:
+            break
     if found is None:
-        said = " ".join(reply.text.split())[:120]
+        # The end, not the start: every reply starts '```json {"rating"', and the end says
+        # whether it was cut off or finished and still broken.
+        said = " ".join(reply.text.split())[-120:]
         raise RuntimeError(
-            f"{ep.model}'s verdict was not usable, so ask for it again: "
-            + (f'it said "{said}"' if said else "it returned nothing, its budget spent thinking")
+            f"{ep.model}'s verdict was not usable twice, so ask for it again: "
+            + (f'it ended "{said}"' if said else "it returned nothing, its budget spent thinking")
         )
     found["answers"] = answers  # what it covers, so a resumed interview is judged again
     store.db().execute(
