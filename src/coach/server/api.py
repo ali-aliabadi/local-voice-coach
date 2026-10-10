@@ -12,6 +12,7 @@ from .. import (
     documents,
     history,
     jobs,
+    machine,
     profile,
     relay,
     settings,
@@ -138,13 +139,18 @@ async def get_jobs(request: Request) -> Response:
     return JSONResponse({**found, "q": words, "seniority": seniority})
 
 
+async def get_machine(_request: Request) -> Response:
+    return JSONResponse(
+        {**machine.specs(), "model_gb": machine.room(), "lm_studio": machine.lm_studio_host()}
+    )
+
+
 async def get_settings(_request: Request) -> Response:
-    choices = {
-        "tts_voice": models.voice_names(),
-        "coach_backend": ("off", *backends.BY_KEY),
-        "sheet_backend": ("off", *backends.BY_KEY),
-        "verdict_backend": ("off", *backends.BY_KEY),
+    models_that_fit = {
+        key: backends.choices(settings.get(key))
+        for key in ("coach_backend", "sheet_backend", "verdict_backend")
     }
+    choices = {"tts_voice": models.voice_names(), **models_that_fit}
     return JSONResponse(settings.as_form(choices) + prompt_fields())
 
 
@@ -196,6 +202,7 @@ async def forget(_request: Request) -> Response:
 ROUTES = [
     Route("/api/modes", get_modes),
     Route("/api/backends", get_backends),
+    Route("/api/machine", get_machine),
     Route("/api/profile", get_profile, methods=["GET"]),
     Route("/api/profile", save_profile, methods=["POST"]),
     Route("/api/extract", extract, methods=["POST"]),

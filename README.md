@@ -16,7 +16,8 @@ You need [uv](https://docs.astral.sh/uv/) and `make`. Docker is optional.
 
 **1. Gemini key.** Free, no card: [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 To stay offline, skip it and load a model in [LM Studio](https://lmstudio.ai/); it shows
-up in the model picker.
+up in the model picker. With LM Studio running, a model there also writes the notes, study
+sheet and verdict whenever Gemini cannot - a spent budget or daily quota, no internet.
 
 **2. Relay (optional): reports on Telegram.** Needs a
 [Relay](https://github.com/ali-aliabadi/relay) server. Its admin runs:
