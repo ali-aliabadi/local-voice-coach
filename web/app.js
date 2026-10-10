@@ -42,5 +42,14 @@ get("/api/machine").then((m) => {
     `${m.cpu} · ${m.cores} cores · ${m.ram_gb} GB RAM · ${gpu} · ${fits}`;
 }).catch(() => {});
 
+// Whether Telegram works, on every page; hover for why, or see the Today page.
+get("/api/today").then(({ wired }) => {
+  const { word, detail } = today.telegram(wired);
+  const line = document.getElementById("telegram");
+  line.textContent = ` · Telegram ${word}`;
+  line.title = detail;
+  line.classList.toggle("warn", word === "not working");
+}).catch(() => {});
+
 apply();
 render();

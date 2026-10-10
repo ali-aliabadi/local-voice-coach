@@ -57,13 +57,16 @@ def status() -> str:
 
 # What the check at the start found wrong; "" when it passed or has not run.
 problem = ""
+# The start waits for the check, so the header never says "on" for a Relay that does not
+# work; this long at most, for a network that swallows the request.
+CHECK_SECONDS = 5
 
 
 def check() -> str:
     """Relay's own check, sending nothing: the URL and the key work, and the recipient
     exists and has Telegram linked. What is wrong, or "" when nothing is."""
     try:
-        found = _call("GET", "/v1/recipients").get("recipients", [])
+        found = _call("GET", "/v1/recipients", timeout=CHECK_SECONDS).get("recipients", [])
     except (OSError, ValueError, RuntimeError) as exc:  # a refused key, or no Relay at all
         return f"can't use Relay: {exc}"
     names = {name: r for r in found for name in [r["username"], *r.get("aliases", [])]}
@@ -76,8 +79,8 @@ def check() -> str:
 
 
 async def check_at_start() -> None:
-    """Off the start's path: a Relay that cannot be reached would hold it for 15 seconds."""
-    global problem  # noqa: PLW0603 - one result, read by the Today page
+    """Before the first page: the header and the Today page say what it found."""
+    global problem  # noqa: PLW0603 - one result, read by the header and the Today page
     if not enabled():
         return
     problem = await asyncio.to_thread(check)
@@ -89,7 +92,7 @@ async def check_at_start() -> None:
 AGENT = "local-voice-coach (+relay-notify)"
 
 
-def _call(method: str, path: str, body: dict | None = None) -> dict:
+def _call(method: str, path: str, body: dict | None = None, timeout: float = 15) -> dict:
     request = Request(  # noqa: S310 - http(s) only, see enabled()
         _env("RELAY_URL").rstrip("/") + path,
         data=json.dumps(body).encode() if body is not None else None,
@@ -101,7 +104,7 @@ def _call(method: str, path: str, body: dict | None = None) -> dict:
         },
     )
     try:
-        with urlopen(request, timeout=15) as response:  # noqa: S310 - http(s) only, see enabled()
+        with urlopen(request, timeout=timeout) as response:  # noqa: S310 - http(s) only, see enabled()
             return json.load(response)
     except HTTPError as exc:  # Relay's own error code and problems, never our content
         raw = exc.read()

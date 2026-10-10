@@ -136,7 +136,7 @@ SPEC: dict[str, Setting] = {
         "Telegram",
         kind="select",
         choices=("on", "off"),
-        help="Telegram needs RELAY_URL, RELAY_API_KEY and RELAY_APP in .env.",
+        help="Telegram needs RELAY_URL, RELAY_API_KEY, RELAY_APP and RELAY_USER in .env.",
     ),
     "relay_weekly": Setting(
         "on",

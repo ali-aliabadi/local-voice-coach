@@ -81,6 +81,7 @@ body > header a:hover { color: var(--ink); }
 body > header a.on { color: var(--ink); border-bottom-color: var(--accent); }
 .brand { font-weight: 550; }
 .machine { color: var(--muted); font-size: 0.8rem; }
+#telegram.warn { color: var(--warn); }
 @media (max-width: 60rem) { .machine { order: 1; flex-basis: 100%; } }
 
 #app {
