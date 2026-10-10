@@ -85,7 +85,8 @@ def test_offline_nothing_is_available_and_it_says_why(monkeypatch):
     ("done", "shown", "locked"),
     [
         (0, {"talk"}, set()),  # a first session sees talk alone
-        (1, None, {"interview", "panel", "review"}),  # then all, the interviews not yet open
+        # then all, the interviews not yet open
+        (1, None, {n for n, m in discover().items() if getattr(m, "INTERVIEW", False)}),
         (2, None, set()),  # then all of it
     ],
 )

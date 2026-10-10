@@ -67,6 +67,7 @@ you have one, the job posting: the interviewer reads both before you start.
 | **shadow** | Repeat a sentence straight back |
 | **interview** | A whole interview built on your resume, from hello to your questions for them |
 | **panel** | Three interviewers, closer to a real onsite |
+| **scenario** | Describe the interview you want, out loud, and it plays that interviewer |
 | **review** | One hard technical question, then a written critique out of 10 |
 
 More modes unlock as you complete sessions.
