@@ -79,8 +79,8 @@ def lm_studio_models(timeout: float = 1.5) -> set[str]:
 
 def too_big(backend: Backend) -> str | None:
     """Why this machine cannot hold a local model, or None if it can."""
-    room = machine.specs()["model_gb"]
-    if backend.local and float(backend.ram.removesuffix("GB")) > room:
+    room = machine.room()  # None: LM Studio is on a machine this one cannot see into
+    if backend.local and room is not None and float(backend.ram.removesuffix("GB")) > room:
         return f"needs {backend.ram}, this machine can spare {room}GB"
     return None
 

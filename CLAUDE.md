@@ -312,20 +312,26 @@ declares a role (`"fast"`/`"deep"`); `survey()` filters the catalogue to that ro
 each row reachable or not. Adding a model is one row. Never branch on backend key.
 
 ### A model too big for the machine is never suggested
-`machine.specs()` reads the chip, cores and memory, and how big a model fits: on Apple
-silicon the GPU may use about 2/3 of unified memory (3/4 from 36GB), less `RESERVED_GB`
-for the system, the browser, Whisper and Kokoro. A local row whose `ram` is bigger is
-greyed in the picker with the reason, left out of the Settings selects (unless already
-chosen) and never used as a stand-in. The header shows the same numbers. In Docker it
-reads the VM, not the host where LM Studio runs.
+`machine.specs()` reads the hardware it runs on, whatever it is: the CPU, cores and RAM,
+and the GPU a model can use - `nvidia-smi` on any system, `system_profiler` on a Mac (Apple
+silicon's GPU cores, or an Intel Mac's AMD card), amdgpu's sysfs on Linux. A card's own
+memory, less `CONTEXT_GB`, is the room on it; Apple silicon gets about 2/3 of unified
+memory (3/4 from 36GB, or `iogpu.wired_limit_mb` if raised), less `RESERVED_GB` for the
+system, the browser, Whisper and Kokoro; with no GPU, RAM less `RESERVED_GB`. A local row
+whose `ram` is bigger is greyed in the picker with the reason, left out of the Settings
+selects (unless already chosen) and never used as a stand-in. When LM Studio's URL is not
+this machine - the host, from inside Docker - `machine.room()` is None and nothing is
+filtered: this machine's memory says nothing about that one. The header shows all of it.
 
 ### Written work falls back to a local model
 `llm.patiently` (notes, summary, study sheet, verdict) waits out what passes: a per-minute
 limit says "retry in", a 503 is overload. A 429 without a retry hint is a spending cap or
 spent credits, and was waited on for three minutes a request, then failed. Anything that
 will not pass - budget, daily quota, no internet, a rejected key - hands the request to
-`backends.stand_in()`, a model LM Studio serves that fits, analysis models first. The
-live conversation does not fall back: it reports the error and offers a retry.
+`backends.stand_in()`, a model LM Studio serves that fits, analysis models first. It runs
+on the event loop's thread, not `to_thread`: settings live in a SQLite connection only the
+thread that opened it may use. The live conversation does not fall back: it reports the
+error and offers a retry.
 
 ### Latency shown to the user must be honest
 The `Latency` column is published/estimated and labelled `est.` where it is a guess. The

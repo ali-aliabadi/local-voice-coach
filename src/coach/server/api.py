@@ -139,7 +139,9 @@ async def get_jobs(request: Request) -> Response:
 
 
 async def get_machine(_request: Request) -> Response:
-    return JSONResponse(machine.specs())
+    return JSONResponse(
+        {**machine.specs(), "model_gb": machine.room(), "lm_studio": machine.lm_studio_host()}
+    )
 
 
 async def get_settings(_request: Request) -> Response:

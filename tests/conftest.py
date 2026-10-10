@@ -17,7 +17,10 @@ READ_FROM_ENVIRONMENT = (
 )  # fmt: skip
 
 # The machine every test runs on, whatever it really runs on: an 18GB M3 Pro.
-MACHINE = {"cpu": "Apple M3 Pro", "cores": 11, "ram_gb": 18, "unified": True, "model_gb": 12}
+MACHINE = {
+    "cpu": "Apple M3 Pro", "cores": 11, "ram_gb": 18, "unified": True,
+    "gpu": {"name": "Apple M3 Pro", "gb": 0, "cores": 14}, "model_gb": 12,
+}  # fmt: skip
 # A scored answer, as fluency() would hand it to the store.
 METRICS = {"words": 40, "wpm": 120, "fillers": 1, "pauses": 2, "longest_pause": 1, "lead_in": 1}
 # The coach's summary of a session: what reaches Telegram as its lessons.

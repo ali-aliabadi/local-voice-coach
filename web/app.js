@@ -32,9 +32,14 @@ route("/", {
 
 // What this machine can run, for choosing a local model: LM Studio's model must fit in it.
 get("/api/machine").then((m) => {
-  const memory = m.unified ? `${m.ram_gb} GB memory, shared with the GPU` : `${m.ram_gb} GB RAM`;
+  const gpu = !m.gpu ? "no GPU a model can use"
+    : m.unified ? `${m.gpu.cores}-core GPU, sharing the RAM`
+      : `${m.gpu.name}, ${m.gpu.gb} GB`;
+  const fits = m.model_gb == null
+    ? `LM Studio is on ${m.lm_studio}: model sizes not checked`
+    : `local models up to ${m.model_gb} GB`;
   document.getElementById("machine").textContent =
-    `${m.cpu} · ${m.cores} cores · ${memory} · local models up to ${m.model_gb} GB`;
+    `${m.cpu} · ${m.cores} cores · ${m.ram_gb} GB RAM · ${gpu} · ${fits}`;
 }).catch(() => {});
 
 apply();

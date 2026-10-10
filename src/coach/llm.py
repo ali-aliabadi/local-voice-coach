@@ -228,7 +228,8 @@ async def patiently(ep: Endpoint, messages: list[dict], max_tokens: int | None =
         try:
             return await _waiting_out(ep, messages, max_tokens)
         except (openai.APIError, RuntimeError) as exc:  # RuntimeError: a quota used up
-            local = await asyncio.to_thread(backends.stand_in)
+            # not in a thread: settings live in a connection only this thread may use
+            local = backends.stand_in()
             if local is None or local.model == ep.model:
                 raise
             print(f"  {ep.model}: {_said(exc)[:120]}\n  {local.model} is writing it instead")
