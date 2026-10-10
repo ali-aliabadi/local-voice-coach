@@ -128,8 +128,12 @@ async def speak(ws, text: str, helped=()) -> dict:
 
 
 async def conversation(app_port: int) -> None:
-    script.extend(["Hi there. What did you do this weekend?", "Oh nice. Which film was it?"])
-    script.extend(["HANG", "HANG", "Sorry, I lost you. Was it scary?"])
+    script.extend(
+        [
+            *("Hi there. What did you do this weekend?", "Oh nice. Which film was it?"),
+            *("HANG", "HANG", "Sorry, I lost you. Was it scary?"),
+        ]
+    )
     async with connect(f"ws://127.0.0.1:{app_port}/ws") as ws:
         await ws.send(json.dumps({"mode": "talk", "backend": "lfm2.5"}))
         session = (await until(ws, "ready"))["session"]
@@ -143,6 +147,8 @@ async def conversation(app_port: int) -> None:
         heard = await speak(ws, "I watched a film at home with my wife.", ["slower", "text"])
         assert "film" in heard["text"].lower(), heard["text"]
         assert heard["metrics"]["wpm"] > 0
+        # half a second of silence before it: Whisper alone timed the first word at 0.0
+        assert 0.4 <= heard["metrics"]["lead_in"] <= 0.7, heard["metrics"]
         assert heard["turn"]
         await until(ws, "turn_done")
 

@@ -1,6 +1,7 @@
 """Speech to text, plus the fluency numbers derived from word timings."""
 
 import asyncio
+import dataclasses
 import itertools
 import re
 import time
@@ -10,6 +11,7 @@ from typing import Any
 import numpy as np
 from faster_whisper import WhisperModel
 from faster_whisper.utils import _MODELS
+from faster_whisper.vad import VadOptions, get_speech_timestamps
 from huggingface_hub import snapshot_download
 from tqdm.auto import tqdm
 
@@ -48,6 +50,20 @@ def fluency(words: Sequence[Any]) -> dict | None:
         "longest_pause": round(max(max(gaps, default=0.0), 0.0), 1),
         "lead_in": round(float(words[0].start), 1),
     }
+
+
+def to_onset(words: list, audio: np.ndarray) -> list:
+    """`words` with the first one starting where the speech does. Whisper cannot time it:
+    it stretches the first word back over the silence, so it read any wait under a second
+    as none and a longer one about 0.4s short - wrong 'before you spoke', and a slower pace.
+    Silero, which faster-whisper ships, finds the start to within 30ms in about 10ms."""
+    spans = get_speech_timestamps(audio, VadOptions(speech_pad_ms=0))
+    if not words or not spans:
+        return words
+    onset = spans[0]["start"] / config.SAMPLE_RATE
+    if float(words[0].start) < onset < float(words[0].end):
+        return [dataclasses.replace(words[0], start=onset), *words[1:]]
+    return words
 
 
 def word_rows(words: Sequence[Any]) -> list[dict]:
@@ -109,6 +125,6 @@ class Transcriber:
                 )[0]
             ),
         )
-        words = [w for s in segments for w in (s.words or [])]
+        words = to_onset([w for s in segments for w in (s.words or [])], audio)
         text = " ".join(s.text for s in segments).strip()
         return text, fluency(words), word_rows(words), (time.perf_counter() - started) * 1000

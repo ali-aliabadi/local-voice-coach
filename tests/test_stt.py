@@ -1,6 +1,8 @@
 """Scoring an answer: fillers, pauses, pace and lead-in are arithmetic on word timestamps."""
 
 import json
+import pathlib
+import wave
 from dataclasses import dataclass
 from typing import Any
 
@@ -9,6 +11,8 @@ import pytest
 
 from coach import stt
 from coach.stt import filler_pattern, fluency, word_rows
+
+SPOKEN = pathlib.Path(__file__).with_name("i-think-so.wav")
 
 
 @dataclass
@@ -76,6 +80,23 @@ def test_a_gap_over_the_threshold_is_a_pause():
 
 def test_lead_in_is_the_silence_before_the_first_word():
     assert scored(("Well", 3.4, 3.8), ("yes", 3.8, 4.1))["lead_in"] == 3.4
+
+
+@pytest.mark.parametrize("silence", [0.3, 0.8, 1.5])
+def test_the_first_word_starts_where_the_speech_does(silence):
+    """Whisper stretched the first word back over the silence: 0.8s before "I" read as
+    " I" from 0.0 to 0.9, so 'before you spoke' said 0."""
+    with wave.open(str(SPOKEN), "rb") as clip:  # "I think so.", by Kokoro, at 16kHz
+        voice = np.frombuffer(clip.readframes(clip.getnframes()), "<i2") / 32768
+    audio = np.concatenate([np.zeros(int(silence * 16000)), voice]).astype(np.float32)
+    words = stt.to_onset(say(("I", 0.0, silence + 0.2), ("think", silence + 0.2, 1.0)), audio)
+    assert abs(words[0].start - silence) < 0.1
+    assert words[1].start == silence + 0.2  # only the first word was wrong
+
+
+def test_whisper_stands_where_no_speech_is_found():
+    words = say(("Yes", 0.4, 0.9))
+    assert stt.to_onset(words, np.zeros(16000, np.float32)) == words
 
 
 def test_numpy_scalars_leave_as_plain_python():

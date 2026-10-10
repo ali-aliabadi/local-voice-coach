@@ -23,7 +23,8 @@ requirement, not a feature.
    nothing gets to break it.
 2. **Never present an estimate as a measurement.** The backend table labels published
    latency `est.`; the `Yours` column is measured from the user's own sessions.
-3. **Fluency metrics stay arithmetic.** wpm, pauses and lead-in come from word timestamps.
+3. **Fluency metrics stay arithmetic.** wpm, pauses and lead-in come from word timestamps,
+   and where speech starts from a voice detector, because Whisper misplaces the first word.
    Exact, free, offline, instant. A model's opinion is not an upgrade.
 
 ## Architecture
