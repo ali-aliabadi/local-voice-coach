@@ -58,6 +58,9 @@ class BrowserIO:
         self.last_reply: tuple[str, str | None] = ("", None)  # for "say it slower"
         self.last_turn: int | None = None  # the reply the user is answering
         self.heard_at: float | None = None  # when the user finished their last answer
+        # Hybrid: seconds from the end of the partner's sentence to the start of this
+        # recording, which began on the user's voice; negative when they cut in.
+        self.began: float | None = None
 
     def prior_turns(self) -> list[dict]:
         """What was already said this session. Seed your history with it so that a browser
@@ -71,6 +74,7 @@ class BrowserIO:
         decoding here and no ffmpeg anywhere in the project.
         """
         chunks: list[np.ndarray] = []
+        self.began = None
         while True:
             message = await self.websocket.receive()
             if message["type"] == "websocket.disconnect":
@@ -99,6 +103,8 @@ class BrowserIO:
             await self._slower()
         if kind == "helped" and self.last_turn:
             store.helped(self.last_turn, [str(k) for k in event.get("kinds", [])][:3])
+        if kind == "began":
+            self.began = float(event.get("after", 0))
         if kind == "end_answer":
             self.heard_at = time.perf_counter()
         return kind
@@ -116,6 +122,8 @@ class BrowserIO:
         if isinstance(audio, str):
             return audio
         text, metrics, words, stt_ms = await self.transcriber.transcribe(audio)
+        if metrics and self.began is not None:  # Whisper timed it from the recording's start
+            metrics["lead_in"] = round(max(0.0, self.began + metrics["lead_in"]), 1)
         if not text:
             await self.send(type="notice", text="Didn't catch that. Move closer to the mic.")
             return None

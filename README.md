@@ -86,7 +86,12 @@ whether they would hire you, and why. Telegram gets only the rating and the deci
 | **lead-in** | seconds before your first word | down |
 
 Whisper drops some fillers even when told not to, so filler counts are a floor. The rest
-come from word timestamps and are exact. Every session is kept: `/history` replays them,
+come from word timestamps and are exact.
+
+**Talking** in Settings is *space* (tap or press space to start and stop) or *hybrid*: the
+mic stays open, your voice starts the answer, a pause ends it, and talking over the
+partner cuts in, as in a real conversation. Lead-in then counts from the end of their
+sentence, not from a key press. Use headphones, or the partner's voice can cut itself off. Every session is kept: `/history` replays them,
 `/progress` charts the trend.
 
 ## Your data

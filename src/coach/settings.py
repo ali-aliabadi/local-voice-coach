@@ -98,19 +98,20 @@ SPEC: dict[str, Setting] = {
         "Off uses the Voice above every time.",
     ),
     # ---- Practice ----
-    "hands_free": Setting(
-        "off",
-        "Hands-free",
+    "talking": Setting(
+        "space",
+        "Talking",
         "Practice",
         kind="select",
-        choices=("on", "off"),
-        help="The mic opens by itself when the partner finishes, and closes after you have "
-        "been quiet for a while. 'Before you spoke' then counts from the end of their "
-        "sentence - the real time it takes you to start.",
+        choices=("space", "hybrid"),
+        help="Space: tap or press space to start and to stop. Hybrid: the mic stays open, "
+        "your voice starts the answer and a pause ends it, and talking over the partner cuts "
+        "in, as in a real conversation - space still works. 'Before you spoke' then counts "
+        "from the end of their sentence. Hybrid hears best with headphones.",
     ),
     "hands_free_silence": Setting(
         3.0,
-        "Hands-free: quiet before it stops",
+        "Hybrid: quiet before it stops",
         "Practice",
         kind="number",
         step=0.5,

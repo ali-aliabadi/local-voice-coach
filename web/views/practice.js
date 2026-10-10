@@ -5,7 +5,9 @@
 //
 // This file is the conversation: the socket, its events, the mic. screen.js draws.
 
-import { Mic, Playback, meter, untilSilence } from "../audio.js";
+import {
+  CHUNK_MS, CUT_IN_LEVEL, Mic, Playback, VOICE_LEVEL, meter, onset, untilSilence,
+} from "../audio.js";
 import * as clock from "../clock.js";
 import { get } from "../form.js";
 import { go } from "../router.js";
@@ -31,9 +33,12 @@ let goal = 0;          // minutes the user set out to practise
 let goalPending = false;
 let stopClock = null;
 let helped = new Set();  // what you needed to follow this reply: again, slower, text
-let handsFree = null;  // { silence } when the mic opens and closes by itself
+let hybrid = null;     // { silence } when your voice starts an answer and a pause ends it
+let readyAt = 0;       // performance.now() when it became your turn: "before you spoke"
+const voice = onset();
 let stopWatch = null;
 let muted = false;     // you cut in: drop the rest of this reply
+let sending = false;   // the partner's reply is still arriving: turn_done has not come
 let limit = 0;         // seconds the next answer may run, when a mode sets one
 let stopCountdown = null;
 
@@ -72,9 +77,7 @@ export async function render(node, _params, query) {
   get("/api/progress").then(({ totals }) => { lifetime = totals.answers ? totals : null; });
 }
 
-export async function leave() {
-  close();
-}
+export const leave = () => close();
 
 function connect(mode, backend, resume, goalMinutes) {
   session = resume || null;
@@ -110,7 +113,12 @@ function handle(event, mode, backend) {
       stopClock = clock.start({
         label: $("#clock"), bar: $("#goalfill"), elapsed: event.elapsed, goal, reached,
       });
-      handsFree = event.hands_free ? { silence: event.silence } : null;
+      hybrid = event.hybrid ? { silence: event.silence } : null;
+      if (hybrid) {
+        $("#how").textContent = "hybrid · just talk, a pause ends your answer · talk over "
+          + "them to cut in · space works too";
+        mic.start(hear).catch(() => screen.notice("No microphone access. Allow it, then reload."));
+      }
       series = event.answers || [];
       if (series.length) screen.session(event.so_far, lifetime, series);
       break;
@@ -118,10 +126,11 @@ function handle(event, mode, backend) {
       playback.keep = !event.replay;
       break;
     case "sentence":
+      sending = true;
       if (muted) break;
       if (parts.length === 0) {
         screen.reset();
-        screen.mic(true, "listen · tap to cut in");
+        screen.mic(true, hybrid ? "listen · talk to cut in" : "listen · tap to cut in");
         playback.newTurn();
         helped = new Set();
       }
@@ -152,18 +161,19 @@ function handle(event, mode, backend) {
       break;
     case "turn_done":
       if (event.wait_ms) waited = event.wait_ms;
-      muted = false;
+      muted = sending = false;
       playback.idle().then(() => {
         parts = [];
-        if (recording) return;  // you cut in: already answering
-        if (handsFree) toggle();
-        else screen.mic(true, "tap to answer");
+        readyAt = performance.now();
+        if (!recording) yourTurn();  // else you cut in: already answering
       });
       break;
     case "notice":
     case "error":
       screen.notice(event.text, { retry: event.retry ? retry : null });
-      screen.mic(true, "tap to answer");
+      sending = false;
+      readyAt = performance.now();
+      yourTurn();
       break;
   }
   screen.status(answered, waited ? `replied in ${(waited / 1000).toFixed(1)}s · ${detail}` : detail);
@@ -185,59 +195,81 @@ function reached() {
     { good: true });
 }
 
-async function toggle() {
-  if ($("#mic").disabled && !recording) return;
-  if (!recording) {
+const yourTurn = () => screen.mic(true, hybrid ? "your turn · just talk" : "tap to answer");
+
+function toggle() {
+  if (recording) end();
+  else if (!$("#mic").disabled) begin();
+}
+
+/** Hybrid: every chunk the open mic hears. Between answers it listens for your voice;
+ * over the partner, or a replay of them, it takes a louder voice for longer. */
+function hear(bytes) {
+  if (recording) return void (socket?.readyState === 1 && socket.send(bytes));
+  const over = parts.length > 0 || playback.playing;
+  const threshold = $("#mic").disabled ? Infinity : over ? CUT_IN_LEVEL : VOICE_LEVEL;
+  const kept = voice({ bytes, at: performance.now() }, mic.level, threshold, over ? 2 : 1);
+  if (kept) begin(kept);
+}
+
+/** Start an answer: by tap or space, or in hybrid by your voice, with the second of audio
+ * from before it was noticed (`kept`). */
+async function begin(kept = []) {
+  if (!hybrid) {  // hybrid's mic opened with the session
     try {
       await mic.start((chunk) => socket?.readyState === 1 && socket.send(chunk));
     } catch {
       screen.notice("No microphone access. Allow it, then tap again.");
       return;
     }
-    recording = true;
-    if (playback.playing) muted = true;  // cutting in: the rest of this reply is dropped
-    playback.stop();  // and a replay must not end up in the recording
-    if (screen.reading()) helped.add("text");
-    // Sent even when empty: "followed by ear" has to be recorded, not assumed.
-    socket?.send(JSON.stringify({ type: "helped", kinds: [...helped] }));
-    helped = new Set();
-    $("#listen-tools").hidden = true;
-    screen.reset();
-    screen.card(null);
-    $("#session").classList.add("dim");
-    $("#mic").setAttribute("aria-pressed", "true");
-    $("#mic").classList.add("recording");
-    $("#level").classList.add("on");
-    stopMeter = meter($("#level"), mic);
-    if (handsFree) {
-      stopWatch = untilSilence(mic, { silence: handsFree.silence, done: () => recording && toggle() });
-      screen.mic(true, "listening · just talk");
-    } else {
-      screen.mic(true, "tap when you are done");
-    }
-    if (limit) {
-      stopCountdown = clock.countdown($("#mic-label"), limit, () => recording && toggle());
-      limit = 0;
-    }
-  } else {
-    recording = false;
-    mic.stop();
-    stopMeter?.();
-    stopWatch?.();
-    stopCountdown?.();
-    $("#session").classList.remove("dim");
-    $("#mic").setAttribute("aria-pressed", "false");
-    $("#mic").classList.remove("recording");
-    $("#level").classList.remove("on");
-    socket?.send(JSON.stringify({ type: "end_answer" }));
-    screen.wait("transcribing");
-    if (goalPending) reached();
   }
+  recording = true;
+  // Cutting in, the rest of this reply is dropped. Only while it is still arriving: set
+  // after turn_done, nothing would clear it and the next reply would go unheard.
+  muted = sending;
+  playback.stop();  // and a replay must not end up in the recording
+  if (screen.reading()) helped.add("text");
+  // Sent even when empty: "followed by ear" has to be recorded, not assumed.
+  socket?.send(JSON.stringify({ type: "helped", kinds: [...helped] }));
+  helped = new Set();
+  if (hybrid) {
+    // Where this recording starts against the end of their last sentence, which is now
+    // if you cut in: Whisper can only time your first word from the start of the recording.
+    const from = kept.length ? kept[0].at - CHUNK_MS : performance.now();
+    const after = (from - Math.max(readyAt, playback.quiet)) / 1000;
+    socket?.send(JSON.stringify({ type: "began", after }));
+    kept.forEach((chunk) => socket?.send(chunk.bytes));
+  }
+  screen.recording(true);
+  stopMeter = meter($("#level"), mic);
+  if (hybrid) {
+    stopWatch = untilSilence(mic, { silence: hybrid.silence, done: () => recording && end() });
+    screen.mic(true, "listening · a pause ends it");
+  } else {
+    screen.mic(true, "tap when you are done");
+  }
+  if (limit) {
+    stopCountdown = clock.countdown($("#mic-label"), limit, () => recording && end());
+    limit = 0;
+  }
+}
+
+function end() {
+  recording = false;
+  if (!hybrid) mic.stop();  // hybrid keeps listening, for the next answer and to cut in
+  stopMeter?.();
+  stopWatch?.();
+  stopCountdown?.();
+  screen.recording(false);
+  socket?.send(JSON.stringify({ type: "end_answer" }));
+  screen.wait("transcribing");
+  if (goalPending) reached();
 }
 
 function close() {
   stopClock?.();
-  if (recording) { mic.stop(); stopMeter?.(); recording = false; }
+  mic.stop();
+  if (recording) { stopMeter?.(); stopWatch?.(); recording = false; }
   playback.stop();
   if (socket?.readyState === 1) socket.send(JSON.stringify({ type: "quit" }));
   const open = socket;
