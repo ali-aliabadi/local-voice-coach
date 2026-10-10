@@ -21,11 +21,13 @@ UNLOCK = 2  # an interview: once everyday talk has had two sessions
 INTERVIEW = True
 PARTNER = "panel"
 
-# name -> (kokoro voice, what they care about). Add a row and they join the panel.
+# name -> (kokoro voice, what they care about). Add a row and they join the panel; its
+# voice needs its pace measured in tts.PACE first, or it is never brought up to a fluent
+# speaker's. PRIYA was af_nicole, a whisper at about 60% of the others' pace.
 PANEL = {
     "MAYA": ("af_heart", "the hiring manager: warm, asks behavioural and motivation questions"),
     "DEREK": ("bm_george", "a staff engineer: digs into system design and technical trade-offs"),
-    "PRIYA": ("af_nicole", "the bar raiser: pushes back, asks about edge cases and failure modes"),
+    "PRIYA": ("bf_emma", "the bar raiser: pushes back, asks about edge cases and failure modes"),
 }
 VOICES = {name: voice for name, (voice, _) in PANEL.items()}
 
