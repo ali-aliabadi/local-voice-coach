@@ -38,6 +38,7 @@ export async function render(root) {
     <p class="foot wired">Gemini: ${t.wired.gemini ? "key set"
       : `no key — <a href="/settings">add one</a>`} · Telegram: ${t.wired.telegram.length
       ? `off — .env needs ${escape(t.wired.telegram.join(", "))}`
+      : t.wired.problem ? `not working — ${escape(t.wired.problem)}`
       : `on, sends to ${escape(t.wired.to)}`}</p>
     ${t.work_on.length ? `<h2>From your last session, work on</h2>
       <ol class="advice">${t.work_on.map((w) => `<li>${escape(w)}</li>`).join("")}</ol>` : ""}

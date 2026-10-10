@@ -23,7 +23,6 @@ services:
       RELAY_API_KEY: ${RELAY_API_KEY:-}
       RELAY_APP: ${RELAY_APP:-}
       RELAY_USER: ${RELAY_USER:-}
-      RELAY_ADMIN: ${RELAY_ADMIN:-}  # the old name for RELAY_USER
 
     # Docker Desktop provides this name already; the mapping is what makes it work on
     # plain Linux too.

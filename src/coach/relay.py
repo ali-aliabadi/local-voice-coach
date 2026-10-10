@@ -7,8 +7,8 @@ secret and is read from the environment only):
     RELAY_URL      Relay's base URL, e.g. https://relay.example.com
     RELAY_API_KEY  this app's key (rk_...), created by the Relay admin
     RELAY_APP      this app's name as Relay records it, e.g. voice-coach
-    RELAY_USER     who this app sends to; optional, default "admin" (RELAY_ADMIN, its
-                   old name, still works when RELAY_USER is unset)
+    RELAY_USER     who this app sends to: your recipient's username. Relay has no default
+                   recipient, so neither does this
 
 What leaves: numbers, a chart, an interview's rating and hire decision, and - if you
 allow it - the coach's lessons. Never audio, never whole transcripts. Message ids are logged; contents and the key never are.
@@ -29,13 +29,15 @@ def _env(name: str, default: str = "") -> str:
 
 
 def recipient() -> str:
-    """Who this app sends to, as Relay's skill resolves it."""
-    return _env("RELAY_USER") or _env("RELAY_ADMIN") or "admin"
+    """Who this app sends to. Relay's skill dropped the fallback to "admin": reports went
+    to whoever runs Relay, not to the person practising."""
+    return _env("RELAY_USER")
 
 
 def missing() -> list[str]:
     """What keeps Relay off: a variable unset, or a URL that is not http(s)."""
-    gaps = [name for name in ("RELAY_URL", "RELAY_API_KEY", "RELAY_APP") if not _env(name)]
+    needed = ("RELAY_URL", "RELAY_API_KEY", "RELAY_APP", "RELAY_USER")
+    gaps = [name for name in needed if not _env(name)]
     if _env("RELAY_URL") and not _env("RELAY_URL").startswith(("http://", "https://")):
         gaps.append("RELAY_URL starting with https://")
     return gaps
@@ -51,6 +53,35 @@ def status() -> str:
     if missing():
         return f"telegram: off - not set: {', '.join(missing())}"
     return f"telegram: on, as {_env('RELAY_APP')} to {recipient()}"
+
+
+# What the check at the start found wrong; "" when it passed or has not run.
+problem = ""
+
+
+def check() -> str:
+    """Relay's own check, sending nothing: the URL and the key work, and the recipient
+    exists and has Telegram linked. What is wrong, or "" when nothing is."""
+    try:
+        found = _call("GET", "/v1/recipients").get("recipients", [])
+    except (OSError, ValueError, RuntimeError) as exc:  # a refused key, or no Relay at all
+        return f"can't use Relay: {exc}"
+    names = {name: r for r in found for name in [r["username"], *r.get("aliases", [])]}
+    who = names.get(recipient())
+    if who is None:
+        return f"{recipient()} is not a Relay recipient"
+    if not who.get("linked_channels"):
+        return f"{recipient()} has no Telegram linked yet, so nothing can reach them"
+    return ""
+
+
+async def check_at_start() -> None:
+    """Off the start's path: a Relay that cannot be reached would hold it for 15 seconds."""
+    global problem  # noqa: PLW0603 - one result, read by the Today page
+    if not enabled():
+        return
+    problem = await asyncio.to_thread(check)
+    print(f"  telegram: {problem or 'checked, ' + recipient() + ' can receive'}")
 
 
 # Cloudflare in front of a Relay answered Python's default "Python-urllib" agent with

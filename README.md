@@ -40,8 +40,10 @@ RELAY_APP=voice-coach
 RELAY_USER=<you>
 ```
 
-Set `RELAY_USER` to your own recipient. Left unset it is `admin`, the person who runs
-Relay, and your reports go to them. Leave the `RELAY_*` lines out to keep Telegram off.
+Set `RELAY_USER` to your own recipient's username; there is no default. At the start
+the app checks, sending nothing, that the key works and that `RELAY_USER` has Telegram
+linked, and the Today page says what is wrong if not. Leave the `RELAY_*` lines out to
+keep Telegram off.
 
 **4. Run.**
 

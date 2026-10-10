@@ -13,7 +13,7 @@ from coach import backends, coach, config, llm, machine, relay, store
 
 READ_FROM_ENVIRONMENT = (
     "GEMINI_API_KEY", "LM_STUDIO_URL", "COACH_BACKEND",
-    "RELAY_URL", "RELAY_API_KEY", "RELAY_APP", "RELAY_USER", "RELAY_ADMIN",
+    "RELAY_URL", "RELAY_API_KEY", "RELAY_APP", "RELAY_USER",
 )  # fmt: skip
 
 # The machine every test runs on, whatever it really runs on: an 18GB M3 Pro.
@@ -101,9 +101,12 @@ class FakeRelay:
     def __init__(self):
         self.sent: list[dict] = []
         self.takes_files = True  # an older Relay refuses the file block
+        self.recipients = [{"username": "ali", "aliases": ["me"], "linked_channels": ["telegram"]}]
 
-    def __call__(self, method, _path, body=None):
-        assert method == "POST", "nothing is ever read back from Relay"
+    def __call__(self, method, path, body=None):
+        if method == "GET":  # the check: the only thing ever read back from Relay
+            assert path == "/v1/recipients"
+            return {"recipients": self.recipients}
         if not self.takes_files and any(b["type"] == "file" for b in body["blocks"]):
             raise RuntimeError("relay 422 invalid_request blocks[0].type: unknown")
         self.sent.append(body)
@@ -116,6 +119,7 @@ def telegram(monkeypatch):
     monkeypatch.setenv("RELAY_URL", "https://relay.test")
     monkeypatch.setenv("RELAY_API_KEY", "rk_test")
     monkeypatch.setenv("RELAY_APP", "coach")
+    monkeypatch.setenv("RELAY_USER", "ali")
     fake = FakeRelay()
     monkeypatch.setattr(relay, "_call", fake)
     return fake
