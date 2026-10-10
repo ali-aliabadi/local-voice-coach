@@ -100,9 +100,11 @@ async def lifespan(_app: Starlette) -> AsyncIterator[None]:
     models.load()
     ticking = asyncio.create_task(clock.run())  # expiring recordings now runs from here
     print(f"  {relay.status()}")
+    checking = asyncio.create_task(relay.check_at_start())
     print("  ready\n")
     yield
     ticking.cancel()
+    checking.cancel()
     await finish_up()
     await llm.close()
 

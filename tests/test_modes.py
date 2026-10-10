@@ -8,7 +8,7 @@ import pytest
 from coach import picture, profile, settings, store, tts
 from coach.chunks import split_for_speech, split_speaker
 from coach.modes import interview, repeat, shadow
-from coach.modes.panel import PANEL
+from coach.modes.panel import PANEL, VOICES
 from coach.server.session import ACCENTS
 
 
@@ -196,3 +196,8 @@ def test_the_interviewer_has_your_resume_and_the_time():
     heard = overhear(interview, store.start("interview", "flash-lite", "m", 30))
     assert "<resume>\nPayments at Acme.\n</resume>" in heard
     assert heard.endswith("Time: 0 minutes into a 30-minute interview.")
+
+
+def test_every_panel_voice_speaks_at_a_fluent_speakers_pace():
+    """af_nicole was not in PACE, so it played at its own pace: about 60% of the others'."""
+    assert set(VOICES.values()) <= set(tts.PACE)

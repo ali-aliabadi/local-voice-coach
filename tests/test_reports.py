@@ -65,7 +65,7 @@ def test_the_session_report(telegram, counted, lessons):
     assert message["title"].startswith("Session done")
     assert "of a 30 min goal" in message["title"]
     assert message["source"] == "coach"
-    assert message["to"] == ["admin"]
+    assert message["to"] == ["ali"]
     assert kinds[:2] == ["text", "image"]
     assert "fields" not in kinds, "the chart says the numbers"
     assert "trend" in message["blocks"][1]["caption"]
@@ -122,45 +122,75 @@ def test_last_weeks_report_once_the_week_is_over(telegram, counted):
 def test_nothing_is_sent_without_relays_variables(counted):
     report(counted())  # no fake: a call to Relay would fail the test
     assert not relay.enabled()
-    assert relay.status() == "telegram: off - not set: RELAY_URL, RELAY_API_KEY, RELAY_APP"
+    assert relay.status() == (
+        "telegram: off - not set: RELAY_URL, RELAY_API_KEY, RELAY_APP, RELAY_USER"
+    )
 
 
 def test_the_first_page_says_whether_telegram_is_on(monkeypatch):
     client = TestClient(Starlette(routes=api.ROUTES))
     assert client.get("/api/today").json()["wired"]["telegram"] == [
-        "RELAY_URL", "RELAY_API_KEY", "RELAY_APP",
+        "RELAY_URL", "RELAY_API_KEY", "RELAY_APP", "RELAY_USER",
     ]  # fmt: skip
     for name, value in {
         "RELAY_URL": "https://r.test",
         "RELAY_API_KEY": "k",
         "RELAY_APP": "a",
+        "RELAY_USER": "ali",
     }.items():
         monkeypatch.setenv(name, value)
     wired = client.get("/api/today").json()["wired"]
-    assert (wired["telegram"], wired["to"]) == ([], "admin")
+    assert (wired["telegram"], wired["to"], wired["problem"]) == ([], "ali", "")
 
 
 @pytest.mark.usefixtures("telegram")
 def test_the_start_says_whether_telegram_is_on(monkeypatch):
-    assert relay.status() == "telegram: on, as coach to admin"
+    assert relay.status() == "telegram: on, as coach to ali"
     assert "rk_test" not in relay.status()
     monkeypatch.setenv("RELAY_URL", "relay.test")
     assert relay.status() == "telegram: off - not set: RELAY_URL starting with https://"
 
 
+def test_there_is_no_default_recipient(monkeypatch):
+    """Relay's skill dropped the fallback to "admin", and RELAY_ADMIN with it."""
+    for name in ("RELAY_URL", "RELAY_API_KEY", "RELAY_APP"):
+        monkeypatch.setenv(name, "https://r.test")
+    monkeypatch.setenv("RELAY_ADMIN", "old")
+    assert relay.recipient() == ""
+    assert relay.missing() == ["RELAY_USER"]
+
+
 @pytest.mark.parametrize(
-    ("env", "recipient"),
+    ("recipients", "problem"),
     [
-        ({"RELAY_ADMIN": "old"}, "old"),
-        ({"RELAY_ADMIN": "old", "RELAY_USER": "ali"}, "ali"),
-        ({}, "admin"),
+        ([{"username": "ali", "linked_channels": ["telegram"]}], ""),
+        ([{"username": "x", "aliases": ["ali"], "linked_channels": ["telegram"]}], ""),
+        ([{"username": "sara", "linked_channels": ["telegram"]}], "ali is not a Relay recipient"),
+        ([{"username": "ali", "linked_channels": []}], "ali has no Telegram linked yet"),
     ],
 )
-def test_who_it_goes_to(monkeypatch, env, recipient):
-    """RELAY_USER, else its old name RELAY_ADMIN, else "admin"."""
-    for name, value in env.items():
-        monkeypatch.setenv(name, value)
-    assert relay.recipient() == recipient
+def test_the_check_sends_nothing_and_says_what_is_wrong(telegram, recipients, problem):
+    telegram.recipients = recipients
+    assert relay.check().startswith(problem)
+    assert bool(relay.check()) == bool(problem)
+    assert not telegram.sent
+
+
+@pytest.mark.usefixtures("telegram")
+def test_the_check_says_when_relay_refuses_the_key(monkeypatch):
+    def refused(*_args, **_kwargs):
+        raise RuntimeError("relay 401 unauthorized")
+
+    monkeypatch.setattr(relay, "_call", refused)
+    assert relay.check() == "can't use Relay: relay 401 unauthorized"
+
+
+def test_the_start_checks_relay_and_the_today_page_shows_it(telegram, monkeypatch):
+    monkeypatch.setattr(relay, "problem", "")
+    telegram.recipients = []
+    asyncio.run(relay.check_at_start())
+    wired = TestClient(Starlette(routes=api.ROUTES)).get("/api/today").json()["wired"]
+    assert wired["problem"] == "ali is not a Relay recipient"
 
 
 def test_an_interviews_report_carries_its_verdict_in_the_title_and_no_more(telegram, counted):
