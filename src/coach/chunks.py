@@ -73,3 +73,14 @@ def split_speaker(text: str, cast: Container[str]) -> tuple[str | None, str]:
         return None, text
     name = match.group(1)
     return (name if name in cast else None), text[match.end() :].strip()
+
+
+# How long the answer to this question may take, which an interviewer writes as "[60]"
+# beside its question. Read and removed before anything is spoken, shown or saved.
+BUDGET = re.compile(r"\s*\[(\d{1,3})\s*s?\]\s*")
+
+
+def take_budget(text: str) -> tuple[int | None, str]:
+    """The seconds in a "[60]" tag, if there is one, and the text without any tag."""
+    found = BUDGET.search(text)
+    return (int(found.group(1)) if found else None), BUDGET.sub(" ", text).strip()

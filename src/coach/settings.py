@@ -119,13 +119,14 @@ SPEC: dict[str, Setting] = {
         "threshold, so thinking mid-sentence is not cut off.",
     ),
     "answer_limit": Setting(
-        90,
+        300,
         "Interview: longest answer",
         "Practice",
         kind="number",
-        step=5,
-        help="Seconds an interview answer may run before the interviewer stops you and asks "
-        "for the short version, as real ones do. 0 never stops you.",
+        step=15,
+        help="The interviewer gives each question its own time - about a minute for "
+        "yourself, more for a design - and stops you past it, as real ones do. This is "
+        "the most any answer gets. 0 never stops you.",
     ),
     # ---- Coach ----
     "coach_backend": Setting(

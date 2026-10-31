@@ -74,9 +74,10 @@ you have one, the job posting: the interviewer reads both before you start.
 
 More modes unlock as you complete sessions.
 
-In interview and panel, an answer that runs past **Interview: longest answer** in Settings
-(90 seconds; 0 turns it off) is stopped, and the interviewer asks for the short version,
-as a real one does.
+In interview and panel, the interviewer gives each question its own time (about a minute
+for "tell me about yourself", several for a design) and stops an answer that runs past
+it to ask for the short version, as a real one does. **Interview: longest answer** in
+Settings caps it (5 minutes; 0 turns it off).
 
 After an interview, the session page has the interviewer's verdict: a rating out of 10,
 whether they would hire you, and why. Telegram gets only the rating and the decision.

@@ -161,7 +161,7 @@ class BrowserIO:
         """
         if thinking:
             await self.send(type="thinking", text=thinking)
-        name, voice, done = None, self.accent, llm.Reply("", None)
+        name, voice, done, budget = None, self.accent, llm.Reply("", None), None
         began, first, heard = time.perf_counter(), None, None
         try:
             async for kind, chunk in llm.stream_sentences(
@@ -169,6 +169,10 @@ class BrowserIO:
             ):
                 if kind == "done":
                     done = chunk
+                    continue
+                said_budget, chunk = chunks.take_budget(chunk)  # noqa: PLW2901 - never spoken
+                budget = budget or said_budget
+                if not chunk:
                     continue
                 if cast and name is None:
                     name, rest = chunks.split_speaker(chunk, cast)
@@ -185,6 +189,7 @@ class BrowserIO:
             await self.send(type="error", text=await llm.explain(endpoint, exc), retry=True)
             return None
         timing = self._timing(began, first, heard)
+        done = done._replace(text=chunks.take_budget(done.text)[1], seconds=budget)
         if done.text:
             self.last_turn = store.record(
                 self.session,
