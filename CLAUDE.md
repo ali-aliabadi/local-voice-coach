@@ -241,6 +241,21 @@ S314) and no multipart parser - the file is the request body. Without a resume t
 asks for no role, stack or years: the resume and posting say all that, and asking
 everyone for a tech stack made a conversation app look like an engineering one.
 
+### Real interviewers stop long answers
+`interview` and `panel` pass `limit=True` to `converse`. The interviewer then begins each
+reply with a time budget for its question, "[60]" (`_budget.INSTRUCTION`): about a minute
+for yourself, minutes for a design. A fixed limit was wrong both ways. It rides in the
+same reply, not a second request, because free tiers count requests. `BrowserIO.reply`
+takes the tag out of every chunk with `chunks.take_budget` before anything is spoken,
+shown or saved, and returns it as `Reply.seconds`; the model's own history keeps the tag
+so it keeps writing one. `answer_limit` is the ceiling and the fallback for a missing tag.
+The model cannot judge while the user speaks - it only sees the words after - which is
+why it decides when it asks. The page ends the recording at zero; when it ran the full
+budget, `cut_off()` adds a note to the model's copy of the answer only, telling it to
+interrupt and ask for the problem in one sentence and what they did in one or two. A
+four-page answer cut off this way is a real failure mode the user hit. `scenario` is left
+out: its first answer is the user describing the interview, which can run long.
+
 ### The verdict is the interviewer's, and Telegram gets one line of it
 After a session of a mode with `INTERVIEW = True`, `verdict.py` writes what a real
 interviewer submits: a rating out of 10, a decision on `DECISIONS` (If they're hired, I

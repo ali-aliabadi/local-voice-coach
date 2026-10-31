@@ -5,11 +5,13 @@ import asyncio
 
 import pytest
 
-from coach import picture, profile, settings, store, tts
-from coach.chunks import split_for_speech, split_speaker
-from coach.modes import interview, repeat, shadow
+from coach import llm, picture, profile, settings, store, tts
+from coach.chunks import split_for_speech, split_speaker, take_budget
+from coach.modes import _budget as budget
+from coach.modes import interview, repeat, shadow, talk
+from coach.modes._converse import cut_off
 from coach.modes.panel import PANEL, VOICES
-from coach.server.session import ACCENTS
+from coach.server.session import ACCENTS, Answer
 
 
 def stream(tokens):
@@ -195,9 +197,103 @@ def test_the_interviewer_has_your_resume_and_the_time():
     profile.save({"resume": "Payments at Acme."})
     heard = overhear(interview, store.start("interview", "flash-lite", "m", 30))
     assert "<resume>\nPayments at Acme.\n</resume>" in heard
-    assert heard.endswith("Time: 0 minutes into a 30-minute interview.")
+    assert "Time: 0 minutes into a 30-minute interview." in heard
 
 
 def test_every_panel_voice_speaks_at_a_fluent_speakers_pace():
     """af_nicole was not in PACE, so it played at its own pace: about 60% of the others'."""
     assert set(VOICES.values()) <= set(tts.PACE)
+
+
+class Waiting(Ear):
+    """Resumed on the user's turn: records what the page is told before the mic opens."""
+
+    def __init__(self):
+        super().__init__()
+        self.events: list[dict] = []
+
+    def prior_turns(self):
+        return [{"role": "assistant", "content": "Tell me about yourself."}]
+
+    async def send(self, **event):
+        self.events.append(event)
+
+    async def answer(self):
+        raise Overheard
+
+
+def wait_on(mode) -> "Waiting":
+    """Run a mode until it opens the mic, and return what the page was told."""
+    ear = Waiting()
+    with pytest.raises(Overheard):
+        asyncio.run(mode.run(None, ear))
+    return ear
+
+
+class Asking(Waiting):
+    """A fresh interview: hears the interviewer's first question, then stops at the mic."""
+
+    def __init__(self, question):
+        super().__init__()
+        self.question = question
+        self.session = store.start("interview", "flash-lite", "m", 30)
+
+    def prior_turns(self):
+        return []
+
+    async def reply(self, _endpoint, messages, **_how):
+        self.system = messages[0]["content"]
+        return llm.Reply("Tell me about yourself.", 1.0, self.question)
+
+
+def countdown(mode, question) -> int | None:
+    ear = Asking(question)
+    with pytest.raises(Overheard):
+        asyncio.run(mode.run(None, ear))
+    sent = [e["seconds"] for e in ear.events if e.get("type") == "limit"]
+    return sent[0] if sent else None
+
+
+def test_the_interviewer_sizes_the_countdown_to_its_question():
+    settings.set("answer_limit", 300)
+    assert countdown(interview, 60) == 60
+    assert countdown(interview, None) == 300  # no tag: the ceiling
+
+
+def test_talk_has_no_countdown_and_is_never_asked_for_one():
+    assert countdown(talk, 60) is None
+    assert "square brackets" not in overhear(talk)
+    assert "square brackets" in overhear(interview, store.start("interview", "flash-lite", "m", 30))
+
+
+@pytest.mark.parametrize(
+    ("asked", "ceiling", "seconds"),
+    [(240, 300, 240), (900, 300, 300), (3, 300, budget.SHORTEST), (None, 120, 120), (60, 0, 0)],
+)
+def test_the_budget_stays_within_bounds(asked, ceiling, seconds):
+    settings.set("answer_limit", ceiling)
+    assert budget.seconds(asked, True) == seconds
+
+
+@pytest.mark.parametrize(
+    ("chunk", "taken"),
+    [
+        ("[60] Tell me about yourself.", (60, "Tell me about yourself.")),
+        ("[240s] MAYA: Design a URL shortener.", (240, "MAYA: Design a URL shortener.")),
+        ("What did you do? [90]", (90, "What did you do?")),
+        ("[45]", (45, "")),  # the tag alone in the last piece: nothing left to speak
+        ("Nice. Why Redis?", (None, "Nice. Why Redis?")),
+    ],
+)
+def test_the_budget_tag_is_never_spoken(chunk, taken):
+    assert take_budget(chunk) == taken
+
+
+@pytest.mark.parametrize(
+    ("seconds", "limit", "stopped"),
+    [(45.2, 45, True), (44.3, 45, True), (30.0, 45, False), (60.0, 0, False)],
+)
+def test_the_interviewer_is_told_only_when_the_clock_ended_the_answer(seconds, limit, stopped):
+    """A real interviewer who stops a long answer asks for it in one sentence."""
+    note = cut_off(Answer("So the problem was", None, seconds), limit)
+    assert ("Let me stop you there" in note) is stopped

@@ -23,6 +23,7 @@ class Reply(NamedTuple):
 
     text: str
     ms: float | None
+    seconds: int | None = None  # the answer's time budget, when the model gave one
 
 
 class Endpoint(NamedTuple):
