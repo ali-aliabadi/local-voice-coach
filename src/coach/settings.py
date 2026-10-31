@@ -118,6 +118,15 @@ SPEC: dict[str, Setting] = {
         help="Seconds of silence that end your answer. Keep it well above the pause "
         "threshold, so thinking mid-sentence is not cut off.",
     ),
+    "answer_limit": Setting(
+        90,
+        "Interview: longest answer",
+        "Practice",
+        kind="number",
+        step=5,
+        help="Seconds an interview answer may run before the interviewer stops you and asks "
+        "for the short version, as real ones do. 0 never stops you.",
+    ),
     # ---- Coach ----
     "coach_backend": Setting(
         "flash-lite",

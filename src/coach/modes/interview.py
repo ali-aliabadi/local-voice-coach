@@ -65,4 +65,5 @@ async def run(endpoint: Endpoint, io: BrowserIO) -> None:
         lambda: profile.system_prompt("interview", PROMPT) + clock(io.session),
         OPENER,
         getting_ready="Reading your resume" if profile.get("resume").strip() else "Getting ready",
+        limit=True,
     )

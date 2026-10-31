@@ -58,4 +58,5 @@ async def run(endpoint: Endpoint, io: BrowserIO) -> None:
         getting_ready="The panel is getting ready",
         role="panel",
         cast=VOICES,
+        limit=True,
     )

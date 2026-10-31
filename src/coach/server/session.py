@@ -23,6 +23,7 @@ class SessionClosed(Exception):  # noqa: N818 - control flow, not an error
 class Answer(NamedTuple):
     text: str
     metrics: dict | None
+    seconds: float = 0.0  # how long the recording ran
 
 
 # What `answer()` returns when the user asked for the last reply again instead of speaking.
@@ -138,7 +139,7 @@ class BrowserIO:
             turn=turn,
             session=history.so_far(self.session),
         )
-        return Answer(text, metrics)
+        return Answer(text, metrics, len(audio) / config.SAMPLE_RATE)
 
     async def reply(
         self,

@@ -7,9 +7,10 @@ import pytest
 
 from coach import picture, profile, settings, store, tts
 from coach.chunks import split_for_speech, split_speaker
-from coach.modes import interview, repeat, shadow
+from coach.modes import interview, repeat, shadow, talk
+from coach.modes._converse import cut_off
 from coach.modes.panel import PANEL, VOICES
-from coach.server.session import ACCENTS
+from coach.server.session import ACCENTS, Answer
 
 
 def stream(tokens):
@@ -201,3 +202,50 @@ def test_the_interviewer_has_your_resume_and_the_time():
 def test_every_panel_voice_speaks_at_a_fluent_speakers_pace():
     """af_nicole was not in PACE, so it played at its own pace: about 60% of the others'."""
     assert set(VOICES.values()) <= set(tts.PACE)
+
+
+class Waiting(Ear):
+    """Resumed on the user's turn: records what the page is told before the mic opens."""
+
+    def __init__(self):
+        super().__init__()
+        self.events: list[dict] = []
+
+    def prior_turns(self):
+        return [{"role": "assistant", "content": "Tell me about yourself."}]
+
+    async def send(self, **event):
+        self.events.append(event)
+
+    async def answer(self):
+        raise Overheard
+
+
+def wait_on(mode) -> "Waiting":
+    """Run a mode until it opens the mic, and return what the page was told."""
+    ear = Waiting()
+    with pytest.raises(Overheard):
+        asyncio.run(mode.run(None, ear))
+    return ear
+
+
+def test_an_interview_answer_gets_the_countdown_and_talk_does_not():
+    settings.set("answer_limit", 45)
+    for mode, limited in ((interview, True), (talk, False)):
+        assert ({"type": "limit", "seconds": 45} in wait_on(mode).events) is limited
+
+
+def test_the_countdown_is_off_at_zero():
+    settings.set("answer_limit", 0)
+    assert not any(e.get("type") == "limit" for e in wait_on(interview).events)
+
+
+@pytest.mark.parametrize(
+    ("seconds", "limit", "stopped"),
+    [(45.2, True, True), (44.3, True, True), (30.0, True, False), (60.0, False, False)],
+)
+def test_the_interviewer_is_told_only_when_the_clock_ended_the_answer(seconds, limit, stopped):
+    """A real interviewer who stops a long answer asks for it in one sentence."""
+    settings.set("answer_limit", 45)
+    note = cut_off(Answer("So the problem was", None, seconds), limit)
+    assert ("Let me stop you there" in note) is stopped
