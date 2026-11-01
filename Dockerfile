@@ -1,6 +1,6 @@
 # The browser handles the microphone and the speakers, so nothing here needs audio
 # devices. This image only ever sees numpy arrays and WAV bytes.
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 # Pinned, so a rebuild next month installs the same way; bump it deliberately.
 COPY --from=ghcr.io/astral-sh/uv:0.12.23 /uv /usr/local/bin/uv
