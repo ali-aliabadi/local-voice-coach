@@ -15,7 +15,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket
 
 from .. import backends, clock, coach, history, llm, relay, reports, settings, sheet, store, verdict
-from . import accounts, login, models, past
+from . import accounts, keyring, login, models, past
 from .api import MODES, ROUTES, partner
 from .guard import MIDDLEWARE
 from .session import BrowserIO, SessionClosed
@@ -116,6 +116,7 @@ app = Starlette(
     routes=[
         *login.ROUTES,
         *accounts.ROUTES,
+        *keyring.ROUTES,
         *ROUTES,
         *past.ROUTES,
         WebSocketRoute("/ws", websocket_session),

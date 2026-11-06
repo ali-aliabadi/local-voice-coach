@@ -70,7 +70,7 @@ def _challenge(ticket: str) -> bytes:
     return challenge
 
 
-def _refused(text: str, status: int = 400) -> JSONResponse:
+def refused(text: str, status: int = 400) -> JSONResponse:
     return JSONResponse({"error": text}, status_code=status)
 
 
@@ -95,7 +95,7 @@ async def invite(request: Request) -> JSONResponse:
     """Who a link is for, so the page can greet them. 404 for a used or stale one."""
     who = people.invited(request.query_params.get("token", ""))
     if who is None:
-        return _refused("This link has been used or has expired. Ask for a new one.", 404)
+        return refused("This link has been used or has expired. Ask for a new one.", 404)
     return JSONResponse({"name": who.name, "passkeys": len(people.passkey_ids(who.id))})
 
 
@@ -103,7 +103,7 @@ async def register_options(request: Request) -> JSONResponse:
     body = await request.json()
     who = people.invited(body.get("token", ""))
     if who is None:
-        return _refused("This link has been used or has expired. Ask for a new one.", 404)
+        return refused("This link has been used or has expired. Ask for a new one.", 404)
     options = webauthn.generate_registration_options(
         rp_id=site(request)[0],
         rp_name="Speaking practice",
@@ -134,30 +134,35 @@ async def register(request: Request) -> Response:
             require_user_verification=True,
         )
     except WebAuthnException as exc:
-        return _refused(f"The passkey was not accepted: {exc}")
+        return refused(f"The passkey was not accepted: {exc}")
     who = people.use_invite(body.get("token", ""))  # used up only once it has worked
     if who is None:
-        return _refused("This link has been used or has expired. Ask for a new one.", 404)
+        return refused("This link has been used or has expired. Ask for a new one.", 404)
     credential_id = bytes_to_base64url(verified.credential_id)
     people.keep_passkey(who.id, credential_id, verified.credential_public_key, verified.sign_count)
     print(f"  {who.name} added a passkey")
     return _signed_in(request, who)
 
 
-async def login_options(request: Request) -> JSONResponse:
+def asking(request: Request, allow: list[str] | None = None) -> JSONResponse:
+    """A sign-in ceremony's options: any passkey of this site's, or only those in `allow`."""
     options = webauthn.generate_authentication_options(
-        rp_id=site(request)[0], user_verification=UserVerificationRequirement.REQUIRED
+        rp_id=site(request)[0],
+        user_verification=UserVerificationRequirement.REQUIRED,
+        allow_credentials=[PublicKeyCredentialDescriptor(id=base64url_to_bytes(i)) for i in allow]
+        if allow
+        else None,
     )
     ticket = _ticket(options.challenge)
     return JSONResponse({"ticket": ticket, "options": json.loads(options_to_json(options))})
 
 
-async def login(request: Request) -> Response:
-    body = await request.json()
+def proved(request: Request, body: dict) -> int | str:
+    """Whose passkey answered the ceremony: their person id, or why it was refused."""
     credential = body.get("credential") or {}
     stored = people.passkey(str(credential.get("id", "")))
     if stored is None:
-        return _refused("This passkey is not one this server knows. It may have been removed.")
+        return "This passkey is not one this server knows. It may have been removed."
     rp_id, origin = site(request)
     try:
         verified = webauthn.verify_authentication_response(
@@ -170,10 +175,21 @@ async def login(request: Request) -> Response:
             require_user_verification=True,
         )
     except WebAuthnException as exc:
-        return _refused(f"The passkey was not accepted: {exc}")
+        return f"The passkey was not accepted: {exc}"
     people.passkey_used(stored["id"], verified.new_sign_count)
-    who = people.get(stored["person_id"])
-    return _signed_in(request, who) if who else _refused("That person was removed.")
+    return int(stored["person_id"])
+
+
+async def login_options(request: Request) -> JSONResponse:
+    return asking(request)
+
+
+async def login(request: Request) -> Response:
+    found = proved(request, await request.json())
+    if isinstance(found, str):
+        return refused(found)
+    who = people.get(found)
+    return _signed_in(request, who) if who else refused("That person was removed.")
 
 
 async def logout(request: Request) -> Response:
@@ -226,7 +242,7 @@ class Gate:
             return None
         response: Response
         if scope["path"].startswith("/api/"):
-            response = _refused("Sign in first.", 401)
+            response = refused("Sign in first.", 401)
         else:
             response = RedirectResponse(f"/login?next={quote(scope['path'])}", status_code=303)
         return await response(scope, receive, send)

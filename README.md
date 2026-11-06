@@ -30,7 +30,8 @@ relay recipients link <you> @your_telegram_name   # then open the bot and tap St
 
 On a Docker-hosted Relay, prefix each with `docker compose exec relay`.
 
-**3. `.env`** in the repo root:
+**3. Settings → Keys and Telegram** (an admin, after confirming with a passkey), or
+`.env` in the repo root, which wins:
 
 ```bash
 GEMINI_API_KEY=...
@@ -42,8 +43,8 @@ RELAY_USER=<you>
 
 Set `RELAY_USER` to your own recipient's username; there is no default. At the start
 the app checks, sending nothing, that the key works and that `RELAY_USER` has Telegram
-linked, and the Today page says what is wrong if not. Leave the `RELAY_*` lines out to
-keep Telegram off.
+linked, and the Today page says what is wrong if not; saving them in Settings checks at
+once. Leave them unset to keep Telegram off.
 
 **4. Run.**
 
@@ -116,7 +117,6 @@ git clone https://github.com/ali-aliabadi/local-voice-coach && cd local-voice-co
 cat >> .env <<'END'
 ALLOWED_HOSTS=coach.example.com
 PORT=18081
-GEMINI_API_KEYS=key1,key2
 END
 make up && make logs                 # the log prints the link that makes your first passkey
 ```
@@ -151,8 +151,8 @@ every page asks for it first. **People** in the header invites someone else, wit
 one-time link sent to their Telegram if they have a Relay username, and makes a link for
 another device of your own. An admin can lock anyone out.
 
-**Gemini keys** in `GEMINI_API_KEYS` (or several, comma-separated, in Settings) are a
-pool: when one is rate-limited or out of quota, the request goes on the next at once.
+**Gemini keys**, added under Settings → Keys and Telegram or listed in `GEMINI_API_KEYS`,
+are a pool: when one is rate-limited or out of quota, the request goes on the next at once.
 Each key's free tier is its own. Use headphones on a phone in hybrid mode, or its
 speaker talks into its own microphone.
 

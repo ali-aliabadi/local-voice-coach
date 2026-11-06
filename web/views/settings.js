@@ -1,4 +1,5 @@
 import { field, get, post, values } from "../form.js";
+import { keyring } from "../keyring.js";
 import { CHOICES, current, set } from "../theme.js";
 
 const GROUPS = ["Backends", "Practice", "Scoring", "Model", "Coach", "Telegram", "Prompts"];
@@ -22,6 +23,7 @@ export async function render(root) {
         <small>Takes effect immediately.</small>
       </label>
     </fieldset>
+    <div id="keyring"></div>
     <form id="settings-form">
       ${GROUPS.map((group) => {
         const rows = items.filter((i) => i.group === group);
@@ -39,6 +41,7 @@ export async function render(root) {
     <p class="foot">Everything is on the machine this app runs on. Nothing is uploaded.</p>
     <button id="forget" class="danger">Delete all your sessions and recordings</button>`;
 
+  keyring(root.querySelector("#keyring"));
   root.querySelector("#theme").addEventListener("change", (event) => set(event.target.value));
 
   root.querySelector("#save").addEventListener("click", async (event) => {

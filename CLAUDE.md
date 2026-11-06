@@ -72,10 +72,11 @@ make e2e                             # real server, real socket, a spoken answer
 | `src/coach/clock.py` | jobs that run on a timer while the server is up |
 | `src/coach/whose.py` | whose rows: the person a request or task acts for, `mine()`, `own()` |
 | `src/coach/people.py` | accounts, passkeys, invite links and sign-ins (hashes only) |
-| `src/coach/relay.py` | the Relay client: Telegram, off unless `RELAY_*` is set |
+| `src/coach/vault.py` | Gemini keys and Relay's connection: set in the app, .env wins |
+| `src/coach/relay.py` | the Relay client: Telegram, off until Relay is set up |
 | `src/coach/reports.py` | what goes to Telegram and when |
 | `src/coach/picture.py` | the charts as PNG, for Telegram (Pillow) |
-| `src/coach/server/` | `app.py` assembly + websocket, `api.py` JSON routes, `past.py` the routes about one finished session, `session.py` the `io` modes talk to, `guard.py` localhost-only, `login.py` passkey ceremonies and the sign-in gate, `accounts.py` the people page, `models.py` loaded models |
+| `src/coach/server/` | `app.py` assembly + websocket, `api.py` JSON routes, `past.py` the routes about one finished session, `session.py` the `io` modes talk to, `guard.py` localhost-only, `login.py` passkey ceremonies and the sign-in gate, `accounts.py` the people page, `keyring.py` keys and Telegram for an admin, `models.py` loaded models |
 | `src/coach/modes/` | one file per mode, discovered automatically; `_`-prefixed files are helpers |
 | `web/` | plain ES modules, no build step; `views/` is one file per route; `screen.js` draws the practice page that `views/practice.js` drives |
 | `models/` | Kokoro weights, gitignored, fetched by `make models` |
@@ -332,11 +333,20 @@ the opposite. The coach's background tasks wait only for those queued before the
 Gemini 3.8 Flash's free tier is 20 requests a day; `llm.patiently` waits out per-minute
 limits but reports a used-up daily quota at once instead of waiting hours.
 
-### Telegram through Relay is optional and environment-only
-`relay.py` is off unless `RELAY_URL`, `RELAY_API_KEY` and `RELAY_APP` are set. The key
-is read from the environment only — never a setting, never logged; logs carry message
-ids, never contents. `reports.py` holds what is sent and when; each message remembers
-what it sent under `relay:` keys in the settings table, so a restart never repeats one.
+### Telegram and keys are set in the app, and .env wins
+`relay.py` is off unless `RELAY_URL`, `RELAY_API_KEY`, `RELAY_APP` and a recipient are
+set. They, and the Gemini key pool, used to be environment-only; the user asked to set
+everything up from a phone. `vault.py` reads each from the environment first, else from
+`vault:` rows in the settings table, so a hand-configured server is unchanged and a
+value in .env cannot be overridden from the page. Stored in plain text: a copy of the
+database is a copy of the keys - the trade for setup without a shell. `server/keyring.py`
+serves them to an admin only, write-only (last four characters, never the key), and
+changes nothing without a passkey from the last ten minutes (`/api/keyring/confirm`),
+because a phone stays signed in for 30 days. Values are read on the event loop's thread
+and passed into `relay._call`, which runs in a worker thread that may not touch SQLite.
+Keys are never logged; logs carry message ids, never contents. `reports.py` holds what
+is sent and when; each message remembers what it sent under `relay:` keys in the
+settings table, so a restart never repeats one.
 The charts are drawn server-side by `picture.py` (Pillow) so a report never depends on
 a browser tab still being open; `picture.SERIES` mirrors `SERIES` in `chart.js`, and
 a test fails if they drift.
