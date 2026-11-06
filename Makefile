@@ -51,6 +51,8 @@ pull:  ## Fetch the published image instead of building (needs IMAGE=ghcr.io/...
 
 up: models  ## Start the stack in the background
 	@mkdir -p data
+	@# The container runs as uid 1000: a data/ that root made is one it cannot write to.
+	@if [ "$$(id -u)" = 0 ]; then chown 1000:1000 data; fi
 	$(COMPOSE) up -d
 	@echo "  http://127.0.0.1:$${PORT:-8000}  (first start loads Whisper, give it a minute)"
 
