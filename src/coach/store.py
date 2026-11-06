@@ -11,6 +11,7 @@ import time
 from typing import cast
 
 from . import config
+from .whose import acting, mine
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -23,7 +24,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     goal_minutes INTEGER,               -- what the user set out to do, or NULL
     summary    TEXT,                    -- the coach's summary, JSON
     sheet      TEXT,                    -- the study sheet's content, JSON
-    verdict    TEXT                     -- an interview's verdict, JSON (verdict.py)
+    verdict    TEXT,                    -- an interview's verdict, JSON (verdict.py)
+    person_id  INTEGER                  -- whose (people.py); NULL is the owner's
 );
 CREATE TABLE IF NOT EXISTS turns (
     id            INTEGER PRIMARY KEY,
@@ -68,8 +70,19 @@ ADDED_COLUMNS = {
         "helped": "TEXT",
         "timing": "TEXT",
     },
-    "sessions": {"goal_minutes": "INTEGER", "summary": "TEXT", "sheet": "TEXT", "verdict": "TEXT"},
+    "sessions": {
+        "goal_minutes": "INTEGER",
+        "summary": "TEXT",
+        "sheet": "TEXT",
+        "verdict": "TEXT",
+        "person_id": "INTEGER",
+    },
 }
+
+
+def owns(session_id: int) -> bool:
+    found = db().execute(f"SELECT 1 FROM sessions s WHERE s.id = ? AND {mine()}", (session_id,))
+    return found.fetchone() is not None
 
 
 def _migrate(connection: sqlite3.Connection) -> None:
@@ -96,9 +109,9 @@ def db() -> sqlite3.Connection:
 # "current session" filed one tab's answers under the other's.
 def start(mode: str, backend: str, model: str, goal: int | None = None) -> int:
     cur = db().execute(
-        "INSERT INTO sessions (started_at, mode, backend, model, goal_minutes)"
-        " VALUES (?, ?, ?, ?, ?)",
-        (time.strftime("%Y-%m-%d %H:%M:%S"), mode, backend, model, goal or None),
+        "INSERT INTO sessions (started_at, mode, backend, model, goal_minutes, person_id)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (time.strftime("%Y-%m-%d %H:%M:%S"), mode, backend, model, goal or None, acting.get()),
     )
     db().commit()
     return cast(int, cur.lastrowid)  # always set after an INSERT
@@ -118,8 +131,7 @@ def goal(session_id: int) -> int | None:
 
 def resume(session_id: int) -> int | None:
     """Re-attach to an existing session, so a browser refresh does not orphan it."""
-    row = db().execute("SELECT id FROM sessions WHERE id = ?", (session_id,)).fetchone()
-    return row["id"] if row else None
+    return session_id if owns(session_id) else None
 
 
 def conversation(session_id: int, limit: int = 16) -> list[dict]:
@@ -212,7 +224,15 @@ def helped(turn_id: int, kinds: list[str]) -> None:
 
 
 def audio_path(turn_id: int) -> str | None:
-    row = db().execute("SELECT audio_path FROM turns WHERE id = ?", (turn_id,)).fetchone()
+    row = (
+        db()
+        .execute(
+            "SELECT t.audio_path FROM turns t JOIN sessions s ON s.id = t.session_id"
+            f" WHERE t.id = ? AND {mine()}",
+            (turn_id,),
+        )
+        .fetchone()
+    )
     return row["audio_path"] if row else None
 
 
@@ -235,10 +255,19 @@ def purge_audio(older_than_days: int) -> int:
 
 
 def forget_everything() -> None:
-    """The delete button. The pitch is that this data is yours, so leaving is one click."""
-    for row in db().execute("SELECT audio_path FROM turns WHERE audio_path IS NOT NULL").fetchall():
+    """The delete button. The pitch is that this data is yours, so leaving is one click.
+    Yours only: someone else's history on the same server is theirs to delete."""
+    yours = f"SELECT s.id FROM sessions s WHERE {mine()}"
+    for row in (
+        db()
+        .execute(
+            f"SELECT audio_path FROM turns WHERE audio_path IS NOT NULL AND session_id IN ({yours})"
+        )
+        .fetchall()
+    ):
         pathlib.Path(row["audio_path"]).unlink(missing_ok=True)
-    db().executescript("DELETE FROM turns; DELETE FROM sessions;")
+    db().execute(f"DELETE FROM turns WHERE session_id IN ({yours})")
+    db().execute(f"DELETE FROM sessions WHERE id IN ({yours})")
     db().commit()
 
 

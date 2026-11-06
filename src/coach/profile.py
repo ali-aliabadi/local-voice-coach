@@ -8,7 +8,7 @@ interviewer asks generic questions.
 import json
 from dataclasses import dataclass
 
-from . import config, history, settings, store
+from . import config, history, settings, store, whose
 
 
 @dataclass(frozen=True)
@@ -62,14 +62,14 @@ BY_KEY = {f.key: f for f in FIELDS}
 def get(key: str) -> str:
     row = (
         store.db()
-        .execute("SELECT value FROM settings WHERE key = ?", (f"profile:{key}",))
+        .execute("SELECT value FROM settings WHERE key = ?", (whose.own(f"profile:{key}"),))
         .fetchone()
     )
     return row["value"] if row else ""
 
 
 def save(values: dict) -> None:
-    rows = [(f"profile:{k}", str(v)) for k, v in values.items() if k in BY_KEY]
+    rows = [(whose.own(f"profile:{k}"), str(v)) for k, v in values.items() if k in BY_KEY]
     if not rows:
         return
     store.db().executemany(
@@ -173,8 +173,8 @@ def recaps(limit: int = 3) -> str:
     """What earlier conversations were about, from the coach's recaps. Without it every
     session starts from nothing, and "do you remember?" gets a bluff."""
     rows = store.db().execute(
-        "SELECT started_at, summary FROM sessions WHERE summary IS NOT NULL"
-        " ORDER BY id DESC LIMIT ?",
+        "SELECT started_at, summary FROM sessions s WHERE summary IS NOT NULL"
+        f" AND {whose.mine()} ORDER BY id DESC LIMIT ?",
         (limit,),
     )
     recaps = [(r["started_at"][:10], json.loads(r["summary"]).get("recap")) for r in rows]

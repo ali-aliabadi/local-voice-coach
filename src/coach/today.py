@@ -7,7 +7,7 @@ work on last time - the three things worth knowing before you start.
 import datetime as dt
 import json
 
-from . import history, store
+from . import history, store, whose
 
 
 def days_practised() -> list[str]:
@@ -37,7 +37,10 @@ def summary(today: dt.date) -> dict:
     latest = history.sessions(limit=1)
     coached = (
         store.db()
-        .execute("SELECT summary FROM sessions WHERE summary IS NOT NULL ORDER BY id DESC LIMIT 1")
+        .execute(
+            "SELECT summary FROM sessions s WHERE summary IS NOT NULL"
+            f" AND {whose.mine()} ORDER BY id DESC LIMIT 1"
+        )
         .fetchone()
     )
     advice = json.loads(coached["summary"]) if coached else {}

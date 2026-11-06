@@ -1,0 +1,26 @@
+/* The sign-in page and the people page: who may use this app. */
+
+.door { max-width: 28rem; }
+.wide { width: 100%; padding: 0.9rem 1.4rem; font-size: 1.05rem; margin-top: 0.5rem; }
+.wide:disabled { opacity: 0.6; cursor: default; }
+#status { min-height: 1.5em; margin-top: 1rem; }
+.warn { color: var(--warn); }
+
+.people { list-style: none; padding: 0; margin: 0 0 1.5rem; }
+.person {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+  gap: 0.5rem 1rem; padding: 0.9rem 0; border-bottom: 1px solid var(--line);
+}
+.person small.foot { display: block; }
+.tag {
+  color: var(--accent); background: var(--accent-soft); border-radius: 6px;
+  padding: 0 0.4rem; font-size: 0.75rem;
+}
+.made-box {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+}
+.made-box p { margin: 0 0 0.5rem; }
+.made { width: 100%; font: 0.85rem ui-monospace, monospace; padding: 0.5rem; margin-bottom: 0.5rem; }
+#invite { align-items: flex-end; }
+#invite label { flex: 1 1 12rem; margin-bottom: 0; }

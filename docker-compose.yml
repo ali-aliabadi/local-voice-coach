@@ -14,6 +14,10 @@ services:
 
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # More keys, comma-separated: a pool, tried in turn when one is rate-limited.
+      GEMINI_API_KEYS: ${GEMINI_API_KEYS:-}
+      # The name other devices reach this by. Setting it turns on passkey sign-in.
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
       # "localhost" inside a container is the container. This reaches LM Studio on the
       # machine running Docker.
       LM_STUDIO_URL: ${LM_STUDIO_URL:-http://host.docker.internal:1234/v1}

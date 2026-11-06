@@ -8,6 +8,9 @@ let ticking = null;    // the seconds counter while you wait on something
 const SHOW = "coach.showText";
 let showText = (() => { try { return localStorage.getItem(SHOW) === "1"; } catch { return false; } })();
 
+// A phone has no space bar to mention.
+const TOUCH = Boolean(globalThis.matchMedia?.("(pointer: coarse)").matches);
+
 export const $ = (sel) => root.querySelector(sel);
 
 export function mount(node) {
@@ -26,7 +29,7 @@ export function mount(node) {
       <button id="mic" class="mic" disabled aria-label="Answer" aria-pressed="false"></button>
       <p class="mic-label" id="mic-label">connecting</p>
       <canvas id="level" width="240" height="28" aria-hidden="true"></canvas>
-      <p class="hint" id="how">space bar works too · answer out loud, as if it were real</p>
+      <p class="hint" id="how">${TOUCH ? "tap to start and stop" : "space bar works too"} · answer out loud, as if it were real</p>
       <p class="notice" id="notice" role="alert" hidden></p>
     </div>
     <section id="card" class="card-result" aria-live="polite" hidden></section>

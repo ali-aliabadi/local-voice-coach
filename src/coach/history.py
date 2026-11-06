@@ -7,7 +7,7 @@ and progress pages.
 import json
 import sqlite3
 
-from . import store
+from . import store, whose
 
 # Rates, not counts. A long answer holds more fillers without being any worse, and talk
 # mode deliberately asks for long answers, so per-answer counts would chart improvement
@@ -57,7 +57,8 @@ MIN_ANSWERS, MIN_MINUTES = 2, 2
 def counted() -> str:
     """The ids of sessions that count, as a subquery for `IN`."""
     return (
-        "(SELECT s.id FROM sessions s JOIN turns t ON t.session_id = s.id GROUP BY s.id"
+        "(SELECT s.id FROM sessions s JOIN turns t ON t.session_id = s.id"
+        f" WHERE {whose.mine()} GROUP BY s.id"
         f" HAVING SUM(t.role = 'you') >= {MIN_ANSWERS}"
         # whole seconds: julianday's float arithmetic put exactly two minutes at 1.9999
         f" AND strftime('%s', MAX(t.at)) - strftime('%s', s.started_at) >= {MIN_MINUTES * 60})"
@@ -97,7 +98,7 @@ def detail(session_id: int) -> dict | None:
         store.db()
         .execute(
             "SELECT s.id, s.started_at, s.ended_at, s.mode, s.backend, s.model, s.goal_minutes,"
-            f" s.summary, s.verdict, {LENGTH} FROM sessions s WHERE s.id = ?",
+            f" s.summary, s.verdict, {LENGTH} FROM sessions s WHERE s.id = ? AND {whose.mine()}",
             (session_id,),
         )
         .fetchone()
@@ -202,6 +203,7 @@ def listening(first_day: str, last_day: str, session_id: int | None = None) -> d
     how many were tracked. Replies from before tracking began are left out rather than
     counted as followed: that would be a number nobody measured."""
     where = "session_id = ?" if session_id else "substr(at, 1, 10) BETWEEN ? AND ?"
+    where += f" AND session_id IN (SELECT s.id FROM sessions s WHERE {whose.mine()})"
     args = (session_id,) if session_id else (first_day, last_day)
     row = (
         store.db()

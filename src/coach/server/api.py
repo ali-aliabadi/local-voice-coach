@@ -20,7 +20,7 @@ from .. import (
     today,
 )
 from ..modes import discover, state, unlock
-from . import models
+from . import login, models
 
 MODES = discover()
 
@@ -145,18 +145,25 @@ async def get_machine(_request: Request) -> Response:
     )
 
 
-async def get_settings(_request: Request) -> Response:
+async def get_settings(request: Request) -> Response:
     models_that_fit = {
         key: backends.choices(settings.get(key))
         for key in ("coach_backend", "sheet_backend", "verdict_backend")
     }
     choices = {"tts_voice": models.voice_names(), **models_that_fit}
-    return JSONResponse(settings.as_form(choices) + prompt_fields())
+    form = settings.as_form(choices)
+    if not login.person(request).admin:  # the server's own knobs are the admin's to set
+        form = [f for f in form if f["key"] not in settings.SHARED]
+    return JSONResponse(form + prompt_fields())
 
 
 async def save_settings(request: Request) -> Response:
+    """Yours, and - for an admin - the server's shared ones (its models, key and disk)."""
     defaults = {f["key"]: f["default"] for f in prompt_fields()}
+    admin = login.person(request).admin
     for key, value in (await request.json()).items():
+        if key in settings.SHARED and not admin:
+            continue
         if key.startswith("prompt:"):
             settings.set_prompt(key[len("prompt:") :], value, defaults.get(key))
         elif key in settings.SPEC:
