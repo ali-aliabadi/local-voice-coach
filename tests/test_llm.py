@@ -5,7 +5,7 @@ import itertools
 from types import SimpleNamespace
 from typing import ClassVar
 
-import httpx
+import httpx2 as httpx
 import openai
 import pytest
 
