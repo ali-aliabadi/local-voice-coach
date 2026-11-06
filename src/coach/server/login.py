@@ -3,7 +3,7 @@
 The browser does the cryptography (WebAuthn); py_webauthn checks it here. Passkeys are
 discoverable, so signing in asks for nothing - the phone offers whichever passkey it
 holds for this site, and that passkey says who you are. Each ceremony's challenge lives
-here for two minutes under a random ticket the page sends back.
+here for five minutes under a random ticket the page sends back.
 
 The site a passkey belongs to is the host the page was served from, so a passkey made
 on the Tailscale name works only there. Behind `tailscale serve` or Caddy the request
@@ -35,7 +35,7 @@ from ..people import LOCAL, Person
 
 WEB = pathlib.Path(__file__).resolve().parents[3] / "web"
 COOKIE = "coach_login"
-CEREMONY_SECONDS = 120
+CEREMONY_SECONDS = 300  # the page fetches fresh options every 4 minutes (login.js)
 OPEN = ("/login",)  # and anything under these:
 OPEN_UNDER = ("/static/", "/api/passkey/")
 _challenges: dict[str, tuple[bytes, float]] = {}
