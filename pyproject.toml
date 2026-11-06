@@ -16,6 +16,7 @@ dependencies = [
     "pypdf>=6.19.0",
     "starlette>=0.41",
     "uvicorn>=0.32",
+    "webauthn>=2.5",
     "websockets>=13",
 ]
 

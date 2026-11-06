@@ -7,6 +7,7 @@ import signal
 from collections.abc import AsyncIterator
 
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import FileResponse
 from starlette.routing import Mount, Route, WebSocketRoute
@@ -14,7 +15,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket
 
 from .. import backends, clock, coach, history, llm, relay, reports, settings, sheet, store, verdict
-from . import models, past
+from . import accounts, login, models, past
 from .api import MODES, ROUTES, partner
 from .guard import MIDDLEWARE
 from .session import BrowserIO, SessionClosed
@@ -101,6 +102,7 @@ async def lifespan(_app: Starlette) -> AsyncIterator[None]:
     ticking = asyncio.create_task(clock.run())  # expiring recordings now runs from here
     print(f"  {relay.status()}")
     await relay.check_at_start()
+    await accounts.bootstrap()
     print("  ready\n")
     yield
     ticking.cancel()
@@ -110,8 +112,10 @@ async def lifespan(_app: Starlette) -> AsyncIterator[None]:
 
 app = Starlette(
     lifespan=lifespan,
-    middleware=MIDDLEWARE,
+    middleware=[*MIDDLEWARE, Middleware(login.Gate)],
     routes=[
+        *login.ROUTES,
+        *accounts.ROUTES,
         *ROUTES,
         *past.ROUTES,
         WebSocketRoute("/ws", websocket_session),

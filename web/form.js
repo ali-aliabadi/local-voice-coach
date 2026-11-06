@@ -50,12 +50,20 @@ export function values(form) {
   return out;
 }
 
+// Signed out mid-visit (30 days on, or locked out): back to the sign-in page, then here.
+const signedIn = (response) => {
+  if (response.status === 401) {
+    location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`);
+  }
+  return response;
+};
+
 export async function post(url, payload) {
-  await fetch(url, {
+  signedIn(await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-  });
+  }));
 }
 
-export const get = async (url) => (await fetch(url)).json();
+export const get = async (url) => signedIn(await fetch(url)).json();

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sign in · Speaking practice</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/people.css">
+</head>
+<body>
+
+<header>
+  <span class="brand">practice</span>
+</header>
+
+<main id="app" class="door">
+  <h1 id="title">Sign in</h1>
+  <p id="lead" class="foot">Use the passkey on this device: your face, fingerprint or screen
+    lock. There is no password.</p>
+  <button class="primary wide" id="go">Sign in with a passkey</button>
+  <p id="status" class="foot" role="status" aria-live="polite"></p>
+  <p id="new" class="foot">New here, or on a new phone? Ask whoever runs this app for a link.
+    Someone already signed in can make one for their own new device on the people page.</p>
+</main>
+
+<script type="module" src="/static/login.js"></script>
+</body>
+</html>

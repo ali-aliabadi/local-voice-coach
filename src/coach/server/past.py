@@ -16,6 +16,13 @@ async def get_sessions(request: Request) -> Response:
     return JSONResponse(history.sessions(before=int(before) if before else None))
 
 
+def theirs(request: Request) -> Response | None:
+    """404 for a session that is not this person's: as if it did not exist."""
+    if store.owns(int(request.path_params["session"])):
+        return None
+    return JSONResponse({"error": "no such session"}, status_code=404)
+
+
 async def get_session(request: Request) -> Response:
     found = history.detail(int(request.path_params["session"]))
     if found is None:
@@ -41,12 +48,16 @@ async def get_session(request: Request) -> Response:
 
 async def write_sheet(request: Request) -> Response:
     """(Re)write a session's study sheet in the background."""
+    if refused := theirs(request):
+        return refused
     sheet.later(int(request.path_params["session"]))
     return JSONResponse({"ok": True})
 
 
 async def get_sheet(request: Request) -> Response:
     """The study sheet as a PDF, drawn fresh from what the model wrote."""
+    if refused := theirs(request):
+        return refused
     session_id = int(request.path_params["session"])
     doc = sheet.render(session_id)
     if doc is None:
@@ -62,6 +73,8 @@ async def get_sheet(request: Request) -> Response:
 async def coach_session(request: Request) -> Response:
     """Notes for answers that have none, then the summary, and an interview's verdict.
     Old sessions get a report too."""
+    if refused := theirs(request):
+        return refused
     coach.catch_up(int(request.path_params["session"]))
     verdict.later(int(request.path_params["session"]))
     return JSONResponse({"ok": True})

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import re
 import time
 from collections.abc import AsyncIterator
 from typing import Any, NamedTuple, cast
@@ -14,8 +13,9 @@ import openai
 from openai import AsyncOpenAI, AsyncStream
 from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
 
-from . import backends, config, settings
+from . import backends, config, keys, settings
 from .chunks import split_for_speech
+from .keys import retry_after
 
 
 class Reply(NamedTuple):
@@ -98,7 +98,7 @@ def endpoint_for(backend: backends.Backend, model_override: str | None = None) -
     if backend.local:
         base_url, api_key = settings.get("lm_studio_url"), "lm-studio"
     else:
-        base_url, api_key = config.BASE_URL, settings.api_key()
+        base_url, api_key = config.BASE_URL, keys.current()
     return Endpoint(
         _client(base_url, api_key), model_override or backend.model, backend.extra or {}
     )
@@ -115,13 +115,16 @@ async def _first_words(
     # **ep.extra hides the stream=True overload from the type checker; it is a stream
     stream = cast(
         AsyncStream[ChatCompletionChunk],
-        await ep.client.chat.completions.create(
-            model=ep.model,
-            messages=conversation(messages),
-            temperature=settings.get("temperature"),
-            max_tokens=max_tokens or settings.get("reply_max_tokens"),
-            stream=True,
-            **ep.extra,
+        await keys.rotating(
+            ep,
+            lambda e: e.client.chat.completions.create(
+                model=e.model,
+                messages=conversation(messages),
+                temperature=settings.get("temperature"),
+                max_tokens=max_tokens or settings.get("reply_max_tokens"),
+                stream=True,
+                **e.extra,
+            ),
         ),
     )
     try:
@@ -181,12 +184,15 @@ async def stream_sentences(
 async def complete(ep: Endpoint, messages: list[dict], max_tokens: int | None = None) -> Reply:
     """One-shot, no streaming. For written output nobody is waiting to hear."""
     started = time.perf_counter()
-    reply = await ep.client.chat.completions.create(
-        model=ep.model,
-        messages=conversation(messages),
-        temperature=settings.get("temperature"),
-        max_tokens=max_tokens or settings.get("review_max_tokens"),
-        **ep.extra,
+    reply = await keys.rotating(
+        ep,
+        lambda e: e.client.chat.completions.create(
+            model=e.model,
+            messages=conversation(messages),
+            temperature=settings.get("temperature"),
+            max_tokens=max_tokens or settings.get("review_max_tokens"),
+            **e.extra,
+        ),
     )
     text = (reply.choices[0].message.content or "").strip()
     if not text:
@@ -201,19 +207,9 @@ async def complete(ep: Endpoint, messages: list[dict], max_tokens: int | None = 
 # free tiers count requests per minute: catching up a 23-answer session all at once got
 # 20 of them refused.
 _one_at_a_time = asyncio.Semaphore(1)
-WAIT = re.compile(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?")
 # Past this it is a daily quota, not a per-minute one: waiting would hold up every other
 # background request for hours. Gemini 3.8 Flash's free tier is 5 a minute and 20 a day.
 LONGEST_WAIT = 120
-
-
-def retry_after(message: str) -> float | None:
-    """Seconds from "Please retry in 3h35m42.5s" or "retry in 33.8s"; None if not said."""
-    found = WAIT.search(message)
-    if not found or not any(found.groups()):
-        return None
-    hours, minutes, seconds = found.groups()
-    return int(hours or 0) * 3600 + int(minutes or 0) * 60 + float(seconds or 0)
 
 
 waiting = ""  # what the background queue is sitting out right now, for the page to say

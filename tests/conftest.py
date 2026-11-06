@@ -9,10 +9,10 @@ import json
 
 import pytest
 
-from coach import backends, coach, config, llm, machine, relay, store
+from coach import backends, coach, config, keys, llm, machine, relay, store
 
 READ_FROM_ENVIRONMENT = (
-    "GEMINI_API_KEY", "LM_STUDIO_URL", "COACH_BACKEND",
+    "GEMINI_API_KEY", "GEMINI_API_KEYS", "ALLOWED_HOSTS", "LM_STUDIO_URL", "COACH_BACKEND",
     "RELAY_URL", "RELAY_API_KEY", "RELAY_APP", "RELAY_USER",
 )  # fmt: skip
 
@@ -42,6 +42,7 @@ def isolated(tmp_path, monkeypatch):
     store._db = None
     coach._pending.clear()
     coach.failed.clear()
+    keys._resting.clear()
     llm._clients.clear()  # a client belongs to the event loop that first used it
     monkeypatch.setattr(llm, "waiting", "")
     # A developer's LM Studio would otherwise stand in for every model a test fails.
