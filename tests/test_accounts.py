@@ -90,7 +90,7 @@ def test_shared_settings_are_one_for_everybody(sara):
     with acting_as(sara.id):
         settings.set("lm_studio_url", "http://box:1234/v1")
     assert settings.get("lm_studio_url") == "http://box:1234/v1"
-    assert "gemini_api_key" in settings.SHARED
+    assert "lm_studio_url" in settings.SHARED
     assert "tts_voice" not in settings.SHARED
 
 

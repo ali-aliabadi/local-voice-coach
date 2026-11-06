@@ -25,14 +25,6 @@ class Setting:
 
 SPEC: dict[str, Setting] = {
     # ---- Backends ----
-    "gemini_api_key": Setting(
-        "",
-        "Gemini API keys",
-        "Backends",
-        kind="password",
-        secret=True,
-        help="Free at aistudio.google.com/apikey. Several, comma-separated, are a pool. Stored locally.",
-    ),
     "lm_studio_url": Setting(
         "http://localhost:1234/v1",
         "LM Studio URL",
@@ -133,14 +125,14 @@ SPEC: dict[str, Setting] = {
         "as useful as Flash in 2s instead of 20s, and its free tier covers an hour a day; "
         "Flash's free tier allows 5 requests a minute. bonsai27 keeps it offline.",
     ),
-    # ---- Telegram, through Relay (see relay.py; switched on by RELAY_* in .env) ----
+    # ---- Telegram, through Relay (see relay.py; switched on in Keys and Telegram) ----
     "relay_session_report": Setting(
         "on",
         "Report after each session",
         "Telegram",
         kind="select",
         choices=("on", "off"),
-        help="Telegram needs RELAY_URL, RELAY_API_KEY, RELAY_APP and RELAY_USER in .env.",
+        help="Telegram is switched on by an admin, under Keys and Telegram above.",
     ),
     "relay_weekly": Setting(
         "on",

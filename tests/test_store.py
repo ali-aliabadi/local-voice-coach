@@ -31,9 +31,9 @@ def test_a_blank_prompt_falls_back_to_the_modes_own():
     assert settings.prompt("talk", "BUILT-IN") == "BUILT-IN"
 
 
-def test_the_form_never_sends_a_secret_to_the_browser():
+def test_the_form_holds_no_keys_and_fills_choices_at_request_time():
     form = {f["key"]: f for f in settings.as_form({"tts_voice": ("am_puck", "af_heart")})}
-    assert form["gemini_api_key"]["value"] == ""
+    assert not any(f["kind"] == "password" for f in form.values())  # keys live in vault.py
     assert form["tts_voice"]["choices"] == ["am_puck", "af_heart"]  # filled at request time
     assert form["whisper_model"]["restart"] is True
 

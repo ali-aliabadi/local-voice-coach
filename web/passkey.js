@@ -32,10 +32,18 @@ async function call(url, body = {}) {
 
 export const supported = () => Boolean(window.PublicKeyCredential && navigator.credentials);
 
+// Where each ceremony goes: making a passkey, signing in, and proving it is still you
+// before the server's keys change (keyring.py).
+const AT = {
+  register: "/api/passkey/register",
+  login: "/api/passkey/login",
+  confirm: "/api/keyring/confirm",
+};
+
 // The server's side of one ceremony, ready before the tap: "register" with an invite
-// token, or "login". Good for one try, for a few minutes (login.CEREMONY_SECONDS).
+// token, "login" or "confirm". Good for one try, for a few minutes (login.CEREMONY_SECONDS).
 export async function prepare(kind, token) {
-  const { ticket, options } = await call(`/api/passkey/${kind}/options`, token ? { token } : {});
+  const { ticket, options } = await call(`${AT[kind]}/options`, token ? { token } : {});
   const publicKey = kind === "register"
     ? {
       ...options,
@@ -68,7 +76,7 @@ export async function create(prepared, token) {
   return call("/api/passkey/register", { ticket: prepared.ticket, token, credential });
 }
 
-// Sign in with whichever passkey this device holds for the site.
+// Sign in, or confirm, with whichever passkey this device holds for the site.
 export async function signIn(prepared) {
   const got = await navigator.credentials.get({ publicKey: prepared.publicKey });
   const credential = {
@@ -83,7 +91,7 @@ export async function signIn(prepared) {
     },
     clientExtensionResults: got.getClientExtensionResults(),
   };
-  return call("/api/passkey/login", { ticket: prepared.ticket, credential });
+  return call(AT[prepared.kind], { ticket: prepared.ticket, credential });
 }
 
 export const signOut = () => call("/api/passkey/logout");

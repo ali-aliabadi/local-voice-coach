@@ -1,8 +1,8 @@
 """Relay: notifications to your phone through Telegram. Optional, and off unless set up.
 
 Relay is a small notification gateway: an app posts a message, Relay formats it for
-Telegram, delivers it and retries. Set these in .env (never in Settings - the key is a
-secret and is read from the environment only):
+Telegram, delivers it and retries. An admin sets these on the Settings page, or in .env,
+which wins (vault.py). The key is never sent back to the browser:
 
     RELAY_URL      Relay's base URL, e.g. https://relay.example.com
     RELAY_API_KEY  this app's key (rk_...), created by the Relay admin
@@ -17,15 +17,15 @@ allow it - the coach's lessons. Never audio, never whole transcripts. Message id
 import asyncio
 import base64
 import json
-import os
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from . import store, whose
+from . import store, vault, whose
 
 
-def _env(name: str, default: str = "") -> str:
-    return os.environ.get(name, default).strip()
+def _env(name: str) -> str:
+    """Read on the event loop's thread: the settings live in a connection only it may use."""
+    return vault.value(name)
 
 
 def recipient() -> str:
@@ -69,19 +69,26 @@ problem = ""
 CHECK_SECONDS = 5
 
 
-def check() -> str:
+def connection() -> tuple[str, str]:
+    """(URL, key), read before a request leaves the event loop's thread."""
+    return _env("RELAY_URL"), _env("RELAY_API_KEY")
+
+
+def check(to: str = "", via: tuple[str, str] | None = None) -> str:
     """Relay's own check, sending nothing: the URL and the key work, and the recipient
     exists and has Telegram linked. What is wrong, or "" when nothing is."""
+    to = to or recipient()
+    via = via or connection()
     try:
-        found = _call("GET", "/v1/recipients", timeout=CHECK_SECONDS).get("recipients", [])
+        found = _call(via, "GET", "/v1/recipients", timeout=CHECK_SECONDS).get("recipients", [])
     except (OSError, ValueError, RuntimeError) as exc:  # a refused key, or no Relay at all
         return f"can't use Relay: {exc}"
     names = {name: r for r in found for name in [r["username"], *r.get("aliases", [])]}
-    who = names.get(recipient())
+    who = names.get(to)
     if who is None:
-        return f"{recipient()} is not a Relay recipient"
+        return f"{to} is not a Relay recipient"
     if not who.get("linked_channels"):
-        return f"{recipient()} has no Telegram linked yet, so nothing can reach them"
+        return f"{to} has no Telegram linked yet, so nothing can reach them"
     return ""
 
 
@@ -89,8 +96,9 @@ async def check_at_start() -> None:
     """Before the first page: the header and the Today page say what it found."""
     global problem  # noqa: PLW0603 - one result, read by the header and the Today page
     if not enabled():
+        problem = ""
         return
-    problem = await asyncio.to_thread(check)
+    problem = await asyncio.to_thread(check, recipient(), connection())
     print(f"  telegram: {problem or 'checked, ' + recipient() + ' can receive'}")
 
 
@@ -99,13 +107,16 @@ async def check_at_start() -> None:
 AGENT = "local-voice-coach (+relay-notify)"
 
 
-def _call(method: str, path: str, body: dict | None = None, timeout: float = 15) -> dict:
+def _call(
+    via: tuple[str, str], method: str, path: str, body: dict | None = None, timeout: float = 15
+) -> dict:
+    url, key = via
     request = Request(  # noqa: S310 - http(s) only, see enabled()
-        _env("RELAY_URL").rstrip("/") + path,
+        url.rstrip("/") + path,
         data=json.dumps(body).encode() if body is not None else None,
         method=method,
         headers={
-            "Authorization": f"Bearer {_env('RELAY_API_KEY')}",
+            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
             "User-Agent": AGENT,
         },
@@ -136,7 +147,7 @@ async def send(
         "blocks": blocks[:20],
         "idempotency_key": key[:128],
     }
-    result = await asyncio.to_thread(_call, "POST", "/v1/messages", body)
+    result = await asyncio.to_thread(_call, connection(), "POST", "/v1/messages", body)
     print(f"  relay: sent {result.get('id')}")
     return result.get("id")
 

@@ -6,7 +6,7 @@ import httpx
 import openai
 import pytest
 
-from coach import keys, llm, settings
+from coach import keys, llm, settings, vault
 
 
 def refused(kind=openai.RateLimitError, message="Please retry in 30s."):
@@ -19,10 +19,15 @@ def endpoint(key):
     return llm.Endpoint(llm._client("https://model.test", key), "flash", {})
 
 
-def test_settings_and_environment_make_one_pool_in_order(monkeypatch):
-    settings.set("gemini_api_key", "a, b")
-    monkeypatch.setenv("GEMINI_API_KEYS", "b,c\nd")
-    assert keys.pool() == ["a", "b", "c", "d"]
+A = "AIzaSy" + "a" * 33
+B = "AIzaSy" + "b" * 33
+
+
+def test_the_app_and_environment_make_one_pool_in_order(monkeypatch):
+    vault.add_key(A)
+    settings._store("gemini_api_key", f"{B}, c")  # the old Settings field still counts
+    monkeypatch.setenv("GEMINI_API_KEYS", "c,d\ne")
+    assert keys.pool() == [A, B, "c", "d", "e"]
 
 
 def test_a_refused_key_hands_the_request_to_the_next(monkeypatch):

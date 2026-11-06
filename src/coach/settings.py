@@ -10,14 +10,13 @@ are stored here. See `prompt()`.
 import os
 from typing import Any
 
-from . import config, store, whose
+from . import store, vault, whose
 from .knobs import SHARED, SPEC, WHISPER_CHOICES, Setting
 
 __all__ = ["SHARED", "SPEC", "WHISPER_CHOICES", "Setting"]
 
 
 _ENV_FALLBACK = {
-    "gemini_api_key": "GEMINI_API_KEY",
     "lm_studio_url": "LM_STUDIO_URL",
     "coach_backend": "COACH_BACKEND",
 }
@@ -127,4 +126,6 @@ def as_form(choices: dict[str, tuple[str, ...]] | None = None) -> list[dict]:
 
 
 def api_key() -> str:
-    return get("gemini_api_key") or config.API_KEY
+    """The first Gemini key, or "": whether Gemini can be reached at all (vault.py)."""
+    found = vault.gemini_keys()
+    return found[0] if found else ""

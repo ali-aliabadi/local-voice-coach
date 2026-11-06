@@ -1,7 +1,7 @@
 """Gemini keys: one, or a pool that people sharing a server lend each other.
 
-The Settings field takes one key or several separated by commas, and GEMINI_API_KEYS
-adds more from the environment. A key that is rate-limited, out of quota or rejected
+An admin adds keys on the Settings page, and GEMINI_API_KEY and GEMINI_API_KEYS add more
+from the environment (vault.py). A key that is rate-limited, out of quota or rejected
 rests, and the request goes again at once on the next one. Only when every key is
 resting does the caller see the error, and then `llm.patiently` waits or falls back as
 it always has. Each key's free tier is its own, so two keys are twice the requests.
@@ -12,7 +12,6 @@ named by its last four characters only.
 
 from __future__ import annotations
 
-import os
 import re
 import time
 from collections.abc import Awaitable, Callable
@@ -20,7 +19,7 @@ from typing import TYPE_CHECKING
 
 import openai
 
-from . import settings
+from . import vault
 
 if TYPE_CHECKING:
     from .llm import Endpoint
@@ -41,9 +40,8 @@ def retry_after(message: str) -> float | None:
 
 
 def pool() -> list[str]:
-    """Every key, in order, once: Settings first, then the environment."""
-    raw = f"{settings.api_key()},{os.environ.get('GEMINI_API_KEYS', '')}"
-    return list(dict.fromkeys(k for k in re.split(r"[\s,]+", raw) if k))
+    """Every key, in order, once: the app's first, then the environment's."""
+    return vault.gemini_keys()
 
 
 def current() -> str:
