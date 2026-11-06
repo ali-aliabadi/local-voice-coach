@@ -3,6 +3,7 @@ import { go, render, route } from "./router.js";
 import { apply } from "./theme.js";
 import * as history_ from "./views/history.js";
 import * as jobs from "./views/jobs.js";
+import * as people from "./views/people.js";
 import * as practice from "./views/practice.js";
 import * as profile from "./views/profile.js";
 import * as progress from "./views/progress.js";
@@ -19,6 +20,7 @@ route("/progress", progress);
 route("/jobs", jobs);
 route("/profile", profile);
 route("/settings", settings);
+route("/people", people);
 route("/today", today);
 
 // "/" is wherever you should be: back into a session you were mid-way through after a
@@ -49,6 +51,11 @@ get("/api/today").then(({ wired }) => {
   line.textContent = ` · Telegram ${word}`;
   line.title = detail;
   line.classList.toggle("warn", word === "not working");
+}).catch(() => {});
+
+// Signed in, the people link carries your name, so a shared phone shows whose it is.
+get("/api/people").then(({ me, required }) => {
+  if (required) document.getElementById("me").textContent = me.name;
 }).catch(() => {});
 
 apply();

@@ -102,10 +102,64 @@ partner cuts in, as in a real conversation. Lead-in then counts from the end of 
 sentence, not from a key press. Use headphones, or the partner's voice can cut itself off. Every session is kept: `/history` replays them,
 `/progress` charts the trend.
 
+## On your phone: your own server
+
+The app can run on a server you rent, so you practise from your phone, and so can
+people you invite. Whisper and Kokoro run there, not on the phone: your recordings move
+from your laptop to that server, and still go nowhere else.
+
+On the server, with Docker, and a web server in front that has a certificate for your
+domain (nginx below; `caddy reverse-proxy --from <domain> --to 127.0.0.1:18081` also works):
+
+```bash
+git clone https://github.com/ali-aliabadi/local-voice-coach && cd local-voice-coach
+cat >> .env <<'END'
+ALLOWED_HOSTS=coach.example.com
+PORT=18081
+GEMINI_API_KEYS=key1,key2
+END
+make up && make logs                 # the log prints the link that makes your first passkey
+```
+
+`ALLOWED_HOSTS` is the name the phone opens, and setting it turns sign-in on. `PORT` is
+published on 127.0.0.1 only. The nginx site passes the Host header and the WebSocket upgrade through:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name coach.example.com;
+    # ssl_certificate ... as for your other sites (certbot --nginx -d coach.example.com)
+    client_max_body_size 20m;            # a resume upload
+    location / {
+        proxy_pass http://127.0.0.1:18081;
+        proxy_set_header Host $host;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 1h;           # a practice session is one long socket
+    }
+}
+```
+
+A CDN proxy in front (Cloudflare's orange cloud) decrypts everything it carries, your
+voice included. Leave the record DNS-only so the audio is only ever readable by your
+server.
+
+Open that link on your phone and make a passkey: your face, fingerprint or screen lock,
+and no password anywhere. The server keeps only the passkey's public half. From then on
+every page asks for it first. **People** in the header invites someone else, with a
+one-time link sent to their Telegram if they have a Relay username, and makes a link for
+another device of your own. An admin can lock anyone out.
+
+**Gemini keys** in `GEMINI_API_KEYS` (or several, comma-separated, in Settings) are a
+pool: when one is rate-limited or out of quota, the request goes on the next at once.
+Each key's free tier is its own. Use headphones on a phone in hybrid mode, or its
+speaker talks into its own microphone.
+
 ## Your data
 
-Sessions and recordings stay in `data/` (Docker) or the repo root (native), never
-uploaded. Recordings are kept forever, about 40MB an hour, unless you set a number of
+Sessions and recordings stay in `data/` (Docker) or the repo root (native), on the
+machine the app runs on, never uploaded anywhere else. Recordings are kept forever, about 40MB an hour, unless you set a number of
 days in Settings. `make reset` erases everything.
 
 ## Contributing

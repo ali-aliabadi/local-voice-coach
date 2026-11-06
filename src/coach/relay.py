@@ -116,10 +116,13 @@ def _call(method: str, path: str, body: dict | None = None, timeout: float = 15)
         raise RuntimeError(f"relay {exc.code} {error.get('code', '')} {problems}".strip()) from None
 
 
-async def send(title: str, blocks: list[dict], key: str, urgency: str = "low") -> str | None:
-    """Post a message. `key` makes a retry, or a second run of the same job, a no-op."""
+async def send(
+    title: str, blocks: list[dict], key: str, urgency: str = "low", to: str | None = None
+) -> str | None:
+    """Post a message, to RELAY_USER unless `to` names another recipient. `key` makes a
+    retry, or a second run of the same job, a no-op."""
     body = {
-        "to": [recipient()],
+        "to": [to or recipient()],
         "source": _env("RELAY_APP"),
         "urgency": urgency,
         "title": title[:256],

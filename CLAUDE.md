@@ -56,6 +56,7 @@ make e2e                             # real server, real socket, a spoken answer
 | `src/coach/stt.py` | Whisper, `fluency()`, `word_rows()` |
 | `src/coach/tts.py` | Kokoro to WAV bytes; touches no audio device |
 | `src/coach/llm.py` | endpoints, streaming, retries |
+| `src/coach/keys.py` | the pool of Gemini keys: a refused key rests, the next one answers |
 | `src/coach/chunks.py` | where to cut a streaming reply so it can be spoken |
 | `src/coach/backends.py` | the model catalogue, reachability probing, what fits this machine |
 | `src/coach/machine.py` | this computer: chip, cores, memory, the biggest local model it holds |
@@ -68,10 +69,11 @@ make e2e                             # real server, real socket, a spoken answer
 | `src/coach/verdict.py` | after an interview: rating out of 10, hire decision, scores by area |
 | `src/coach/jobs.py` | real postings from Himalayas' public API, for the jobs page |
 | `src/coach/clock.py` | jobs that run on a timer while the server is up |
+| `src/coach/people.py` | accounts, passkeys, invite links and sign-ins (hashes only) |
 | `src/coach/relay.py` | the Relay client: Telegram, off unless `RELAY_*` is set |
 | `src/coach/reports.py` | what goes to Telegram and when |
 | `src/coach/picture.py` | the charts as PNG, for Telegram (Pillow) |
-| `src/coach/server/` | `app.py` assembly + websocket, `api.py` JSON routes, `past.py` the routes about one finished session, `session.py` the `io` modes talk to, `guard.py` localhost-only, `models.py` loaded models |
+| `src/coach/server/` | `app.py` assembly + websocket, `api.py` JSON routes, `past.py` the routes about one finished session, `session.py` the `io` modes talk to, `guard.py` localhost-only, `login.py` passkey ceremonies and the sign-in gate, `accounts.py` the people page, `models.py` loaded models |
 | `src/coach/modes/` | one file per mode, discovered automatically; `_`-prefixed files are helpers |
 | `web/` | plain ES modules, no build step; `views/` is one file per route; `screen.js` draws the practice page that `views/practice.js` drives |
 | `models/` | Kokoro weights, gitignored, fetched by `make models` |
@@ -274,6 +276,19 @@ a visible link back and naming it as the source - the jobs page does both; keep 
 Remotive was rejected: jobs a day late and four calls a day. Postings not in English are
 dropped by a count of common English words, because a third of a real first page was
 Portuguese, Spanish or Ukrainian.
+
+### Beyond localhost, a passkey or nothing
+Self-hosting is for practising from a phone. Once `ALLOWED_HOSTS` names a host,
+`login.Gate` turns away every request without a signed-in cookie: pages go to `/login`,
+the API gets 401, the socket is closed. On localhost nobody signs in and everything is
+the owner, so the native app is unchanged. Passkeys only, never passwords: the server
+holds public keys, and sign-ins and invite links as SHA-256 hashes, so a copied database
+signs nobody in. Nobody signs up: an admin adds a person, which makes a one-time link
+(Telegram through Relay when they have a recipient, shown to the admin either way). The
+passkey's site is the request's Host, so the proxy in front (Caddy, `tailscale serve`)
+must pass Host through; anything not localhost is taken to be https. Gemini keys are a
+pool (`keys.rotating`, at the two places a request is made): a refused key rests for as
+long as its error says and the request goes on the next at once.
 
 ### Recordings are kept forever
 They never leave the machine, so deleting them protects nothing; the user asked for them

@@ -20,7 +20,10 @@ requirement, not a feature.
    transcript, the profile, the resume and job posting - reaches a model, and only if the
    user picked a cloud backend. A job search sends Himalayas its search words, and only
    when the user searches. This is the one promise no hosted competitor can make, and
-   nothing gets to break it.
+   nothing gets to break it. Self-hosting moves "the machine" to a server you run, for
+   practising from a phone: the audio goes there over https and stays there. It still
+   never reaches a model or a third party, and a server beyond localhost refuses
+   everything until you sign in with a passkey (`people.py`).
 2. **Never present an estimate as a measurement.** The backend table labels published
    latency `est.`; the `Yours` column is measured from the user's own sessions.
 3. **Fluency metrics stay arithmetic.** wpm, pauses and lead-in come from word timestamps,

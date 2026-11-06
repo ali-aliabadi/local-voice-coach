@@ -33,11 +33,11 @@ SPEC: dict[str, Setting] = {
     # ---- Backends ----
     "gemini_api_key": Setting(
         "",
-        "Gemini API key",
+        "Gemini API keys",
         "Backends",
         kind="password",
         secret=True,
-        help="Free key at aistudio.google.com/apikey. Stored locally, never displayed again.",
+        help="Free at aistudio.google.com/apikey. Several, comma-separated, are a pool. Stored locally.",
     ),
     "lm_studio_url": Setting(
         "http://localhost:1234/v1",
