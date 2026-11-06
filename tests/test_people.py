@@ -15,7 +15,7 @@ from starlette.routing import Route, WebSocketRoute  # noqa: E402
 from starlette.testclient import TestClient  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
-from coach import people, relay, store  # noqa: E402
+from coach import people, relay, store, whose  # noqa: E402
 from coach.server import accounts, login  # noqa: E402
 
 HOST = "coach.tail.ts.net"
@@ -219,3 +219,22 @@ def test_the_first_way_in_is_a_link_at_the_start(capsys):
 def test_relay_sends_to_whoever_is_named(telegram):
     asyncio.run(relay.send("t", [], key="k", to="sara"))
     assert telegram.sent[-1]["to"] == ["sara"]
+
+
+def test_relay_user_set_after_the_first_start_is_taken_up(monkeypatch):
+    """The first start on a server often comes before .env has Relay in it."""
+    first = people.owner()
+    assert first.name == "me"
+    monkeypatch.setenv("RELAY_USER", "ali")
+    assert people.owner() == people.Person(first.id, "ali", "ali", True)
+    assert people.get(first.id) == people.Person(first.id, "ali", "ali", True)
+
+
+def test_the_owner_is_the_owner_whoever_is_asking(monkeypatch):
+    monkeypatch.setenv("RELAY_USER", "ali")
+    sara = people.add("Sara", "sara")
+    acting = whose.acting.set(sara.id)
+    try:
+        assert people.owner().relay == "ali"
+    finally:
+        whose.acting.reset(acting)

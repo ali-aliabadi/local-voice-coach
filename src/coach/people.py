@@ -18,7 +18,7 @@ import sqlite3
 import time
 from typing import NamedTuple
 
-from . import relay, store
+from . import store
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS people (
@@ -128,7 +128,15 @@ def owner() -> Person:
     RELAY_USER so their reports keep going where they went before accounts."""
     query = "SELECT * FROM people WHERE admin = 1 ORDER BY id LIMIT 1"
     found = _person(_db().execute(query).fetchone())
-    return found or add(relay.recipient() or "me", relay.recipient() or None, admin=True)
+    named = os.environ.get("RELAY_USER", "").strip()  # not relay.recipient(): that is whoever acts
+    if found is None:
+        return add(named or "me", named or None, admin=True)
+    if named and not found.relay:  # RELAY_USER set after the first start: take it up now
+        name = named if found.name == "me" else found.name
+        _db().execute("UPDATE people SET name = ?, relay = ? WHERE id = ?", (name, named, found.id))
+        _db().commit()
+        return found._replace(name=name, relay=named)
+    return found
 
 
 def revoke(person_id: int) -> None:
