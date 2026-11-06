@@ -52,7 +52,8 @@ make e2e                             # real server, real socket, a spoken answer
 |---|---|
 | `main.py` | the only root module: argument parsing, starts uvicorn |
 | `src/coach/config.py` | constants that are not user-facing |
-| `src/coach/settings.py` | user-editable settings; SPEC drives the settings UI |
+| `src/coach/settings.py` | reading and writing settings, each person's own or the server's |
+| `src/coach/knobs.py` | SPEC, every user-editable knob, which drives the settings UI; SHARED |
 | `src/coach/stt.py` | Whisper, `fluency()`, `word_rows()` |
 | `src/coach/tts.py` | Kokoro to WAV bytes; touches no audio device |
 | `src/coach/llm.py` | endpoints, streaming, retries |
@@ -69,6 +70,7 @@ make e2e                             # real server, real socket, a spoken answer
 | `src/coach/verdict.py` | after an interview: rating out of 10, hire decision, scores by area |
 | `src/coach/jobs.py` | real postings from Himalayas' public API, for the jobs page |
 | `src/coach/clock.py` | jobs that run on a timer while the server is up |
+| `src/coach/whose.py` | whose rows: the person a request or task acts for, `mine()`, `own()` |
 | `src/coach/people.py` | accounts, passkeys, invite links and sign-ins (hashes only) |
 | `src/coach/relay.py` | the Relay client: Telegram, off unless `RELAY_*` is set |
 | `src/coach/reports.py` | what goes to Telegram and when |
@@ -289,6 +291,18 @@ passkey's site is the request's Host, so the proxy in front (Caddy, `tailscale s
 must pass Host through; anything not localhost is taken to be https. Gemini keys are a
 pool (`keys.rotating`, at the two places a request is made): a refused key rests for as
 long as its error says and the request goes on the next at once.
+
+### Every person's rows are their own
+One server, several people, nobody seeing another's history. `whose.acting` is a
+ContextVar the gate sets per request and socket; asyncio tasks copy it, so the coach's
+work after a session is filed under whoever practised. `sessions.person_id` is NULL for
+the owner - so real history from before accounts needed no migration - and
+`history.counted()` filters on `whose.mine()`, which scopes every list, total, streak,
+trend and report built on it. A query by id checks `store.owns()` and answers 404 for
+someone else's. Personal settings, prompts, profile and `relay:` memory are stored as
+`key@<person>` (`whose.own`); a new person's settings start from the owner's, the profile
+never does. `knobs.SHARED` (backends, Whisper, retention) is the server's, one value, set
+by an admin only. Telegram goes to each person's own Relay name.
 
 ### Recordings are kept forever
 They never leave the machine, so deleting them protects nothing; the user asked for them

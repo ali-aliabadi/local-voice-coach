@@ -36,8 +36,8 @@ export async function render(root) {
     </div>
     <hr>
     <h2>Your data</h2>
-    <p class="foot">Everything is on this machine. Nothing is uploaded.</p>
-    <button id="forget" class="danger">Delete every session and recording</button>`;
+    <p class="foot">Everything is on the machine this app runs on. Nothing is uploaded.</p>
+    <button id="forget" class="danger">Delete all your sessions and recordings</button>`;
 
   root.querySelector("#theme").addEventListener("change", (event) => set(event.target.value));
 
@@ -51,7 +51,7 @@ export async function render(root) {
   });
 
   root.querySelector("#forget").addEventListener("click", async (event) => {
-    if (!confirm("Delete every session, metric and recording? This cannot be undone.")) return;
+    if (!confirm("Delete all your sessions, metrics and recordings? This cannot be undone.")) return;
     await fetch("/api/forget", { method: "POST" });
     event.target.textContent = "Deleted.";
   });

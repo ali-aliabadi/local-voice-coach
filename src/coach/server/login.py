@@ -30,7 +30,7 @@ from webauthn.helpers.structs import (
     UserVerificationRequirement,
 )
 
-from .. import people
+from .. import people, whose
 from ..people import LOCAL, Person
 
 WEB = pathlib.Path(__file__).resolve().parents[3] / "web"
@@ -214,7 +214,12 @@ class Gate:
             who = people.owner()
         if who is not None:
             scope.setdefault("state", {})["person"] = who
-            return await self.app(scope, receive, send)
+            # Everything below reads and writes this person's rows; the owner's are NULL.
+            acting = whose.acting.set(None if who.id == people.owner().id else who.id)
+            try:
+                return await self.app(scope, receive, send)
+            finally:
+                whose.acting.reset(acting)
         if scope["type"] == "websocket":
             await receive()  # the connect event, then refuse it
             await send({"type": "websocket.close", "code": 1008})

@@ -21,7 +21,7 @@ import os
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from . import store
+from . import store, whose
 
 
 def _env(name: str, default: str = "") -> str:
@@ -29,15 +29,22 @@ def _env(name: str, default: str = "") -> str:
 
 
 def recipient() -> str:
-    """Who this app sends to. Relay's skill dropped the fallback to "admin": reports went
-    to whoever runs Relay, not to the person practising."""
-    return _env("RELAY_USER")
+    """Who this app sends to: RELAY_USER for the owner, anyone else's own Relay name.
+    Relay's skill dropped the fallback to "admin": reports went to whoever runs Relay,
+    not to the person practising."""
+    who = whose.acting.get()
+    if who is None:
+        return _env("RELAY_USER")
+    row = store.db().execute("SELECT relay FROM people WHERE id = ?", (who,)).fetchone()
+    return (row["relay"] or "") if row else ""
 
 
 def missing() -> list[str]:
     """What keeps Relay off: a variable unset, or a URL that is not http(s)."""
-    needed = ("RELAY_URL", "RELAY_API_KEY", "RELAY_APP", "RELAY_USER")
+    needed = ("RELAY_URL", "RELAY_API_KEY", "RELAY_APP")
     gaps = [name for name in needed if not _env(name)]
+    if not recipient():
+        gaps.append("RELAY_USER" if whose.acting.get() is None else "your Relay username")
     if _env("RELAY_URL") and not _env("RELAY_URL").startswith(("http://", "https://")):
         gaps.append("RELAY_URL starting with https://")
     return gaps
@@ -168,7 +175,7 @@ def text(body: str) -> dict:
 def recall(name: str) -> str:
     row = (
         store.db()
-        .execute("SELECT value FROM settings WHERE key = ?", (f"relay:{name}",))
+        .execute("SELECT value FROM settings WHERE key = ?", (whose.own(f"relay:{name}"),))
         .fetchone()
     )
     return row["value"] if row else ""
@@ -178,6 +185,6 @@ def remember(name: str, value: str) -> None:
     store.db().execute(
         "INSERT INTO settings (key, value) VALUES (?, ?) "
         "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        (f"relay:{name}", value),
+        (whose.own(f"relay:{name}"), value),
     )
     store.db().commit()
