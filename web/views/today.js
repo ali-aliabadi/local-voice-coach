@@ -14,7 +14,7 @@ export function keepLast(mode, backend) {
 /** Telegram in words: off, on, or what Relay's check at the start found wrong. The header
  * says it on every page; the Today page says it in full. */
 export const telegram = (w) => (w.telegram.length
-  ? { word: "off", detail: `.env needs ${w.telegram.join(", ")}` }
+  ? { word: "off", detail: `not set yet: ${w.telegram.join(", ")}. An admin sets it under Settings → Keys and Telegram` }
   : w.problem ? { word: "not working", detail: w.problem }
   : { word: "on", detail: `sends to ${w.to}` });
 
