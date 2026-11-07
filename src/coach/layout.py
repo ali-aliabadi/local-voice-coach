@@ -20,7 +20,7 @@ Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
 W, H, MARGIN = 1240, 1754, 100  # A4 at 150 dpi
 WIDTH = W - 2 * MARGIN
 FOOT = 70  # kept clear at the bottom for the page number
-GOOD, FAR = "#067d5f", "#b5501f"
+GOOD, FAR = "#116fc0", "#8a6200"
 # What Pillow's own font cannot draw, for when the real font is missing.
 ASCII = {
     "→": "->",

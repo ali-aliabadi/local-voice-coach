@@ -1,0 +1,73 @@
+/* The design tokens, after Sonnat (sonnat.design, MIT): Divar's design system.
+   Taken from it: neutral greys at its text alphas (87% ink, 56% muted, 12% lines),
+   its radii (4 / 8 / 16 / round), its card elevation, 40px controls, a 16px spacer and
+   weights 400 / 500 / 700, and its pink primary as the accent. Pink sits on top of an
+   orange and a green under colour blindness, so warn moved to amber and good to
+   Sonnat's blue: good/warn is a blue/amber pair that stays apart for every kind of
+   colour blindness, and accent and warn never carry meaning by colour alone (the mic
+   changes shape, the trend line is dashed). Every pair below was re-checked for
+   contrast and CVD separation; change a colour and re-run the check. */
+:root {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --ink: #212121;
+  --muted: #707070;
+  --line: #e0e0e0;
+  --accent: #d6135a;        /* Sonnat pink, a shade deep enough for white text */
+  --on-accent: #ffffff;
+  --accent-soft: #f8ecf0;   /* pink 50 */
+  --good: #116fc0;          /* Sonnat blue 700 */
+  --warn: #8a6200;          /* amber */
+  --goal: #f6e3ea;          /* the target band behind a trend line */
+  --quiet: #ececec;         /* silence before you started */
+  --gap: #f6ecd2;           /* a pause mid-answer */
+
+  --r-sm: 4px;              /* buttons, inputs */
+  --radius: 8px;            /* cards */
+  --r-lg: 16px;             /* the hero card */
+  --pill: 999px;            /* chips, tags */
+  --shadow: 0 0 4px rgb(0 0 0 / 0.04), 0 4px 12px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.08);
+  --space: 1rem;
+  --control: 2.5rem;        /* 40px, Sonnat's medium button and field */
+  color-scheme: light dark;
+}
+
+/* Cool and open rather than near-black: this is read for an hour at a time. Sonnat's
+   own dark (#121212) is the near-black the user already called "very dark". */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #172029;
+    --surface: #1f2b36;
+    --ink: #e3edf6;
+    --muted: #92a8ba;
+    --line: #2f3e4d;
+    --accent: #ee6d9a;      /* pink 400 */
+    --on-accent: #172029;
+    --accent-soft: #3b2a38;
+    --good: #6db2ee;
+    --warn: #d4a03c;
+    --goal: #33283a;
+    --quiet: #26323e;
+    --gap: #3a3222;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.18);
+  }
+}
+
+/* Same values again for an explicit choice, so the toggle wins over the system in both
+   directions. Plain CSS cannot share them without a preprocessor. */
+:root[data-theme="dark"] {
+  --bg: #172029;
+  --surface: #1f2b36;
+  --ink: #e3edf6;
+  --muted: #92a8ba;
+  --line: #2f3e4d;
+  --accent: #ee6d9a;
+  --on-accent: #172029;
+  --accent-soft: #3b2a38;
+  --good: #6db2ee;
+  --warn: #d4a03c;
+  --goal: #33283a;
+  --quiet: #26323e;
+  --gap: #3a3222;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.18);
+}

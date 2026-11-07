@@ -13,8 +13,8 @@
 }
 .person small.foot { display: block; }
 .tag {
-  color: var(--accent); background: var(--accent-soft); border-radius: 6px;
-  padding: 0 0.4rem; font-size: 0.75rem;
+  color: var(--accent); background: var(--accent-soft); border-radius: var(--pill); border: 0;
+  padding: 0.05rem 0.55rem; font-size: 0.75rem; font-weight: 500;
 }
 .made-box {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);

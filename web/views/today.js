@@ -41,7 +41,7 @@ export async function render(root) {
       : t.sessions ? "Good start. Keep going while it is fresh." : "Nothing yet today."}</p>
     <div class="row start">
       ${usual ? `<button class="primary" id="go">Continue: ${escape(usual.mode)}</button>` : ""}
-      <a href="/modes">${usual ? "or choose something else" : "Choose what to practise"}</a>
+      <a href="/modes"${usual ? "" : ` class="primary"`}>${usual ? "or choose something else" : "Choose what to practise"}</a>
     </div>
     <p class="foot wired">Gemini: ${t.wired.gemini ? "key set"
       : `no key — <a href="/settings">add one</a>`} · Telegram: ${relay.word} —

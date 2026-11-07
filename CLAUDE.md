@@ -187,11 +187,13 @@ picked in Settings; Speech speed is the one knob for slowing down. `tts.PACE` ho
 accent's measured pace. A new accent needs it measured before joining `ACCENTS`.
 
 ### The palette is validated, not eyeballed
-Sky blue accent with an orange warn: blue and orange is the one pair that stays distinct
-under every kind of colour blindness. Both modes were run through the dataviz validator
-(lightness band, chroma floor, CVD separation, contrast) and every check passes; light
-mode colours also clear 4.5:1 on the page background, because the verdict text is small.
-Change a colour and re-run the validator rather than trusting your eye.
+Tokens live in `web/tokens.css`, after Sonnat (see DESIGN.md): Sonnat's pink accent, a blue
+good and an amber warn. Blue and amber is the pair that stays distinct under every kind of
+colour blindness, and it is the pair that carries meaning (verdicts, deltas). Pink and amber
+are closer for some readers, so where they meet nothing rests on colour alone: the mic
+changes shape when recording, the trend line is dashed. Every pair was checked for contrast
+and CVD separation; light mode colours also clear 4.5:1 on the page background, because the
+verdict text is small. Change a colour and re-run the check rather than trusting your eye.
 
 Dark mode is a cool blue-grey, deliberately not near-black. The first version was a warm
 near-black and the first thing the user said about it was "very dark". `theme.js` also
@@ -435,8 +437,8 @@ budget, exactly like `gemini-3.8-flash` did at 120. The `review_max_tokens` sett
 
 ## Frontend notes
 
-- `style.css` is page chrome and forms; `data.css` is anything that displays a
-  measurement. Both are linked from `index.html`.
+- `tokens.css` is the palette, radii and elevation (after Sonnat); `style.css` is page chrome and forms; `data.css` is anything that displays a
+  measurement. All three are linked from `index.html`.
 - **Scope global element selectors.** A bare `header {}` rule styled every `<header>`,
   including the one inside each chart card — that was a 48px indent and a stray rule on
   every chart. It is `body > header` now.
