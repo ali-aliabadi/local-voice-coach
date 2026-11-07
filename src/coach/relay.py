@@ -17,6 +17,7 @@ allow it - the coach's lessons. Never audio, never whole transcripts. Message id
 import asyncio
 import base64
 import json
+import time
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -92,14 +93,30 @@ def check(to: str = "", via: tuple[str, str] | None = None) -> str:
     return ""
 
 
-async def check_at_start() -> None:
-    """Before the first page: the header and the Today page say what it found."""
-    global problem  # noqa: PLW0603 - one result, read by the header and the Today page
+async def recheck(force: bool = False) -> str:
+    """Ask Relay again whether it works, at most every RECHECK_SECONDS unless forced: after
+    Telegram is saved, and whenever a page asks, so a fixed setting never shows as broken
+    until the next start. Values are read here, on the event loop's thread."""
+    global problem, _checked  # noqa: PLW0603 - one result, read by the header and the Today page
     if not enabled():
         problem = ""
-        return
-    problem = await asyncio.to_thread(check, recipient(), connection())
-    print(f"  telegram: {problem or 'checked, ' + recipient() + ' can receive'}")
+    elif force or time.monotonic() - _checked > RECHECK_SECONDS:
+        problem = await asyncio.to_thread(check, recipient(), connection())
+        _checked = time.monotonic()
+    return problem
+
+
+# ponytail: one result for the server, not per person; key it by recipient if several
+# people ever have different Relay names that fail differently.
+_checked = 0.0
+RECHECK_SECONDS = 30
+
+
+async def check_at_start() -> None:
+    """Before the first page: the header and the Today page say what it found."""
+    if enabled():
+        await recheck(force=True)
+        print(f"  telegram: {problem or 'checked, ' + recipient() + ' can receive'}")
 
 
 # Cloudflare in front of a Relay answered Python's default "Python-urllib" agent with
