@@ -103,6 +103,16 @@ would turn a listening exercise into a reading one.
 **Calm and minimal.** Generous white space, one accent colour, soft type. The user is
 already nervous; the tool should not add to it.
 
+**Sonnat's shapes, our colours.** The look follows [Sonnat](https://www.sonnat.design/)
+(Divar's design system, MIT): neutral greys at its text opacities, 4/8/16px corners, its
+card elevation, 40px controls, filled/outlined/text buttons, pill chips, an app bar with a
+tab row. Its values were read from the `@sonnat/ui` package, not the website, and live in
+`web/tokens.css`; there is no React and no build step, only CSS. Its pink primary was left
+out: it sits on top of the orange warn and the green good under colour blindness, so the
+accent is Sonnat's navy and the blue/orange pair holds. Its font, IRANSans, is commercial
+and made for Persian; the system font stays. Dark mode stays blue-grey: Sonnat's #121212 is
+the near-black the user called "very dark".
+
 The three things that justify a browser existing at all:
 
 - **Replay your own answer.** Hearing yourself say "mmmm" beats being told you did.

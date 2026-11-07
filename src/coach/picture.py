@@ -40,10 +40,10 @@ def shifts(before: dict, now: dict) -> list[str]:
     return said
 
 
-# The light theme's tokens from web/style.css: Telegram shows images on either theme, and
+# The light theme's tokens from web/tokens.css: Telegram shows images on either theme, and
 # light reads on both.
-PAGE, SURFACE, INK, MUTED = "#f4f9fd", "#ffffff", "#16232f", "#5c7285"
-LINE, ACCENT, GOAL = "#dde8f1", "#1c6fbe", "#dbeaf8"
+PAGE, SURFACE, INK, MUTED = "#fafafa", "#ffffff", "#212121", "#707070"
+LINE, ACCENT, GOAL = "#e0e0e0", "#1337ec", "#e3e7fa"
 # The trend, in the warn colour: blue and orange stay apart under every colour blindness,
 # and it is dashed so it does not rest on colour alone.
 TREND_COLOUR = "#b5501f"

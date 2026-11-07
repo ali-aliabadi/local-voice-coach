@@ -187,7 +187,7 @@ picked in Settings; Speech speed is the one knob for slowing down. `tts.PACE` ho
 accent's measured pace. A new accent needs it measured before joining `ACCENTS`.
 
 ### The palette is validated, not eyeballed
-Sky blue accent with an orange warn: blue and orange is the one pair that stays distinct
+Tokens live in `web/tokens.css`, after Sonnat (see DESIGN.md). Sonnat's navy accent with an orange warn: blue and orange is the one pair that stays distinct
 under every kind of colour blindness. Both modes were run through the dataviz validator
 (lightness band, chroma floor, CVD separation, contrast) and every check passes; light
 mode colours also clear 4.5:1 on the page background, because the verdict text is small.
@@ -435,8 +435,8 @@ budget, exactly like `gemini-3.8-flash` did at 120. The `review_max_tokens` sett
 
 ## Frontend notes
 
-- `style.css` is page chrome and forms; `data.css` is anything that displays a
-  measurement. Both are linked from `index.html`.
+- `tokens.css` is the palette, radii and elevation (after Sonnat); `style.css` is page chrome and forms; `data.css` is anything that displays a
+  measurement. All three are linked from `index.html`.
 - **Scope global element selectors.** A bare `header {}` rule styled every `<header>`,
   including the one inside each chart card — that was a 48px indent and a stray rule on
   every chart. It is `body > header` now.
