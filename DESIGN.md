@@ -107,10 +107,11 @@ already nervous; the tool should not add to it.
 (Divar's design system, MIT): neutral greys at its text opacities, 4/8/16px corners, its
 card elevation, 40px controls, filled/outlined/text buttons, pill chips, an app bar with a
 tab row. Its values were read from the `@sonnat/ui` package, not the website, and live in
-`web/tokens.css`; there is no React and no build step, only CSS. Its pink primary was left
-out: it sits on top of the orange warn and the green good under colour blindness, so the
-accent is Sonnat's navy and the blue/orange pair holds. Its font, IRANSans, is commercial
-and made for Persian; the system font stays. Dark mode stays blue-grey: Sonnat's #121212 is
+`web/tokens.css`; there is no React and no build step, only CSS. Its pink primary is the
+accent. Pink sits on top of an orange and a green under colour blindness, so warn moved to
+amber and good to Sonnat's blue: a blue/amber pair that stays apart for every kind of colour
+blindness, and accent and warn never carry meaning by colour alone. Its font, IRANSans, is
+commercial and made for Persian; the system font stays. Dark mode stays blue-grey: Sonnat's #121212 is
 the near-black the user called "very dark".
 
 The three things that justify a browser existing at all:

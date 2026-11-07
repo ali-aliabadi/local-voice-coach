@@ -1,9 +1,11 @@
 /* The design tokens, after Sonnat (sonnat.design, MIT): Divar's design system.
    Taken from it: neutral greys at its text alphas (87% ink, 56% muted, 12% lines),
    its radii (4 / 8 / 16 / round), its card elevation, 40px controls, a 16px spacer and
-   weights 400 / 500 / 700. Not taken: its pink primary, which sits too close to the
-   orange warn and the green good under colour blindness; the accent is Sonnat's navy,
-   so accent/warn stay the blue-orange pair. Every pair below was re-checked for
+   weights 400 / 500 / 700, and its pink primary as the accent. Pink sits on top of an
+   orange and a green under colour blindness, so warn moved to amber and good to
+   Sonnat's blue: good/warn is a blue/amber pair that stays apart for every kind of
+   colour blindness, and accent and warn never carry meaning by colour alone (the mic
+   changes shape, the trend line is dashed). Every pair below was re-checked for
    contrast and CVD separation; change a colour and re-run the check. */
 :root {
   --bg: #fafafa;
@@ -11,14 +13,14 @@
   --ink: #212121;
   --muted: #707070;
   --line: #e0e0e0;
-  --accent: #1337ec;        /* Sonnat navy 600 */
+  --accent: #d6135a;        /* Sonnat pink, a shade deep enough for white text */
   --on-accent: #ffffff;
-  --accent-soft: #eceef8;   /* navy 50 */
-  --good: #067d5f;
-  --warn: #b5501f;
-  --goal: #e3e7fa;          /* the target band behind a trend line */
+  --accent-soft: #f8ecf0;   /* pink 50 */
+  --good: #116fc0;          /* Sonnat blue 700 */
+  --warn: #8a6200;          /* amber */
+  --goal: #f6e3ea;          /* the target band behind a trend line */
   --quiet: #ececec;         /* silence before you started */
-  --gap: #fae7da;           /* a pause mid-answer */
+  --gap: #f6ecd2;           /* a pause mid-answer */
 
   --r-sm: 4px;              /* buttons, inputs */
   --radius: 8px;            /* cards */
@@ -39,14 +41,14 @@
     --ink: #e3edf6;
     --muted: #92a8ba;
     --line: #2f3e4d;
-    --accent: #9aa8ef;      /* navy 300 */
+    --accent: #ee6d9a;      /* pink 400 */
     --on-accent: #172029;
-    --accent-soft: #25304a;
-    --good: #2d9d82;
-    --warn: #c8794a;
-    --goal: #232f48;
+    --accent-soft: #3b2a38;
+    --good: #6db2ee;
+    --warn: #d4a03c;
+    --goal: #33283a;
     --quiet: #26323e;
-    --gap: #382e26;
+    --gap: #3a3222;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.18);
   }
 }
@@ -59,13 +61,13 @@
   --ink: #e3edf6;
   --muted: #92a8ba;
   --line: #2f3e4d;
-  --accent: #9aa8ef;
+  --accent: #ee6d9a;
   --on-accent: #172029;
-  --accent-soft: #25304a;
-  --good: #2d9d82;
-  --warn: #c8794a;
-  --goal: #232f48;
+  --accent-soft: #3b2a38;
+  --good: #6db2ee;
+  --warn: #d4a03c;
+  --goal: #33283a;
   --quiet: #26323e;
-  --gap: #382e26;
+  --gap: #3a3222;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.18);
 }
