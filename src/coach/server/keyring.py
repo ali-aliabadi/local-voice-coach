@@ -7,7 +7,6 @@ the server's keys. On localhost nobody has a passkey and nobody else can reach t
 so it asks for none there. What .env sets is shown and cannot be changed here.
 """
 
-import asyncio
 import hashlib
 import time
 
@@ -130,11 +129,7 @@ async def save_relay(request: Request) -> JSONResponse:
         vault.put(name, text)
     if "RELAY_USER" in body and vault.source("RELAY_USER") != "env":
         people.set_relay(people.owner().id, vault.value("RELAY_USER"))
-    relay.problem = ""
-    if relay.enabled():  # say now whether it works, not at the next start
-        relay.problem = await asyncio.to_thread(
-            relay.check, vault.value("RELAY_USER"), relay.connection()
-        )
+    await relay.recheck(force=True)  # say now whether it works, not at the next start
     return await show(request)
 
 

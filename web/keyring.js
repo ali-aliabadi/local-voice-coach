@@ -71,21 +71,32 @@ function draw(box, data) {
     </fieldset>`;
 
   const said = (text) => { box.querySelector("#said").textContent = text; };
-  const act = async (url, body) => {
-    try { draw(box, await call(url, body)); } catch (error) { said(error.message); }
+  // Whatever happens is said where it can be seen. A refusal redraws first: once the
+  // passkey's ten minutes ran out, the form looked open and Save failed out of sight.
+  const act = async (url, body, done) => {
+    try {
+      const data = await call(url, body);
+      draw(box, data);
+      box.querySelector("#said").textContent = done(data);
+    } catch (error) {
+      await keyring(box);
+      box.querySelector("#said").textContent = error.message;
+    }
+    box.querySelector("#said").scrollIntoView({ block: "center", behavior: "smooth" });
   };
 
   box.querySelectorAll("[data-remove]").forEach((button) => {
-    button.onclick = () => act(`/api/keyring/keys/${button.dataset.remove}/remove`, {});
+    button.onclick = () => act(`/api/keyring/keys/${button.dataset.remove}/remove`, {}, () => "Key removed.");
   });
   box.querySelector("#add-key").onsubmit = (event) => {
     event.preventDefault();
-    act("/api/keyring/keys", { key: event.target.key.value });
+    act("/api/keyring/keys", { key: event.target.key.value }, () => "Key added.");
   };
   box.querySelector("#relay").onsubmit = (event) => {
     event.preventDefault();
     const fields = [...event.target.querySelectorAll("input:not(:disabled)")];
-    act("/api/keyring/relay", Object.fromEntries(fields.map((f) => [f.name, f.value])));
+    act("/api/keyring/relay", Object.fromEntries(fields.map((f) => [f.name, f.value])),
+      (data) => `Saved. Telegram: ${telegram(data.telegram)}`);
   };
   if (locked) unlock(box, said);
 }

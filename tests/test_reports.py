@@ -139,6 +139,7 @@ def test_the_first_page_says_whether_telegram_is_on(monkeypatch):
         "RELAY_USER": "ali",
     }.items():
         monkeypatch.setenv(name, value)
+    monkeypatch.setattr(relay, "check", lambda *_: "")  # it asks Relay; none runs here
     wired = client.get("/api/today").json()["wired"]
     assert (wired["telegram"], wired["to"], wired["problem"]) == ([], "ali", "")
 
@@ -191,6 +192,18 @@ def test_the_start_checks_relay_and_the_today_page_shows_it(telegram, monkeypatc
     asyncio.run(relay.check_at_start())
     wired = TestClient(Starlette(routes=api.ROUTES)).get("/api/today").json()["wired"]
     assert wired["problem"] == "ali is not a Relay recipient"
+
+
+def test_the_today_page_asks_relay_again_so_a_fix_shows_without_a_restart(telegram, monkeypatch):
+    """The user linked Telegram after the start and Today kept saying it was broken."""
+    monkeypatch.setattr(relay, "RECHECK_SECONDS", 0)
+    telegram.recipients = []
+    asyncio.run(relay.check_at_start())
+    client = TestClient(Starlette(routes=api.ROUTES))
+    assert client.get("/api/today").json()["wired"]["problem"] == "ali is not a Relay recipient"
+    telegram.recipients = [{"username": "ali", "linked_channels": ["telegram"]}]
+    assert client.get("/api/today").json()["wired"]["problem"] == ""
+    assert not telegram.sent
 
 
 def test_an_interviews_report_carries_its_verdict_in_the_title_and_no_more(telegram, counted):

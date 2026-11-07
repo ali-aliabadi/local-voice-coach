@@ -197,7 +197,7 @@ async def get_today(_request: Request) -> Response:
         "gemini": bool(settings.api_key()),
         "telegram": relay.missing(),
         "to": relay.recipient(),
-        "problem": relay.problem,
+        "problem": await relay.recheck(),
     }
     return JSONResponse({**today.summary(dt.date.today()), "wired": wired})
 
