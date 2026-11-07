@@ -128,7 +128,8 @@ within 30ms. Silero rejects tones, so its test uses a spoken clip, `tests/i-thin
 `talking` is `space` or `hybrid`. In hybrid the mic opens with the session and never
 closes: `audio.onset` keeps the last second of chunks and, once one is louder than
 `VOICE_LEVEL`, sends them as the start of an answer, so the first syllable survives; a
-pause of `hands_free_silence` ends it. Over the partner it takes `CUT_IN_LEVEL` for two
+pause of `hands_free_silence` ends it. Both are only defaults: the start screen (`/models`) offers them
+for one session, sent in the socket's opening message (`app.talking`), never saved. Over the partner it takes `CUT_IN_LEVEL` for two
 chunks in a row, because their echo is what the mic hears most (headphones are the real
 fix; `echoCancellation` is on). The recording no longer starts when they stopped, so the
 page sends `began`, seconds from the end of their last sentence to the recording's

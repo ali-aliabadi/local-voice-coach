@@ -73,13 +73,16 @@ export async function render(node, _params, query) {
   });
   const fresh = query.get("mode");
   if (fresh) keepLast(mode, backend);
-  connect(mode, backend, fresh ? null : saved?.session, Number(query.get("goal")) || 0);
+  // this session's way of talking, from the start screen; a reload keeps it
+  const talking = fresh ? { talking: query.get("talking"), silence: query.get("silence") }
+    : saved?.talking;
+  connect(mode, backend, fresh ? null : saved?.session, Number(query.get("goal")) || 0, talking);
   get("/api/progress").then(({ totals }) => { lifetime = totals.answers ? totals : null; });
 }
 
 export const leave = () => close();
 
-function connect(mode, backend, resume, goalMinutes) {
+function connect(mode, backend, resume, goalMinutes, talking) {
   session = resume || null;
   answered = 0;
   parts = [];
@@ -88,7 +91,7 @@ function connect(mode, backend, resume, goalMinutes) {
   socket = new WebSocket(`${scheme}://${location.host}/ws`);
   socket.binaryType = "arraybuffer";
   socket.onopen = () =>
-    socket.send(JSON.stringify({ mode, backend, resume, goal: goalMinutes }));
+    socket.send(JSON.stringify({ mode, backend, resume, goal: goalMinutes, ...talking }));
   socket.onmessage = (e) => {
     if (typeof e.data === "string") handle(JSON.parse(e.data), mode, backend);
     else if (!muted) playback.push(e.data);
@@ -107,7 +110,8 @@ function handle(event, mode, backend) {
       answered = event.answered || 0;
       if (!parts.length) screen.say(`Waiting for the ${event.partner}…`, false);
       detail = `${event.model} · ${event.local ? "on this machine" : "cloud"}`;
-      remember({ mode, backend, session });
+      remember({ mode, backend, session,
+        talking: { talking: event.hybrid ? "hybrid" : "space", silence: event.silence } });
       goal = event.goal || 0;
       stopClock?.();
       stopClock = clock.start({

@@ -31,12 +31,48 @@ export const modes = {
   },
 };
 
+const QUIETS = [1.5, 2, 2.5, 3, 4, 5];  // seconds; Settings' own value joins if not here
+
+/** Chips for one choice; `aria-pressed` marks the one taken. */
+const chips = (name, options, chosen) => options.map(([value, label]) =>
+  `<button class="chip-button" data-${name}="${value}"
+    aria-pressed="${String(value) === String(chosen)}">${label}</button>`).join("");
+
+/** How this session listens, prefilled from Settings. A choice here lasts one session:
+ * it rides in the link to /practice and is never saved, so Settings keeps the default. */
+function talkingChoice(root, form) {
+  const value = (key) => form.find((f) => f.key === key)?.value;
+  const chosen = { talking: value("talking") || "space", silence: Number(value("hands_free_silence")) || 3 };
+  const quiets = [...new Set([...QUIETS, chosen.silence])].sort((a, b) => a - b);
+  const draw = () => {
+    root.querySelector("#talking").innerHTML = `
+      <fieldset class="goals"><legend>Talking, this session</legend>
+        ${chips("talking", [["space", "tap to talk"], ["hybrid", "hands-free"]], chosen.talking)}
+      </fieldset>
+      ${chosen.talking === "hybrid" ? `<fieldset class="goals">
+        <legend>Hands-free: quiet before your answer ends</legend>
+        ${chips("silence", quiets.map((q) => [q, `${q}s`]), chosen.silence)}
+      </fieldset>` : ""}`;
+    root.querySelectorAll("[data-talking]").forEach((b) => b.addEventListener("click", () => {
+      chosen.talking = b.dataset.talking;
+      draw();
+    }));
+    root.querySelectorAll("[data-silence]").forEach((b) => b.addEventListener("click", () => {
+      chosen.silence = Number(b.dataset.silence);
+      draw();
+    }));
+  };
+  draw();
+  return () => `&talking=${chosen.talking}&silence=${chosen.silence}`;
+}
+
 export const models = {
   async render(root, _params, query) {
     const mode = query.get("mode") || "talk";
     const list = await get("/api/modes");
     const chosen = list.find((m) => m.name === mode) || list[0];
-    const data = await get(`/api/backends?role=${chosen.endpoint}`);
+    const [data, form] = await Promise.all([
+      get(`/api/backends?role=${chosen.endpoint}`), get("/api/settings")]);
 
     root.innerHTML = `
       <p class="crumbs"><a href="/modes">mode</a> › <b>${mode}</b></p>
@@ -45,6 +81,7 @@ export const models = {
         ${GOALS.map((g) => `<button class="chip-button" data-goal="${g}"
           aria-pressed="${g === lastGoal()}">${g ? `${g} min` : "no goal"}</button>`).join("")}
       </fieldset>
+      <div id="talking"></div>
       <div class="table">
         ${data.backends.map((b) => {
           const yours = b.samples
@@ -64,14 +101,15 @@ export const models = {
         : `Nothing reachable: no internet, and LM Studio is not serving a usable model.
            Add an API key in <a href="/settings">settings</a>, or start LM Studio.`}</p>`;
 
-    root.querySelectorAll(".chip-button").forEach((button) =>
+    const talking = talkingChoice(root, form);
+    root.querySelectorAll("[data-goal]").forEach((button) =>
       button.addEventListener("click", () => {
         keepGoal(Number(button.dataset.goal));
-        root.querySelectorAll(".chip-button").forEach((b) =>
+        root.querySelectorAll("[data-goal]").forEach((b) =>
           b.setAttribute("aria-pressed", String(b === button)));
       }));
     root.querySelectorAll(".pick").forEach((button) =>
       button.addEventListener("click", () =>
-        go(`/practice?mode=${mode}&backend=${button.dataset.key}&goal=${lastGoal()}`)));
+        go(`/practice?mode=${mode}&backend=${button.dataset.key}&goal=${lastGoal()}${talking()}`)));
   },
 };

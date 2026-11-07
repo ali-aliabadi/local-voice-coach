@@ -11,9 +11,10 @@ warnings.filterwarnings("ignore", message="Using `httpx`")  # starlette's own tr
 from starlette.testclient import TestClient  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
-from coach import backends, documents  # noqa: E402
+from coach import backends, documents, settings  # noqa: E402
 from coach.modes import discover, state  # noqa: E402
 from coach.server import api  # noqa: E402
+from coach.server.app import talking  # noqa: E402
 from coach.server.guard import MIDDLEWARE  # noqa: E402
 
 HERE, EVIL = "http://127.0.0.1:8000", "https://evil.example"
@@ -112,3 +113,14 @@ def test_an_upload_comes_back_as_text_to_check_and_is_not_kept(name, body, statu
     assert response.status_code == status
     assert key in response.json()
     assert not TestClient(Starlette(routes=api.ROUTES)).get("/api/profile").json()["resume"]
+
+
+def test_the_start_screen_chooses_how_this_session_listens_and_settings_stay_put():
+    settings.set("talking", "space")
+    settings.set("hands_free_silence", "3.0")
+    assert talking({}) == (False, 3.0)  # nothing chosen: the defaults in Settings
+    assert talking({"talking": "hybrid", "silence": 2}) == (True, 2.0)
+    assert settings.get("talking") == "space"  # a choice for one session is not saved
+    assert talking({"talking": "shout", "silence": "soon"}) == (False, 3.0)
+    assert talking({"talking": "hybrid", "silence": 99}) == (True, 15.0)
+    assert talking({"silence": float("nan")}) == (False, 3.0)

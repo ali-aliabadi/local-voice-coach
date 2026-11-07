@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import math
 import pathlib
 import signal
 from collections.abc import AsyncIterator
@@ -28,6 +29,22 @@ async def page(_request: Request) -> FileResponse:
     return FileResponse(WEB / "index.html")
 
 
+def talking(opening: dict) -> tuple[bool, float]:
+    """How this session listens: hybrid or not, and the quiet that ends an answer. The start
+    screen's choice wins for this session only; Settings holds the default and is never
+    written, so trying hybrid once does not change tomorrow's session."""
+    choice = opening.get("talking")
+    if choice not in settings.SPEC["talking"].choices:
+        choice = settings.get("talking")
+    try:
+        silence = float(opening["silence"])
+    except (KeyError, TypeError, ValueError):
+        silence = float(settings.get("hands_free_silence"))
+    if not math.isfinite(silence):
+        silence = float(settings.get("hands_free_silence"))
+    return choice == "hybrid", min(max(silence, 0.5), 15.0)
+
+
 async def websocket_session(websocket: WebSocket) -> None:
     """One connection, one session, one mode loop."""
     await websocket.accept()
@@ -41,6 +58,7 @@ async def websocket_session(websocket: WebSocket) -> None:
         session = (resumed and store.resume(int(resumed))) or store.start(
             opening["mode"], backend.key, endpoint.model, opening.get("goal")
         )
+        hybrid, silence = talking(opening)
         io = BrowserIO(websocket, models.voice(), models.transcriber(), session)
         await io.send(
             type="ready",
@@ -55,8 +73,8 @@ async def websocket_session(websocket: WebSocket) -> None:
             goal=store.goal(session),
             answers=history.answers(session),
             so_far=history.so_far(session),
-            hybrid=settings.get("talking") == "hybrid",
-            silence=settings.get("hands_free_silence"),
+            hybrid=hybrid,
+            silence=silence,
         )
         await mode.run(endpoint, io)
     except SessionClosed:
