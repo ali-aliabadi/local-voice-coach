@@ -1,61 +1,5 @@
-/* Calm and minimal: generous space, one accent, soft type.
+/* Calm and minimal: generous space, one accent, soft type. Tokens are in tokens.css.
    The user is already nervous. The interface should not add to it. */
-
-/* Sky blue, validated rather than eyeballed: every pair clears the CVD separation and
-   contrast checks in both modes. Accent/warn are blue and orange on purpose - the one
-   pair that stays distinct for every kind of colour blindness. */
-:root {
-  --bg: #f4f9fd;
-  --surface: #ffffff;
-  --ink: #16232f;
-  --muted: #5c7285;
-  --line: #dde8f1;
-  --accent: #1c6fbe;
-  --accent-soft: #e4f0fb;
-  --good: #067d5f;
-  --warn: #b5501f;
-  --goal: #dbeaf8;          /* the target band behind a trend line */
-  --quiet: #e8eff5;         /* silence before you started */
-  --gap: #fae7da;           /* a pause mid-answer */
-  --radius: 14px;
-  --space: 1.5rem;
-  color-scheme: light dark;
-}
-
-/* Cool and open rather than near-black: this is read for an hour at a time. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #172029;
-    --surface: #1f2b36;
-    --ink: #e3edf6;
-    --muted: #92a8ba;
-    --line: #2f3e4d;
-    --accent: #4a97d4;
-    --accent-soft: #1c3040;
-    --good: #2d9d82;
-    --warn: #c8794a;
-    --goal: #1d3243;
-    --quiet: #26323e;
-    --gap: #382e26;
-  }
-}
-
-/* Same values again for an explicit choice, so the toggle wins over the system in both
-   directions. Plain CSS cannot share them without a preprocessor. */
-:root[data-theme="dark"] {
-  --bg: #172029;
-  --surface: #1f2b36;
-  --ink: #e3edf6;
-  --muted: #92a8ba;
-  --line: #2f3e4d;
-  --accent: #4a97d4;
-  --accent-soft: #1c3040;
-  --good: #2d9d82;
-  --warn: #c8794a;
-  --goal: #1d3243;
-  --quiet: #26323e;
-  --gap: #382e26;
-}
 
 * { box-sizing: border-box; }
 
@@ -64,33 +8,43 @@ body {
   background: var(--bg);
   color: var(--ink);
   font: 16px/1.65 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
   padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
 }
 
+/* An app bar, as Sonnat's: a surface with a shadow, the pages as a tab bar under it. */
 body > header {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1.25rem;
-  padding: 1rem clamp(1rem, 5vw, 3rem);
-  border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0 1.25rem;
+  padding: 0 clamp(1rem, 5vw, 3rem); padding-top: env(safe-area-inset-top, 0);
+  background: var(--surface); box-shadow: var(--shadow);
 }
-nav { display: flex; gap: 1.25rem; margin-left: auto; }
+nav { display: flex; gap: 0.25rem; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+nav::-webkit-scrollbar { display: none; }
 body > header a {
-  color: var(--muted); text-decoration: none;
-  border-bottom: 1px solid transparent; padding-bottom: 1px;
+  color: var(--muted); text-decoration: none; white-space: nowrap;
+  border-bottom: 2px solid transparent; padding: 0.8rem 0.5rem 0.7rem; font-weight: 500;
+  font-size: 0.92rem;
 }
 body > header a:hover { color: var(--ink); }
-body > header a.on { color: var(--ink); border-bottom-color: var(--accent); }
-.brand { font-weight: 550; }
-.machine { color: var(--muted); font-size: 0.8rem; }
+body > header a.on { color: var(--accent); border-bottom-color: var(--accent); }
+body > header a.brand { font-weight: 700; color: var(--ink); padding-left: 0; font-size: 1.05rem; }
+.machine { color: var(--muted); font-size: 0.75rem; line-height: 1.4; }
 #telegram.warn { color: var(--warn); }
-@media (max-width: 60rem) { .machine { order: 1; flex-basis: 100%; } }
+@media (max-width: 60rem) {
+  .machine { order: 1; flex-basis: 100%; padding-bottom: 0.6rem; }
+  nav { order: 0; flex-basis: 100%; margin: 0 -0.5rem;
+    mask-image: linear-gradient(to right, #000 88%, transparent); }
+  body > header a.brand { padding: 0.9rem 0 0.1rem; }
+}
 
 #app {
   display: block; max-width: 46rem; margin: 0 auto;
   padding: clamp(2rem, 6vh, 4rem) clamp(1rem, 5vw, 2rem) 6rem;
 }
 
-h1 { font-size: 1.5rem; font-weight: 550; letter-spacing: -0.01em; margin: 0 0 1.75rem; }
-h2 { font-size: 1.05rem; font-weight: 550; margin: 2.5rem 0 1rem; }
+h1 { font-size: 1.75rem; font-weight: 700; line-height: 1.3; letter-spacing: -0.01em; margin: 0 0 1.5rem; }
+h2 { font-size: 1.125rem; font-weight: 700; line-height: 1.5; margin: 2.5rem 0 1rem; }
 hr { border: 0; border-top: 1px solid var(--line); margin: 3rem 0 2rem; }
 
 button { font: inherit; cursor: pointer; }
@@ -102,29 +56,34 @@ button { font: inherit; cursor: pointer; }
 }
 .link:hover { color: var(--ink); border-bottom-color: var(--line); }
 .more { display: block; margin: 1.25rem auto 0; }
-.primary {
-  background: var(--accent); color: #fff; border: 0;
-  border-radius: 9px; padding: 0.6rem 1.4rem;
+/* Sonnat's three buttons: filled (one per screen), outlined, and text (.link). */
+.primary, .danger, .ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  min-height: var(--control); padding: 0 1.25rem; border-radius: var(--r-sm);
+  font-weight: 500; font-size: 0.95rem; text-decoration: none; line-height: 1.2;
+  transition: background .15s, border-color .15s, box-shadow .15s;
 }
-.danger {
-  background: none; border: 1px solid var(--line); color: var(--warn);
-  border-radius: 9px; padding: 0.55rem 1.1rem;
-}
+.primary { background: var(--accent); color: var(--on-accent); border: 0; }
+.primary:hover { box-shadow: var(--shadow); }
+.primary:disabled { opacity: 0.4; box-shadow: none; }
+.ghost { background: none; border: 1px solid var(--line); color: var(--accent); }
+.ghost:hover { border-color: var(--accent); }
+.danger { background: none; border: 1px solid var(--line); color: var(--warn); }
 .danger:hover { border-color: var(--warn); }
 
 /* ---- setup ---- */
 .cards { display: grid; gap: 0.75rem; }
 .card {
   text-align: left; background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--radius); padding: 1.1rem 1.25rem; width: 100%;
+  border-radius: var(--radius); padding: 1rem 1.25rem; width: 100%; box-shadow: var(--shadow);
   transition: border-color .15s, transform .15s;
 }
 .card:hover { border-color: var(--accent); transform: translateY(-1px); }
 .card[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .card { display: block; text-decoration: none; color: inherit; }
-.card b { font-weight: 550; display: block; }
+.card b { font-weight: 700; display: block; }
 .card span { color: var(--muted); font-size: 0.9rem; }
-.card.hero { padding: 1.6rem 1.5rem; border-color: var(--accent); background: var(--accent-soft); }
+.card.hero { padding: 1.5rem; border-radius: var(--r-lg); border-color: var(--accent); background: var(--accent-soft); }
 .card.hero b { font-size: 1.35rem; }
 .card.locked { opacity: 0.55; cursor: not-allowed; }
 .card.locked:hover { border-color: var(--line); transform: none; }
@@ -134,18 +93,19 @@ button { font: inherit; cursor: pointer; }
 .pick {
   display: grid; gap: 0.15rem 1rem; text-align: left; width: 100%;
   grid-template-columns: 1fr auto; align-items: baseline;
-  background: var(--surface); border: 1px solid var(--line);
-  border-radius: 11px; padding: 0.8rem 1rem;
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
+  border-radius: var(--radius); padding: 0.9rem 1rem;
 }
 .pick { text-decoration: none; color: inherit; }
 .pick:hover:not([disabled]) { border-color: var(--accent); }
 .pick[disabled] { opacity: 0.45; cursor: not-allowed; }
-.pick b { font-weight: 550; }
+.pick b { font-weight: 700; }
 .pick .meta { color: var(--muted); font-size: 0.85rem; grid-column: 1 / -1; }
 .pick .cost { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .tag {
-  font-size: 0.72rem; border: 1px solid var(--line); border-radius: 99px;
-  padding: 0.05rem 0.5rem; color: var(--muted); margin-left: 0.4rem;
+  font-size: 0.72rem; border: 1px solid var(--line); border-radius: var(--pill);
+  padding: 0.05rem 0.5rem; color: var(--muted); margin-left: 0.4rem; white-space: nowrap;
+  font-weight: 500;
 }
 .tag.free { color: var(--accent); border-color: var(--accent); }
 
@@ -156,8 +116,8 @@ button { font: inherit; cursor: pointer; }
 }
 .stage { display: grid; justify-items: center; gap: 0.9rem; }
 .mic {
-  width: 78px; height: 78px; border-radius: 50%;
-  border: 1px solid var(--line); background: var(--surface);
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow);
   transition: transform .15s, background .2s, border-color .2s;
 }
 .mic::after {
@@ -172,15 +132,15 @@ button { font: inherit; cursor: pointer; }
 .topline { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
 .topline p { margin: 0; }
 .clock { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.9rem; }
-.goalbar { height: 3px; background: var(--line); border-radius: 2px; margin-top: 0.6rem; }
+.goalbar { height: 4px; background: var(--line); border-radius: var(--pill); margin-top: 0.6rem; }
 .goalbar i { display: block; height: 100%; width: 0; background: var(--accent);
-  border-radius: 2px; transition: width 1s linear; }
+  border-radius: var(--pill); transition: width 1s linear; }
 .question.veiled { filter: blur(7px); user-select: none; }
 .listen-tools { text-align: center; margin: -2.5rem auto 2.5rem; font-size: 0.85rem;
   color: var(--muted); }
 .session { margin-top: clamp(2rem, 6vh, 3rem); transition: opacity .3s; }
 .session.dim { opacity: 0.25; }
-.session h2, #result h2 { font-size: 0.8rem; font-weight: 550; color: var(--muted);
+.session h2, #result h2 { font-size: 0.75rem; font-weight: 700; color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 1rem; }
 .spark { display: block; width: 100%; max-width: 8rem; height: 26px; margin-top: 0.5rem; }
 .notice.good { color: var(--good); }
@@ -194,16 +154,21 @@ button { font: inherit; cursor: pointer; }
 /* ---- goal picker ---- */
 .goals { border: 0; padding: 0; margin: 0 0 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .goals legend { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.5rem; padding: 0; }
+/* Sonnat's choice chip: outlined, filled with the accent once chosen. */
 .chip-button { background: var(--surface); color: var(--ink); border: 1px solid var(--line);
-  border-radius: 99px; padding: 0.35rem 0.9rem; font-size: 0.85rem; }
-.chip-button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  border-radius: var(--pill); min-height: 2rem; padding: 0 0.9rem; font-size: 0.85rem; font-weight: 500; }
+.chip-button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent);
+  color: var(--on-accent); }
 #level { opacity: 0; transition: opacity .2s; }
 #level.on { opacity: 1; }
 
 /* ---- result ---- */
 #result { margin-top: clamp(2.5rem, 8vh, 4rem); border-top: 1px solid var(--line); padding-top: 1.75rem; }
-.counts { display: flex; flex-wrap: wrap; gap: 2.5rem; margin-bottom: 2.5rem; }
-.count b { font-size: 2rem; font-weight: 550; display: block; line-height: 1.1; }
+.counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem;
+  margin-bottom: 2rem; }
+.count { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 0.9rem 1rem; }
+.count b { font-size: 2rem; font-weight: 700; display: block; line-height: 1.1; }
 .count span { color: var(--muted); font-size: 0.8rem; }
 .transcript { line-height: 2; margin: 1.25rem 0; }
 .filler {
@@ -216,22 +181,28 @@ audio { height: 34px; }
 .critique { white-space: pre-wrap; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
 .notice { color: var(--warn); max-width: 34rem; text-align: center; margin: 1rem auto 0; }
 .notice button {
-  display: block; margin: 0.75rem auto 0; background: none; color: var(--ink);
-  border: 1px solid var(--line); border-radius: 9px; padding: 0.45rem 1.2rem;
+  display: block; margin: 0.75rem auto 0; background: none; color: var(--accent);
+  border: 1px solid var(--line); border-radius: var(--r-sm); min-height: var(--control);
+  padding: 0 1.2rem; font-weight: 500;
 }
 .notice button:hover { border-color: var(--accent); }
 .end { display: block; margin: 4rem auto 0; }
 
 /* ---- settings ---- */
 fieldset { border: 0; padding: 0; margin: 0 0 2.5rem; }
-legend { font-weight: 550; padding: 0; margin-bottom: 0.9rem; }
+legend { font-weight: 700; padding: 0; margin-bottom: 0.9rem; }
 label { display: block; margin-bottom: 1.25rem; }
-label > span { display: block; font-size: 0.9rem; margin-bottom: 0.3rem; }
+label > span { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.35rem; }
 label small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
 input, select, textarea {
-  font: inherit; width: 100%; padding: 0.5rem 0.7rem; color: var(--ink);
-  background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
+  font: inherit; width: 100%; min-height: var(--control); padding: 0.45rem 0.75rem; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+  transition: border-color .15s, box-shadow .15s;
 }
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent);
+}
+input[type="checkbox"], input[type="radio"] { min-height: 0; accent-color: var(--accent); }
 input[type="number"] { max-width: 9rem; }
 textarea { min-height: 8.5rem; line-height: 1.6; resize: vertical; }
 .saved { color: var(--accent); font-size: 0.85rem; }
@@ -270,7 +241,7 @@ svg { display: block; max-width: 100%; }
 .steps li::before { content: "○"; position: absolute; left: 0; }
 .steps li.done { color: var(--ink); }
 .steps li.done::before { content: "✓"; color: var(--good); }
-.steps li.now { color: var(--ink); font-weight: 550; }
+.steps li.now { color: var(--ink); font-weight: 500; }
 .steps li.now::before { content: "●"; color: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
 .steps li span { display: block; font-weight: 400; color: var(--muted); font-size: 0.88rem; }
 @keyframes pulse { 50% { opacity: 0.25; } }
